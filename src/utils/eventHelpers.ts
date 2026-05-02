@@ -17,6 +17,8 @@ import type {
   RegisterEventRequest,
   StreamEventRequest,
 } from "../gen/event/v1/event_pb";
+import { toJson } from "@bufbuild/protobuf";
+import { RegisterEventRequestSchema, StreamEventRequestSchema } from "../gen/event/v1/event_pb";
 
 /**
  * Extract API key ID from the request context
@@ -37,7 +39,8 @@ export async function validateAndParseRegisterEvent(
   req: RegisterEventRequest
 ): Promise<RegisterEventSchemaType> {
   try {
-    return await registerEventSchema.parseAsync(req);
+    const json = toJson(RegisterEventRequestSchema, req);
+    return await registerEventSchema.parseAsync(json);
   } catch (error) {
     throw convertValidationError(error);
   }
@@ -50,7 +53,8 @@ export async function validateAndParseStreamEvent(
   req: StreamEventRequest
 ): Promise<StreamEventSchemaType> {
   try {
-    return await streamEventSchema.parseAsync(req);
+    const json = toJson(StreamEventRequestSchema, req);
+    return await streamEventSchema.parseAsync(json);
   } catch (error) {
     throw convertValidationError(error);
   }

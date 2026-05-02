@@ -1,7 +1,5 @@
-import {
-  CreateAPIKeyRequest,
-  CreateAPIKeyResponse,
-} from "../../../gen/auth/v1/auth_pb";
+import type { CreateAPIKeyRequest, CreateAPIKeyResponse } from "../../../gen/auth/v1/auth_pb";
+import { CreateAPIKeyResponseSchema, CreateAPIKeyRequestSchema } from "../../../gen/auth/v1/auth_pb";
 import { createAPIKeySchema } from "../../../zod/apikey";
 import { APIKeyError } from "../../../errors/apikey";
 import { AuthError } from "../../../errors/auth";
@@ -13,6 +11,8 @@ import type { HandlerContext } from "@connectrpc/connect";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import { hashAPIKey } from "../../../utils/hashAPIKey";
+import { create } from "@bufbuild/protobuf";
+import { toJson } from "@bufbuild/protobuf";
 
 export async function createAPIKey(
   req: CreateAPIKeyRequest,
@@ -62,7 +62,7 @@ export async function createAPIKey(
     throw APIKeyError.creationFailed("Storage returned no ID");
   }
 
-  return new CreateAPIKeyResponse({
+  return create(CreateAPIKeyResponseSchema, {
     apiKeyId: keyEventData.id,
     apiKey: apiKey,
     name: validatedData.name,
@@ -73,7 +73,8 @@ export async function createAPIKey(
 
 function validateRequest(req: CreateAPIKeyRequest) {
   try {
-    return createAPIKeySchema.parse(req);
+    const json = toJson(CreateAPIKeyRequestSchema, req);
+    return createAPIKeySchema.parse(json);
   } catch (error) {
     if (error instanceof ZodError) {
       const issues = error.issues

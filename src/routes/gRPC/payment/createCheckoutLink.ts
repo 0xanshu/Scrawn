@@ -1,7 +1,5 @@
-import {
-  CreateCheckoutLinkRequest,
-  CreateCheckoutLinkResponse,
-} from "../../../gen/payment/v1/payment_pb";
+import type { CreateCheckoutLinkRequest, CreateCheckoutLinkResponse } from "../../../gen/payment/v1/payment_pb";
+import { CreateCheckoutLinkResponseSchema, CreateCheckoutLinkRequestSchema } from "../../../gen/payment/v1/payment_pb";
 import {
   createCheckoutLinkSchema,
   type CreateCheckoutLinkSchemaType,
@@ -17,6 +15,8 @@ import {
 import { StorageAdapterFactory } from "../../../factory";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
+import { create } from "@bufbuild/protobuf";
+import { toJson } from "@bufbuild/protobuf";
 import type { UserId } from "../../../config/identifiers";
 
 export async function createCheckoutLink(
@@ -52,7 +52,7 @@ export async function createCheckoutLink(
     apiKeyId
   );
 
-  return new CreateCheckoutLinkResponse({
+  return create(CreateCheckoutLinkResponseSchema, {
     checkoutLink: checkoutUrl,
   });
 }
@@ -79,7 +79,8 @@ function validateRequest(
   req: CreateCheckoutLinkRequest
 ): CreateCheckoutLinkSchemaType {
   try {
-    return createCheckoutLinkSchema.parse(req);
+    const json = toJson(CreateCheckoutLinkRequestSchema, req);
+    return createCheckoutLinkSchema.parse(json);
   } catch (error) {
     if (error instanceof ZodError) {
       const issues = error.issues

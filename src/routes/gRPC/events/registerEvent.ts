@@ -1,8 +1,7 @@
-import {
-  RegisterEventRequest,
-  RegisterEventResponse,
-} from "../../../gen/event/v1/event_pb";
+import type { RegisterEventRequest, RegisterEventResponse } from "../../../gen/event/v1/event_pb";
+import { RegisterEventResponseSchema } from "../../../gen/event/v1/event_pb";
 import type { HandlerContext } from "@connectrpc/connect";
+import { create } from "@bufbuild/protobuf";
 import { wideEventContextKey } from "../../../context/requestContext";
 import {
   extractApiKeyFromContext,
@@ -33,7 +32,7 @@ export async function registerEvent(
   // Store the event
   await storeEvent(event, apiKeyId);
 
-  return new RegisterEventResponse({
+  return create(RegisterEventResponseSchema, {
     random: "Event stored successfully",
   });
 }
