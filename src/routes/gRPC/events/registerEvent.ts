@@ -1,10 +1,7 @@
-import type {
-  RegisterEventRequest,
-  RegisterEventResponse,
-} from "../../../gen/event/v1/event_pb";
+import type { RegisterEventRequest, RegisterEventResponse } from "../../../gen/event/v1/event_pb";
 import { RegisterEventResponseSchema } from "../../../gen/event/v1/event_pb";
-import { create } from "@bufbuild/protobuf";
 import type { HandlerContext } from "@connectrpc/connect";
+import { create } from "@bufbuild/protobuf";
 import { wideEventContextKey } from "../../../context/requestContext";
 import {
   extractApiKeyFromContext,

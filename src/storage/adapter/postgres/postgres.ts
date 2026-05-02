@@ -10,6 +10,7 @@ import {
   handlePriceRequestSdkCall,
   handleAddAiTokenUsage,
   handlePriceRequestAiTokenUsage,
+  handleAddMetadata,
 } from "./handlers";
 import type {
   SerializedEvent,
@@ -70,6 +71,10 @@ export class PostgresAdapter implements StorageAdapter {
 
       case "PAYMENT": {
         return await handleAddPayment(event_data, apiKeyId);
+      }
+
+      case "METADATA": {
+        return await handleAddMetadata(event_data);
       }
 
       default: {

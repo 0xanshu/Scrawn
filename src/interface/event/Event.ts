@@ -27,6 +27,11 @@ export type PaymentEventData = {
   creditAmount: number;
 };
 
+export type MetadataEventData = {
+  payment_cron: string;
+  payment_webhook: string | null;
+};
+
 /**
  * Event kind discriminator
  */
@@ -35,6 +40,7 @@ export type EventKind =
   | "AI_TOKEN_USAGE"
   | "ADD_KEY"
   | "PAYMENT"
+  | "METADATA";
 
 /**
  * Mapping of event kinds to their data structures
@@ -44,6 +50,7 @@ export type EventDataMap = {
   AI_TOKEN_USAGE: AITokenUsageEventData;
   ADD_KEY: AddKeyEventData;
   PAYMENT: PaymentEventData;
+  METADATA: MetadataEventData;
 };
 
 /**
@@ -75,6 +82,7 @@ type SqlRecordMap = {
   SDK_CALL: SqlRecordWithUserId<"SDK_CALL">;
   AI_TOKEN_USAGE: SqlRecordWithUserId<"AI_TOKEN_USAGE">;
   PAYMENT: SqlRecordWithUserId<"PAYMENT">;
+  METADATA: BaseSqlRecord<"METADATA">;
 };
 
 /**
@@ -94,7 +102,7 @@ export type SerializedEvent<K extends EventKind = EventKind> = {
  */
 export interface Event<K extends EventKind = EventKind> {
   readonly type: K;
-  readonly reported_timestamp: DateTime;
+  readonly ingested_timestamp: DateTime;
   readonly data: EventData<K>;
 
   serialize(): SerializedEvent<K>;
@@ -105,6 +113,7 @@ export interface Event<K extends EventKind = EventKind> {
  */
 export interface SDKCallEvent extends Event<"SDK_CALL"> {
   readonly userId: UserId;
+  readonly reportedTimestamp: DateTime;
 }
 
 /**
@@ -112,6 +121,7 @@ export interface SDKCallEvent extends Event<"SDK_CALL"> {
  */
 export interface AITokenUsageEvent extends Event<"AI_TOKEN_USAGE"> {
   readonly userId: UserId;
+  readonly reportedTimestamp: DateTime;
 }
 
 /**
@@ -125,3 +135,8 @@ export interface AddKeyEvent extends Event<"ADD_KEY"> {}
 export interface PaymentEvent extends Event<"PAYMENT"> {
   readonly userId: UserId;
 }
+
+/**
+ * Metadata Event
+ */
+export interface MetadataEvent extends Event<"METADATA"> {}

@@ -9,9 +9,16 @@ import {
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 import { USER_ID_CONFIG } from "../../../config/identifiers";
+import { DateTime } from "luxon";
 
 export const usersTable = pgTable("users", {
   id: USER_ID_CONFIG.dbType("id").primaryKey(),
+  last_billed_timestamp: timestamp("last_billed_timestamp", {
+    withTimezone: true,
+    mode: "string",
+  })
+    .default(DateTime.utc(1).toString())
+    .notNull(),
 });
 
 export const usersRelation = relations(usersTable, ({ many }) => ({
@@ -57,6 +64,12 @@ export const eventsTable = pgTable("events", {
     withTimezone: true,
     mode: "string",
   }).notNull(),
+  ingested_timestamp: timestamp("ingested_timestamp", {
+    withTimezone: true,
+    mode: "string",
+  })
+    .defaultNow()
+    .notNull(),
   userId: USER_ID_CONFIG.dbType("user_id")
     .references(() => usersTable.id)
     .notNull(),
@@ -123,7 +136,7 @@ export const paymentEventsRelation = relations(
 
 export const tagsTable = pgTable("tags", {
   id: uuid("id").primaryKey().defaultRandom(),
-  tag: text("key").notNull(),
+  key: text("key").notNull(),
   amount: integer("amount").notNull(),
 });
 
@@ -147,3 +160,9 @@ export const aiTokenUsageEventsRelation = relations(
     }),
   })
 );
+
+export const metadataTable = pgTable("metadata", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  payment_cron: text("payment_cron").notNull(),
+  payment_webhook: text("payment_webhook"),
+});

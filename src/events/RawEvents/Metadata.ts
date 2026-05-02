@@ -1,11 +1,14 @@
-import type { AddKeyEvent, AddKeyEventData } from "../../interface/event/Event";
+import type {
+  MetadataEvent,
+  MetadataEventData,
+} from "../../interface/event/Event";
 import { DateTime } from "luxon";
 
-export class AddKey implements AddKeyEvent {
+export class Metadata implements MetadataEvent {
   public ingested_timestamp: DateTime;
-  public readonly type = "ADD_KEY" as const;
+  public readonly type = "METADATA" as const;
 
-  constructor(public data: AddKeyEventData) {
+  constructor(public data: MetadataEventData) {
     this.ingested_timestamp = DateTime.utc();
   }
 
