@@ -1,5 +1,11 @@
-import type { CreateCheckoutLinkRequest, CreateCheckoutLinkResponse } from "../../../gen/payment/v1/payment_pb";
-import { CreateCheckoutLinkResponseSchema, CreateCheckoutLinkRequestSchema } from "../../../gen/payment/v1/payment_pb";
+import type {
+  CreateCheckoutLinkRequest,
+  CreateCheckoutLinkResponse,
+} from "../../../gen/payment/v1/payment_pb";
+import {
+  CreateCheckoutLinkResponseSchema,
+  CreateCheckoutLinkRequestSchema,
+} from "../../../gen/payment/v1/payment_pb";
 import {
   createCheckoutLinkSchema,
   type CreateCheckoutLinkSchemaType,
@@ -8,16 +14,23 @@ import { PaymentError } from "../../../errors/payment";
 import { AuthError } from "../../../errors/auth";
 import { ZodError } from "zod";
 import type { HandlerContext } from "@connectrpc/connect";
+import type {
+  PaymentProviderConfig,
+  CheckoutParams,
+} from "./paymentProvider.ts";
 import {
-  lemonSqueezySetup,
-  createCheckout,
-} from "@lemonsqueezy/lemonsqueezy.js";
+  getPaymentProviderConfig,
+  createProviderCheckout,
+  type CheckoutResult,
+} from "./paymentProvider.ts";
 import { StorageAdapterFactory } from "../../../factory";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import { create } from "@bufbuild/protobuf";
 import { toJson } from "@bufbuild/protobuf";
 import type { UserId } from "../../../config/identifiers";
+import { DateTime } from "luxon";
+import { handleAddSession } from "../../../storage/adapter/postgres/handlers";
 
 export async function createCheckoutLink(
   req: CreateCheckoutLinkRequest,
@@ -31,48 +44,42 @@ export async function createCheckoutLink(
   }
 
   // Validate environment configuration
-  const config = getConfig();
+  const config = getPaymentProviderConfig();
 
   // Validate the incoming request
   const validatedData = validateRequest(req);
   wideEventBuilder?.setUser(validatedData.userId);
 
-  // Configure Lemon Squeezy SDK
-  lemonSqueezySetup({ apiKey: config.apiKey });
+  // Payment provider is configured via paymentProvider.ts
 
   // Get custom price from storage
-  const custom_price = await calculatePrice(validatedData.userId);
+  const beforeTimestamp = DateTime.utc();
+  const custom_price = await calculatePrice(
+    validatedData.userId,
+    beforeTimestamp
+  );
   wideEventBuilder?.setPaymentContext({ priceAmount: custom_price });
 
   // Create checkout session
-  const checkoutUrl = await createCheckoutSession(
+  const checkoutResult = await createCheckoutSession(
     config,
     custom_price,
     validatedData.userId,
-    apiKeyId
+    apiKeyId,
+    beforeTimestamp
   );
 
+  // Add session to database
+  const sessionResult = await handleAddSession(
+    validatedData.userId,
+    checkoutResult.sessionId,
+    beforeTimestamp
+  );
+  wideEventBuilder?.setPaymentContext({ sessionId: sessionResult.id });
+
   return create(CreateCheckoutLinkResponseSchema, {
-    checkoutLink: checkoutUrl,
+    checkoutLink: checkoutResult.checkoutUrl,
   });
-}
-
-interface LemonSqueezyConfig {
-  apiKey: string;
-  storeId: string;
-  variantId: string;
-}
-
-function getConfig(): LemonSqueezyConfig {
-  const apiKey = process.env.LEMON_SQUEEZY_API_KEY;
-  const storeId = process.env.LEMON_SQUEEZY_STORE_ID;
-  const variantId = process.env.LEMON_SQUEEZY_VARIANT_ID;
-
-  if (!apiKey) throw PaymentError.missingApiKey();
-  if (!storeId) throw PaymentError.missingStoreId();
-  if (!variantId) throw PaymentError.missingVariantId();
-
-  return { apiKey, storeId, variantId };
 }
 
 function validateRequest(
@@ -94,7 +101,10 @@ function validateRequest(
   }
 }
 
-async function calculatePrice(userId: UserId): Promise<number> {
+async function calculatePrice(
+  userId: UserId,
+  beforeTimestamp: DateTime
+): Promise<number> {
   const storageAdapter =
     await StorageAdapterFactory.getEventStorageAdapter("PAYMENT");
 
@@ -102,7 +112,7 @@ async function calculatePrice(userId: UserId): Promise<number> {
     throw PaymentError.storageAdapterFailed("Storage adapter not available");
   }
 
-  const price = await storageAdapter.price(userId, "PAYMENT");
+  const price = await storageAdapter.price(userId, "PAYMENT", beforeTimestamp);
 
   if (typeof price !== "number" || isNaN(price) || price < 0) {
     throw PaymentError.priceCalculationFailed(
@@ -115,55 +125,37 @@ async function calculatePrice(userId: UserId): Promise<number> {
 }
 
 async function createCheckoutSession(
-  config: LemonSqueezyConfig,
+  config: PaymentProviderConfig,
   customPrice: number,
   userId: string,
-  apiKeyId: string
-): Promise<string> {
-  const checkoutResponse = await createCheckout(
-    config.storeId,
-    config.variantId,
-    {
-      customPrice,
-      checkoutData: {
-        custom: {
-          user_id: String(userId),
-          api_key_id: String(apiKeyId),
-        },
-      },
-    }
-  );
+  apiKeyId: string,
+  beforeTimestamp: DateTime
+): Promise<CheckoutResult> {
+  const params: CheckoutParams = {
+    customPrice,
+    userId,
+    apiKeyId,
+  };
 
-  if (!checkoutResponse) {
-    throw PaymentError.invalidCheckoutResponse("Response is null");
-  }
-
-  if (checkoutResponse.error) {
-    throw PaymentError.checkoutCreationFailed(
-      checkoutResponse.error?.message || JSON.stringify(checkoutResponse.error)
-    );
-  }
-
-  const checkoutUrl = checkoutResponse.data?.data?.attributes?.url;
+  const checkoutResult = await createProviderCheckout(config, params);
 
   if (
-    !checkoutUrl ||
-    typeof checkoutUrl !== "string" ||
-    checkoutUrl.trim().length === 0
+    !checkoutResult.checkoutUrl ||
+    typeof checkoutResult.checkoutUrl !== "string" ||
+    checkoutResult.checkoutUrl.trim().length === 0
   ) {
     throw PaymentError.invalidCheckoutResponse(
       "No valid checkout URL in response"
     );
   }
 
-  // Validate URL format
   try {
-    new URL(checkoutUrl);
+    new URL(checkoutResult.checkoutUrl);
   } catch {
     throw PaymentError.invalidCheckoutResponse(
-      `Invalid URL format: ${checkoutUrl}`
+      `Invalid URL format: ${checkoutResult.checkoutUrl}`
     );
   }
 
-  return checkoutUrl;
+  return checkoutResult;
 }

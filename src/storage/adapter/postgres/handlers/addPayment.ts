@@ -1,18 +1,17 @@
 import { getPostgresDB } from "../../../db/postgres/db";
-import {
-  usersTable,
-  eventsTable,
-  paymentEventsTable,
-} from "../../../db/postgres/schema";
+import { eventsTable, paymentEventsTable } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import { type SqlRecord } from "../../../../interface/event/Event";
 import { DateTime } from "luxon";
+import { StorageAdapterFactory } from "../../../../factory";
+import { User } from "../../../../events/RawEvents/User";
 
 export async function handleAddPayment(
   event_data: SqlRecord<"PAYMENT">,
   apiKeyId?: string
 ): Promise<{ id: string } | void> {
   const connectionObject = getPostgresDB();
+
 
   try {
     const creditAmount = event_data?.data?.creditAmount;
@@ -23,7 +22,7 @@ export async function handleAddPayment(
       creditAmount === null ||
       typeof creditAmount !== "number" ||
       !Number.isFinite(creditAmount) ||
-      creditAmount <= 0
+      creditAmount < 0
     ) {
       throw StorageError.invalidData(
         `Invalid creditAmount: must be a positive finite number, got ${String(
@@ -33,27 +32,9 @@ export async function handleAddPayment(
     }
 
     await connectionObject.transaction(async (txn) => {
-      // Insert user if not exists
-      try {
-        await txn
-          .insert(usersTable)
-          .values({
-            id: event_data.userId,
-          })
-          .onConflictDoNothing();
-      } catch (e) {
-        if (
-          e instanceof Error &&
-          e.message.includes('Failed query: insert into "users" ("id")')
-        ) {
-          // User already exists, ignore the error
-        } else {
-          throw StorageError.userInsertFailed(
-            event_data.userId,
-            e instanceof Error ? e : new Error(String(e))
-          );
-        }
-      }
+      const adapter = await StorageAdapterFactory.getEventStorageAdapter("USER");
+      const userEvent = new User({ id: event_data.userId });
+      await adapter.add(userEvent.serialize(), "");
 
       // Validate and prepare timestamp
       let reported_timestamp;

@@ -1,40 +1,30 @@
-import crypto from "node:crypto";
-import { lemonSqueezySetup } from "@lemonsqueezy/lemonsqueezy.js";
+import DodoPayments from "dodopayments";
 import { Payment } from "../../events/RawEvents/Payment.ts";
 import { StorageAdapterFactory } from "../../factory/EventStorageAdapterFactory.ts";
 import type { WideEventBuilder } from "../../context/requestContext.ts";
+import { getDodoClient } from "../gRPC/payment/paymentProvider.ts";
+import { getPostgresDB } from "../../storage/db/postgres/db";
+import { usersTable, sessionsTable } from "../../storage/db/postgres/schema";
+import { eq } from "drizzle-orm";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// Initialize Lemon Squeezy SDK if API key is available
-const LEMON_SQUEEZY_API_KEY = process.env.LEMON_SQUEEZY_API_KEY;
-
-if (LEMON_SQUEEZY_API_KEY) {
-  lemonSqueezySetup({
-    apiKey: LEMON_SQUEEZY_API_KEY,
-  });
-}
-
-interface LemonSqueezyWebhookPayload {
-  meta: {
-    event_name: string;
-    custom_data?: {
-      user_id?: string;
-      api_key_id?: string;
-    };
-  };
+interface DodoWebhookPayload {
+  type: string;
+  business_id: string;
+  timestamp: string;
   data: {
-    id: string;
-    type: string;
-    attributes: {
-      store_id: number;
-      customer_id: number;
-      order_number: number;
-      total: number;
-      total_usd: number;
-      status: string;
-      created_at: string;
-      updated_at: string;
+    payload_type: string;
+    payment_id: string;
+    checkout_session_id?: string;
+    total_amount: number;
+    currency: string;
+    status: string;
+    customer_id?: string;
+    customer?: {
+      customer_id: string;
+      email?: string;
+      name?: string;
     };
   };
 }
@@ -44,81 +34,36 @@ interface WebhookResponse {
   body: { message?: string; error?: string };
 }
 
-/**
- * Verifies the webhook signature from Lemon Squeezy
- */
-function verifyWebhookSignature(
-  payload: string,
-  signature: string | undefined,
-  secret: string
-): boolean {
-  if (!signature) {
-    return false;
-  }
-
-  try {
-    const hmac = crypto.createHmac("sha256", secret);
-    hmac.update(payload);
-    const digest = hmac.digest("hex");
-
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Handles the Lemon Squeezy order-created webhook.
- * This handler is designed to work with the HTTP logging middleware,
- * which provides a WideEventBuilder for adding business context.
- */
-export async function handleLemonSqueezyWebhook(
+export async function handleDodoWebhook(
   rawBody: string,
   signature: string | undefined,
+  timestamp: string | undefined,
+  webhookId: string | undefined,
   builder: WideEventBuilder
 ): Promise<WebhookResponse> {
   try {
-    // Read webhook secret at runtime for testability
-    const LEMON_SQUEEZY_WEBHOOK_SECRET =
-      process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
+    const client = getDodoClient();
 
-    if (!LEMON_SQUEEZY_WEBHOOK_SECRET) {
-      builder.setError(500, {
-        type: "ConfigurationError",
-        message: "Webhook secret not configured",
-      });
-      return {
-        statusCode: 500,
-        body: { error: "Webhook secret not configured" },
-      };
-    }
+    const headers: Record<string, string> = {
+      "webhook-id": webhookId || "",
+      "webhook-signature": signature || "",
+      "webhook-timestamp": timestamp || "",
+    };
 
-    const isValid = verifyWebhookSignature(
-      rawBody,
-      signature,
-      LEMON_SQUEEZY_WEBHOOK_SECRET
-    );
-
-    if (!isValid) {
+    let webhookPayload: DodoWebhookPayload;
+    try {
+      webhookPayload = client.webhooks.unwrap(rawBody, {
+        headers,
+      }) as unknown as DodoWebhookPayload;
+    } catch {
       builder.setError(401, {
         type: "AuthenticationError",
-        message: "Invalid signature",
+        message: "Invalid webhook signature",
       });
       return { statusCode: 401, body: { error: "Invalid signature" } };
     }
 
-    let webhookPayload: LemonSqueezyWebhookPayload;
-    try {
-      webhookPayload = JSON.parse(rawBody) as LemonSqueezyWebhookPayload;
-    } catch {
-      builder.setError(400, {
-        type: "ParseError",
-        message: "Invalid JSON payload",
-      });
-      return { statusCode: 400, body: { error: "Invalid JSON payload" } };
-    }
-
-    if (!webhookPayload.meta || !webhookPayload.data?.attributes) {
+    if (!webhookPayload.type || !webhookPayload.data) {
       builder.setError(400, {
         type: "ParseError",
         message: "Invalid webhook payload shape",
@@ -129,59 +74,110 @@ export async function handleLemonSqueezyWebhook(
       };
     }
 
-    // Add webhook event context
     builder.setWebhookContext({
-      webhookEvent: webhookPayload.meta.event_name,
-      orderId: webhookPayload.data.id,
+      webhookEvent: webhookPayload.type,
+      orderId: webhookPayload.data.payment_id,
     });
 
-    // Handle only order-created events
-    if (webhookPayload.meta.event_name !== "order_created") {
+    if (webhookPayload.type !== "payment.succeeded") {
       builder.setSuccess(200);
       builder.addContext({ ignored: true });
       return { statusCode: 200, body: { message: "Event ignored" } };
     }
 
-    // Extract user ID from custom data
-    const userId = webhookPayload.meta.custom_data?.user_id;
-    const apiKeyId = webhookPayload.meta.custom_data?.api_key_id;
+    const { payment_id, checkout_session_id, total_amount, status } =
+      webhookPayload.data;
+    const creditAmount = Math.round(total_amount);
+
+    if (!checkout_session_id) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Missing checkout_session_id in webhook payload",
+      });
+      return {
+        statusCode: 400,
+        body: { error: "Missing checkout_session_id in webhook payload" },
+      };
+    }
+
+    const db = getPostgresDB();
+
+    const sessions = await db
+      .select({
+        id: sessionsTable.id,
+        userId: sessionsTable.userId,
+        billed_upto: sessionsTable.billed_upto,
+        processed: sessionsTable.processed,
+      })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.sessionId, checkout_session_id))
+      .limit(1);
+
+
+    if (sessions.length === 0 || !sessions[0]) {
+      builder.setError(404, {
+        type: "NotFoundError",
+        message: `Session not found for checkout_session_id: ${checkout_session_id}`,
+      });
+      return {
+        statusCode: 404,
+        body: { error: "Session not found" },
+      };
+    }
+
+    const session = sessions[0];
+
+    if (session.processed) {
+      builder.setSuccess(200);
+      builder.addContext({ ignored: true });
+      return { statusCode: 200, body: { message: "Session already processed" } };
+    }
+
+    const userId = session.userId;
+    const billedUpto = session.billed_upto;
+
 
     if (!userId) {
-      builder.setError(400, {
-        type: "ValidationError",
-        message: "Missing user_id in webhook payload",
+      builder.setError(500, {
+        type: "InternalServerError",
+        message: `User ID not found for session: ${checkout_session_id}`,
       });
       return {
-        statusCode: 400,
-        body: { error: "Missing user_id in webhook payload" },
+        statusCode: 500,
+        body: { error: "User ID not found for session" },
       };
     }
 
-    if (!apiKeyId) {
-      builder.setError(400, {
-        type: "ValidationError",
-        message: "Missing apiKeyId in webhook payload",
+    if (!billedUpto) {
+      builder.setError(500, {
+        type: "InternalServerError",
+        message: `billed_upto not found for session: ${checkout_session_id}`,
       });
       return {
-        statusCode: 400,
-        body: { error: "Missing apiKeyId in webhook payload" },
+        statusCode: 500,
+        body: { error: "billed_upto not found for session" },
       };
     }
 
-    // Add user and payment context to wide event
+    await db
+      .update(usersTable)
+      .set({ last_billed_timestamp: billedUpto })
+      .where(eq(usersTable.id, userId));
+
+    await db
+      .update(sessionsTable)
+      .set({ processed: true })
+      .where(eq(sessionsTable.sessionId, checkout_session_id));
+
     builder.setUser(userId);
-
-    // Extract payment amount (convert from cents to the integer format used in DB)
-    const creditAmount = Math.round(webhookPayload.data.attributes.total);
     builder.setPaymentContext({ creditAmount });
 
-    // Create and store the payment event
     try {
       const paymentEvent = new Payment(userId, { creditAmount });
       const adapter =
         await StorageAdapterFactory.getEventStorageAdapter("PAYMENT");
 
-      await adapter.add(paymentEvent.serialize(), apiKeyId);
+      await adapter.add(paymentEvent.serialize());
 
       builder.setSuccess(200);
       return {

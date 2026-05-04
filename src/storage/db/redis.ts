@@ -11,7 +11,6 @@ export function getRedisConnection(REDIS_URL?: string): IORedis {
 
   redisConnection = new IORedis(REDIS_URL, {
     maxRetriesPerRequest: null,
-    lazyConnect: true,
   });
 
   return redisConnection;

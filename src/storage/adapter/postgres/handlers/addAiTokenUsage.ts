@@ -1,13 +1,11 @@
 import { getPostgresDB } from "../../../db/postgres/db";
-import {
-  usersTable,
-  eventsTable,
-  aiTokenUsageEventsTable,
-} from "../../../db/postgres/schema";
+import { eventsTable, aiTokenUsageEventsTable } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import { type SqlRecord } from "../../../../interface/event/Event";
 import type { UserId } from "../../../../config/identifiers";
 import { DateTime } from "luxon";
+import { StorageAdapterFactory } from "../../../../factory";
+import { User } from "../../../../events/RawEvents/User";
 
 type AggregatedEvent = {
   userId: UserId;
@@ -119,31 +117,15 @@ export async function handleAddAiTokenUsage(
     const aggregatedEvents = Array.from(aggregationMap.values());
 
     await connectionObject.transaction(async (txn) => {
-      // Collect unique user IDs
+      // Collect unique user IDs and ensure they exist via USER event
       const uniqueUserIds = Array.from(
         new Set(aggregatedEvents.map((event) => event.userId))
       );
 
-      // Batch insert users if not exists
-      try {
-        if (uniqueUserIds.length > 0) {
-          await txn
-            .insert(usersTable)
-            .values(uniqueUserIds.map((id) => ({ id })))
-            .onConflictDoNothing();
-        }
-      } catch (e) {
-        if (
-          e instanceof Error &&
-          e.message.includes('Failed query: insert into "users" ("id")')
-        ) {
-          // Users already exist, ignore the error
-        } else {
-          throw StorageError.userInsertFailed(
-            uniqueUserIds.join(", "),
-            e instanceof Error ? e : new Error(String(e))
-          );
-        }
+      const adapter = await StorageAdapterFactory.getEventStorageAdapter("USER");
+      for (const userId of uniqueUserIds) {
+        const userEvent = new User({ id: userId });
+        await adapter.add(userEvent.serialize(), "");
       }
 
       // Prepare event values for batch insert

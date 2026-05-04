@@ -1,11 +1,13 @@
 import { getPostgresDB } from "../../../db/postgres/db";
 import { sdkCallEventsTable, eventsTable, usersTable } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
-import { eq, sum, gt, sql } from "drizzle-orm";
+import { eq, sum, gt, sql, and } from "drizzle-orm";
+import type { DateTime } from "luxon";
 import { type UserId } from "../../../../config/identifiers";
 
 export async function handlePriceRequestSdkCall(
-  userId: UserId
+  userId: UserId,
+  beforeTimestamp: DateTime
 ): Promise<number> {
   const connectionObject = getPostgresDB();
 
@@ -22,6 +24,11 @@ export async function handlePriceRequestSdkCall(
 
     let result;
     try {
+      const baseCondition = sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId}`;
+      const whereClause = beforeTimestamp
+        ? and(baseCondition, sql`${eventsTable.reported_timestamp} < ${beforeTimestamp.toISO()}`)
+        : baseCondition;
+
       result = await connectionObject
         .select({
           price: sum(sdkCallEventsTable.debitAmount),
@@ -32,9 +39,7 @@ export async function handlePriceRequestSdkCall(
           usersTable,
           eq(eventsTable.userId, usersTable.id)
         )
-        .where(
-          sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId}`
-        )
+        .where(whereClause)
         .groupBy(eventsTable.userId);
     } catch (e) {
       throw StorageError.queryFailed(

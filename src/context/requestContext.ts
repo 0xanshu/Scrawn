@@ -77,13 +77,14 @@ export class WideEventBuilder {
     return this;
   }
 
-  /**
-   * Set payment/pricing context.
-   */
+/**
+    * Set payment/pricing context.
+    */
   setPaymentContext(data: {
     creditAmount?: number;
     debitAmount?: number;
     priceAmount?: number;
+    sessionId?: string;
   }): this {
     if (data.creditAmount !== undefined)
       this.event.creditAmount = data.creditAmount;
@@ -91,6 +92,8 @@ export class WideEventBuilder {
       this.event.debitAmount = data.debitAmount;
     if (data.priceAmount !== undefined)
       this.event.priceAmount = data.priceAmount;
+    if (data.sessionId !== undefined)
+      this.event.sessionId = data.sessionId;
     return this;
   }
 

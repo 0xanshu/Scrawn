@@ -5,12 +5,14 @@ import {
   usersTable,
 } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
-import { eq, sum, sql } from "drizzle-orm";
+import { eq, sum, sql, and } from "drizzle-orm";
+import type { DateTime } from "luxon";
 import { type SqlRecord } from "../../../../interface/event/Event";
 import { type UserId } from "../../../../config/identifiers";
 
 export async function handlePriceRequestAiTokenUsage(
-  userId: UserId
+  userId: UserId,
+  beforeTimestamp: DateTime
 ): Promise<number> {
   const connectionObject = getPostgresDB();
 
@@ -27,6 +29,11 @@ export async function handlePriceRequestAiTokenUsage(
 
     let result;
     try {
+      const baseCondition = sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId}`;
+      const whereClause = beforeTimestamp
+        ? and(baseCondition, sql`${eventsTable.reported_timestamp} < ${beforeTimestamp.toISO()}`)
+        : baseCondition;
+
       result = await connectionObject
         .select({
           price: sum(
@@ -39,9 +46,7 @@ export async function handlePriceRequestAiTokenUsage(
           usersTable,
           eq(eventsTable.userId, usersTable.id)
         )
-        .where(
-          sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId}`
-        )
+        .where(whereClause)
         .groupBy(eventsTable.userId);
     } catch (e) {
       throw StorageError.queryFailed(
