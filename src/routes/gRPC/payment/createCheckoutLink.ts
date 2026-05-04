@@ -21,6 +21,7 @@ import type {
 import {
   getPaymentProviderConfig,
   createProviderCheckout,
+  type CheckoutResult,
 } from "./paymentProvider.ts";
 import { StorageAdapterFactory } from "../../../factory";
 import { apiKeyContextKey } from "../../../context/auth";
@@ -28,6 +29,8 @@ import { wideEventContextKey } from "../../../context/requestContext";
 import { create } from "@bufbuild/protobuf";
 import { toJson } from "@bufbuild/protobuf";
 import type { UserId } from "../../../config/identifiers";
+import { DateTime } from "luxon";
+import { handleAddSession } from "../../../storage/adapter/postgres/handlers";
 
 export async function createCheckoutLink(
   req: CreateCheckoutLinkRequest,
@@ -50,19 +53,32 @@ export async function createCheckoutLink(
   // Payment provider is configured via paymentProvider.ts
 
   // Get custom price from storage
-  const custom_price = await calculatePrice(validatedData.userId);
+  const beforeTimestamp = DateTime.utc();
+  const custom_price = await calculatePrice(
+    validatedData.userId,
+    beforeTimestamp
+  );
   wideEventBuilder?.setPaymentContext({ priceAmount: custom_price });
 
   // Create checkout session
-  const checkoutUrl = await createCheckoutSession(
+  const checkoutResult = await createCheckoutSession(
     config,
     custom_price,
     validatedData.userId,
-    apiKeyId
+    apiKeyId,
+    beforeTimestamp
   );
 
+  // Add session to database
+  const sessionResult = await handleAddSession(
+    validatedData.userId,
+    checkoutResult.sessionId,
+    beforeTimestamp
+  );
+  wideEventBuilder?.setPaymentContext({ sessionId: sessionResult.id });
+
   return create(CreateCheckoutLinkResponseSchema, {
-    checkoutLink: checkoutUrl,
+    checkoutLink: checkoutResult.checkoutUrl,
   });
 }
 
@@ -85,7 +101,10 @@ function validateRequest(
   }
 }
 
-async function calculatePrice(userId: UserId): Promise<number> {
+async function calculatePrice(
+  userId: UserId,
+  beforeTimestamp: DateTime
+): Promise<number> {
   const storageAdapter =
     await StorageAdapterFactory.getEventStorageAdapter("PAYMENT");
 
@@ -93,7 +112,7 @@ async function calculatePrice(userId: UserId): Promise<number> {
     throw PaymentError.storageAdapterFailed("Storage adapter not available");
   }
 
-  const price = await storageAdapter.price(userId, "PAYMENT");
+  const price = await storageAdapter.price(userId, "PAYMENT", beforeTimestamp);
 
   if (typeof price !== "number" || isNaN(price) || price < 0) {
     throw PaymentError.priceCalculationFailed(
@@ -109,22 +128,21 @@ async function createCheckoutSession(
   config: PaymentProviderConfig,
   customPrice: number,
   userId: string,
-  apiKeyId: string
-): Promise<string> {
+  apiKeyId: string,
+  beforeTimestamp: DateTime
+): Promise<CheckoutResult> {
   const params: CheckoutParams = {
     customPrice,
     userId,
     apiKeyId,
   };
 
-  const checkoutUrl = await createProviderCheckout(config, params);
-
-  console.log(checkoutUrl);
+  const checkoutResult = await createProviderCheckout(config, params);
 
   if (
-    !checkoutUrl ||
-    typeof checkoutUrl !== "string" ||
-    checkoutUrl.trim().length === 0
+    !checkoutResult.checkoutUrl ||
+    typeof checkoutResult.checkoutUrl !== "string" ||
+    checkoutResult.checkoutUrl.trim().length === 0
   ) {
     throw PaymentError.invalidCheckoutResponse(
       "No valid checkout URL in response"
@@ -132,12 +150,12 @@ async function createCheckoutSession(
   }
 
   try {
-    new URL(checkoutUrl);
+    new URL(checkoutResult.checkoutUrl);
   } catch {
     throw PaymentError.invalidCheckoutResponse(
-      `Invalid URL format: ${checkoutUrl}`
+      `Invalid URL format: ${checkoutResult.checkoutUrl}`
     );
   }
 
-  return checkoutUrl;
+  return checkoutResult;
 }

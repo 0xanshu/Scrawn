@@ -7,3 +7,4 @@ export { handleAddAiTokenUsage } from "./addAiTokenUsage";
 export { handlePriceRequestAiTokenUsage } from "./priceRequestAiTokenUsage";
 export { handleAddMetadata } from "./addMetadata";
 export { handleAddUser } from "./addUser";
+export { handleAddSession } from "./addSession";

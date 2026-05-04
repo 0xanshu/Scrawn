@@ -1,5 +1,6 @@
 import type { SerializedEvent, EventKind } from "../event/Event";
 import { type UserId } from "../../config/identifiers";
+import type { DateTime } from "luxon";
 
 /**
  * Storage Adapter - consumes and persists events
@@ -11,5 +12,9 @@ export interface StorageAdapter {
     serialized: SerializedEvent<EventKind>,
     apiKeyId?: string
   ): Promise<{ id: string } | void>;
-  price(userID: UserId, event_type: EventKind): Promise<number>;
+  price(
+    userID: UserId,
+    event_type: EventKind,
+    beforeTimestamp: DateTime
+  ): Promise<number>;
 }

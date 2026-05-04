@@ -12,26 +12,46 @@ import { USER_ID_CONFIG } from "../../../config/identifiers";
 import { DateTime } from "luxon";
 
 export const usersTable = pgTable("users", {
-  id: USER_ID_CONFIG.dbType("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
-  email: text("email").notNull().unique(),
+  id: USER_ID_CONFIG.dbType("id").primaryKey(),
   last_billed_timestamp: timestamp("last_billed_timestamp", {
     withTimezone: true,
     mode: "string",
   })
     .default(DateTime.utc(1).toString())
     .notNull(),
-  payment_provider_user_id: text("payment_provider_user_id").unique().notNull(),
-  registered_timestamp: timestamp("registered_timestamp", {
+  payment_provider_user_id: text("payment_provider_user_id"),
+});
+
+export const usersRelation = relations(usersTable, ({ many }) => ({
+  events: many(eventsTable),
+  sessions: many(sessionsTable),
+}));
+
+export const sessionsTable = pgTable("sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sessionId: text("session_id").notNull().unique(),
+  processed: boolean("processed").default(false),
+  userId: USER_ID_CONFIG.dbType("user_id").references(() => usersTable.id),
+  billed_upto: timestamp("billed_upto", {
+    withTimezone: true,
+    mode: "string",
+  })
+    .notNull(),
+  createdAt: timestamp("created_at", {
     withTimezone: true,
     mode: "string",
   })
     .defaultNow()
     .notNull(),
-});
+}, (table) => ({
+  uniqueSessionId: uniqueIndex("unique_session_id").on(table.sessionId),
+}));
 
-export const usersRelation = relations(usersTable, ({ many }) => ({
-  events: many(eventsTable),
+export const sessionRelations = relations(sessionsTable, ({ one }) => ({
+  user: one(usersTable, {
+    fields: [sessionsTable.userId],
+    references: [usersTable.id],
+  }),
 }));
 
 export const apiKeysTable = pgTable(

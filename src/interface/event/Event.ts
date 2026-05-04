@@ -33,8 +33,7 @@ export type MetadataEventData = {
 };
 
 export type UserEventData = {
-  name: string;
-  email: string;
+  id: string;
 };
 
 /**
@@ -46,7 +45,7 @@ export type EventKind =
   | "ADD_KEY"
   | "PAYMENT"
   | "METADATA"
-  | "USER";
+  | "USER"
 
 /**
  * Mapping of event kinds to their data structures

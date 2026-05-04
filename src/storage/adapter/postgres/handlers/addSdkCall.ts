@@ -1,13 +1,10 @@
 import { getPostgresDB } from "../../../db/postgres/db";
-import {
-  usersTable,
-  eventsTable,
-  sdkCallEventsTable,
-} from "../../../db/postgres/schema";
-import { eq } from "drizzle-orm";
+import { eventsTable, sdkCallEventsTable } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import { type SqlRecord } from "../../../../interface/event/Event";
 import { DateTime } from "luxon";
+import { StorageAdapterFactory } from "../../../../factory";
+import { User } from "../../../../events/RawEvents/User";
 
 export async function handleAddSdkCall(
   event_data: SqlRecord<"SDK_CALL">,
@@ -26,18 +23,9 @@ export async function handleAddSdkCall(
     }
 
     await connectionObject.transaction(async (txn) => {
-      // Check user exists
-      const existingUser = await txn
-        .select({ id: usersTable.id })
-        .from(usersTable)
-        .where(eq(usersTable.id, event_data.userId))
-        .limit(1);
-
-      if (existingUser.length === 0) {
-        throw StorageError.dataNotFound(
-          `User with ID ${event_data.userId} not found`
-        );
-      }
+      const adapter = await StorageAdapterFactory.getEventStorageAdapter("USER");
+      const userEvent = new User({ id: event_data.userId });
+      await adapter.add(userEvent.serialize(), "");
 
       // Validate and prepare timestamp
       let reported_timestamp;

@@ -2,9 +2,11 @@ import { StorageError } from "../../../../errors/storage";
 import { StorageAdapterFactory } from "../../../../factory";
 import { type SqlRecord } from "../../../../interface/event/Event";
 import type { UserId } from "../../../../config/identifiers";
+import type { DateTime } from "luxon";
 
 export async function handlePriceRequestPayment(
-  userId: UserId
+  userId: UserId,
+  beforeTimestamp: DateTime
 ): Promise<number> {
   try {
     if (!userId) {
@@ -23,7 +25,7 @@ export async function handlePriceRequestPayment(
       );
     }
 
-    const sdkPrice = await sdkStorageAdapter.price(userId, "SDK_CALL");
+    const sdkPrice = await sdkStorageAdapter.price(userId, "SDK_CALL", beforeTimestamp);
 
     if (typeof sdkPrice !== "number" || isNaN(sdkPrice)) {
       throw StorageError.priceCalculationFailed(
@@ -44,7 +46,7 @@ export async function handlePriceRequestPayment(
       );
     }
 
-    const aiPrice = await aiStorageAdapter.price(userId, "AI_TOKEN_USAGE");
+    const aiPrice = await aiStorageAdapter.price(userId, "AI_TOKEN_USAGE", beforeTimestamp);
 
     if (typeof aiPrice !== "number" || isNaN(aiPrice)) {
       throw StorageError.priceCalculationFailed(

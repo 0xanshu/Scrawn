@@ -1,14 +1,11 @@
 import { getPostgresDB } from "../../../db/postgres/db";
-import {
-  usersTable,
-  eventsTable,
-  aiTokenUsageEventsTable,
-} from "../../../db/postgres/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eventsTable, aiTokenUsageEventsTable } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import { type SqlRecord } from "../../../../interface/event/Event";
 import type { UserId } from "../../../../config/identifiers";
 import { DateTime } from "luxon";
+import { StorageAdapterFactory } from "../../../../factory";
+import { User } from "../../../../events/RawEvents/User";
 
 type AggregatedEvent = {
   userId: UserId;
@@ -120,25 +117,15 @@ export async function handleAddAiTokenUsage(
     const aggregatedEvents = Array.from(aggregationMap.values());
 
     await connectionObject.transaction(async (txn) => {
-      // Collect unique user IDs
+      // Collect unique user IDs and ensure they exist via USER event
       const uniqueUserIds = Array.from(
         new Set(aggregatedEvents.map((event) => event.userId))
       );
 
-      // Check all users exist
-      if (uniqueUserIds.length > 0) {
-        const existingUsers = await txn
-          .select({ id: usersTable.id })
-          .from(usersTable)
-          .where(inArray(usersTable.id, uniqueUserIds));
-
-        if (existingUsers.length !== uniqueUserIds.length) {
-          const foundIds = new Set(existingUsers.map((u) => u.id));
-          const missingIds = uniqueUserIds.filter((id) => !foundIds.has(id));
-          throw StorageError.dataNotFound(
-            `Users with IDs ${missingIds.join(", ")} not found`
-          );
-        }
+      const adapter = await StorageAdapterFactory.getEventStorageAdapter("USER");
+      for (const userId of uniqueUserIds) {
+        const userEvent = new User({ id: userId });
+        await adapter.add(userEvent.serialize(), "");
       }
 
       // Prepare event values for batch insert

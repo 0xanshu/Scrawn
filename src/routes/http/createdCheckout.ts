@@ -3,6 +3,9 @@ import { Payment } from "../../events/RawEvents/Payment.ts";
 import { StorageAdapterFactory } from "../../factory/EventStorageAdapterFactory.ts";
 import type { WideEventBuilder } from "../../context/requestContext.ts";
 import { getDodoClient } from "../gRPC/payment/paymentProvider.ts";
+import { getPostgresDB } from "../../storage/db/postgres/db";
+import { usersTable, sessionsTable } from "../../storage/db/postgres/schema";
+import { eq } from "drizzle-orm";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -13,18 +16,11 @@ interface DodoWebhookPayload {
   data: {
     payload_type: string;
     payment_id: string;
-    customer_id: string;
-    customer_email?: string;
-    customer_name?: string;
+    checkout_session_id?: string;
     total_amount: number;
     currency: string;
-    metadata?: {
-      user_id?: string;
-      api_key_id?: string;
-      custom_price?: string;
-    };
-    product_id?: string;
-    subscription_id?: string;
+    status: string;
+    customer_id?: string;
     customer?: {
       customer_id: string;
       email?: string;
@@ -89,30 +85,111 @@ export async function handleDodoWebhook(
       return { statusCode: 200, body: { message: "Event ignored" } };
     }
 
-    const { metadata, total_amount } = webhookPayload.data;
-    const userId =
-      metadata?.user_id || webhookPayload.data.customer?.customer_id;
+    const { payment_id, checkout_session_id, total_amount, status } =
+      webhookPayload.data;
     const creditAmount = Math.round(total_amount);
 
-    if (!userId) {
+    if (!checkout_session_id) {
       builder.setError(400, {
         type: "ValidationError",
-        message: "Missing user_id in webhook metadata",
+        message: "Missing checkout_session_id in webhook payload",
       });
       return {
         statusCode: 400,
-        body: { error: "Missing user_id in webhook metadata" },
+        body: { error: "Missing checkout_session_id in webhook payload" },
       };
     }
+
+    const db = getPostgresDB();
+
+    console.log("[WEBHOOK] Looking up session:", checkout_session_id);
+
+    const sessions = await db
+      .select({
+        id: sessionsTable.id,
+        userId: sessionsTable.userId,
+        billed_upto: sessionsTable.billed_upto,
+        processed: sessionsTable.processed,
+      })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.sessionId, checkout_session_id))
+      .limit(1);
+
+    console.log("[WEBHOOK] Session query result:", sessions);
+
+    if (sessions.length === 0 || !sessions[0]) {
+      builder.setError(404, {
+        type: "NotFoundError",
+        message: `Session not found for checkout_session_id: ${checkout_session_id}`,
+      });
+      return {
+        statusCode: 404,
+        body: { error: "Session not found" },
+      };
+    }
+
+    const session = sessions[0];
+    console.log("[WEBHOOK] Session found:", session);
+
+    if (session.processed) {
+      console.log("[WEBHOOK] Session already processed, ignoring");
+      builder.setSuccess(200);
+      builder.addContext({ ignored: true });
+      return { statusCode: 200, body: { message: "Session already processed" } };
+    }
+
+    const userId = session.userId;
+    const billedUpto = session.billed_upto;
+
+    console.log("[WEBHOOK] UserId:", userId, "billedUpto:", billedUpto);
+
+    if (!userId) {
+      console.log("[WEBHOOK] ERROR: User ID is null/undefined for session");
+      builder.setError(500, {
+        type: "InternalServerError",
+        message: `User ID not found for session: ${checkout_session_id}`,
+      });
+      return {
+        statusCode: 500,
+        body: { error: "User ID not found for session" },
+      };
+    }
+
+    if (!billedUpto) {
+      console.log("[WEBHOOK] ERROR: billed_upto is null/undefined for session");
+      builder.setError(500, {
+        type: "InternalServerError",
+        message: `billed_upto not found for session: ${checkout_session_id}`,
+      });
+      return {
+        statusCode: 500,
+        body: { error: "billed_upto not found for session" },
+      };
+    }
+
+    console.log("[WEBHOOK] Updating user last_billed_timestamp to:", billedUpto);
+    await db
+      .update(usersTable)
+      .set({ last_billed_timestamp: billedUpto })
+      .where(eq(usersTable.id, userId));
+
+    console.log("[WEBHOOK] Marking session as processed");
+    await db
+      .update(sessionsTable)
+      .set({ processed: true })
+      .where(eq(sessionsTable.sessionId, checkout_session_id));
 
     builder.setUser(userId);
     builder.setPaymentContext({ creditAmount });
 
+    console.log("[WEBHOOK] Creating payment event for userId:", userId, "creditAmount:", creditAmount);
     try {
       const paymentEvent = new Payment(userId, { creditAmount });
+      console.log("[WEBHOOK] Payment event serialized:", paymentEvent.serialize());
       const adapter =
         await StorageAdapterFactory.getEventStorageAdapter("PAYMENT");
 
+      console.log("[WEBHOOK] Adding payment event to storage");
       await adapter.add(paymentEvent.serialize(), "");
 
       builder.setSuccess(200);
@@ -121,6 +198,7 @@ export async function handleDodoWebhook(
         body: { message: "Webhook processed successfully" },
       };
     } catch (dbError) {
+      console.log("[WEBHOOK] ERROR storing payment event:", dbError);
       const errorMessage =
         dbError instanceof Error ? dbError.message : String(dbError);
       builder.setError(500, {

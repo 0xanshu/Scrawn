@@ -26,6 +26,9 @@ export class StorageAdapterFactory {
       case "METADATA": {
         return new PostgresAdapter();
       }
+      case "USER": {
+        return new PostgresAdapter();
+      }
       default: {
         throw new Error(`Unknown event type: ${RequestType}`);
       }

@@ -19,6 +19,7 @@ import type {
   SqlRecord,
 } from "../../../interface/event/Event";
 import type { UserId } from "../../../config/identifiers";
+import type { DateTime } from "luxon";
 
 export class PostgresAdapter implements StorageAdapter {
   connectionObject = getPostgresDB();
@@ -88,18 +89,22 @@ export class PostgresAdapter implements StorageAdapter {
     }
   }
 
-  async price(userID: UserId, event_type: EventKind): Promise<number> {
+  async price(
+    userID: UserId,
+    event_type: EventKind,
+    beforeTimestamp: DateTime
+  ): Promise<number> {
     switch (event_type) {
       case "PAYMENT": {
-        return await handlePriceRequestPayment(userID);
+        return await handlePriceRequestPayment(userID, beforeTimestamp);
       }
 
       case "SDK_CALL": {
-        return await handlePriceRequestSdkCall(userID);
+        return await handlePriceRequestSdkCall(userID, beforeTimestamp);
       }
 
       case "AI_TOKEN_USAGE": {
-        return await handlePriceRequestAiTokenUsage(userID);
+        return await handlePriceRequestAiTokenUsage(userID, beforeTimestamp);
       }
 
       default: {

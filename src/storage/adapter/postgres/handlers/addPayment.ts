@@ -1,13 +1,10 @@
 import { getPostgresDB } from "../../../db/postgres/db";
-import {
-  usersTable,
-  eventsTable,
-  paymentEventsTable,
-} from "../../../db/postgres/schema";
-import { eq } from "drizzle-orm";
+import { eventsTable, paymentEventsTable } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import { type SqlRecord } from "../../../../interface/event/Event";
 import { DateTime } from "luxon";
+import { StorageAdapterFactory } from "../../../../factory";
+import { User } from "../../../../events/RawEvents/User";
 
 export async function handleAddPayment(
   event_data: SqlRecord<"PAYMENT">,
@@ -15,8 +12,11 @@ export async function handleAddPayment(
 ): Promise<{ id: string } | void> {
   const connectionObject = getPostgresDB();
 
+  console.log("[handleAddPayment] Starting with event_data:", event_data);
+
   try {
     const creditAmount = event_data?.data?.creditAmount;
+    console.log("[handleAddPayment] creditAmount:", creditAmount);
 
     // Ensure creditAmount is a finite number and positive
     if (
@@ -24,8 +24,9 @@ export async function handleAddPayment(
       creditAmount === null ||
       typeof creditAmount !== "number" ||
       !Number.isFinite(creditAmount) ||
-      creditAmount <= 0
+      creditAmount < 0
     ) {
+      console.log("[handleAddPayment] Invalid creditAmount:", creditAmount);
       throw StorageError.invalidData(
         `Invalid creditAmount: must be a positive finite number, got ${String(
           creditAmount
@@ -33,25 +34,22 @@ export async function handleAddPayment(
       );
     }
 
+    console.log("[handleAddPayment] Starting transaction for user:", event_data.userId);
     await connectionObject.transaction(async (txn) => {
-      // Check user exists
-      const existingUser = await txn
-        .select({ id: usersTable.id })
-        .from(usersTable)
-        .where(eq(usersTable.id, event_data.userId))
-        .limit(1);
-
-      if (existingUser.length === 0) {
-        throw StorageError.dataNotFound(
-          `User with ID ${event_data.userId} not found`
-        );
-      }
+      console.log("[handleAddPayment] Ensuring user exists:", event_data.userId);
+      const adapter = await StorageAdapterFactory.getEventStorageAdapter("USER");
+      const userEvent = new User({ id: event_data.userId });
+      console.log("[handleAddPayment] User event to serialize:", userEvent.serialize());
+      await adapter.add(userEvent.serialize(), "");
+      console.log("[handleAddPayment] User ensured/created successfully");
 
       // Validate and prepare timestamp
       let reported_timestamp;
       try {
         reported_timestamp = event_data.reported_timestamp.toISO();
+        console.log("[handleAddPayment] reported_timestamp:", reported_timestamp);
       } catch (e) {
+        console.log("[handleAddPayment] ERROR converting reported_timestamp:", e);
         throw StorageError.invalidTimestamp(
           "Failed to convert reported_timestamp to ISO format",
           e instanceof Error ? e : new Error(String(e))
@@ -59,6 +57,7 @@ export async function handleAddPayment(
       }
 
       if (!reported_timestamp || reported_timestamp.trim().length === 0) {
+        console.log("[handleAddPayment] ERROR: reported_timestamp is empty");
         throw StorageError.invalidTimestamp(
           "Timestamp is undefined or empty after conversion"
         );
@@ -66,6 +65,11 @@ export async function handleAddPayment(
 
       // Insert event (apiKeyId is optional for webhook events)
       let eventID;
+      console.log("[handleAddPayment] Inserting into eventsTable:", {
+        reported_timestamp,
+        userId: event_data.userId,
+        api_keyId: apiKeyId,
+      });
       try {
         [eventID] = await txn
           .insert(eventsTable)
@@ -76,7 +80,9 @@ export async function handleAddPayment(
             api_keyId: apiKeyId,
           })
           .returning({ id: eventsTable.id });
+        console.log("[handleAddPayment] Event inserted, eventID:", eventID);
       } catch (e) {
+        console.log("[handleAddPayment] ERROR inserting event:", e);
         throw StorageError.eventInsertFailed(
           `Failed to insert event for user ${event_data.userId}`,
           e instanceof Error ? e : new Error(String(e))
@@ -84,16 +90,23 @@ export async function handleAddPayment(
       }
 
       if (!eventID) {
+        console.log("[handleAddPayment] ERROR: Event insert returned no ID");
         throw StorageError.emptyResult("Event insert returned no ID");
       }
 
       // Insert payment event
+      console.log("[handleAddPayment] Inserting into paymentEventsTable:", {
+        id: eventID.id,
+        creditAmount: event_data.data.creditAmount,
+      });
       try {
         await txn.insert(paymentEventsTable).values({
           id: eventID.id,
           creditAmount: event_data.data.creditAmount,
         });
+        console.log("[handleAddPayment] Payment event inserted successfully");
       } catch (e) {
+        console.log("[handleAddPayment] ERROR inserting payment event:", e);
         throw StorageError.insertFailed(
           `Failed to insert payment event for event ID ${eventID.id}`,
           e instanceof Error ? e : new Error(String(e))
@@ -103,6 +116,7 @@ export async function handleAddPayment(
       return { id: eventID };
     });
   } catch (e) {
+    console.log("[handleAddPayment] Caught error:", e);
     // Use duck typing instead of instanceof to work with mocked modules
     if (
       e &&
@@ -113,6 +127,7 @@ export async function handleAddPayment(
       throw e;
     }
 
+    console.log("[handleAddPayment] Rethrowing as transactionFailed:", e);
     throw StorageError.transactionFailed(
       "Transaction failed while storing PAYMENT event",
       e instanceof Error ? e : new Error(String(e))

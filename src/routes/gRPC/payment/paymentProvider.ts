@@ -30,6 +30,11 @@ export interface CheckoutParams {
   apiKeyId: string;
 }
 
+export interface CheckoutResult {
+  sessionId: string;
+  checkoutUrl: string;
+}
+
 export function getPaymentProviderConfig(): PaymentProviderConfig {
   const productId = process.env.DODO_PAYMENTS_PRODUCT_ID;
   const returnUrl = `${process.env.APP_URL}/checkout/success`;
@@ -44,7 +49,7 @@ export function getPaymentProviderConfig(): PaymentProviderConfig {
 export async function createProviderCheckout(
   config: PaymentProviderConfig,
   params: CheckoutParams
-): Promise<string> {
+): Promise<CheckoutResult> {
   const client = getDodoClient();
 
   const session = await client.checkoutSessions.create({
@@ -68,5 +73,16 @@ export async function createProviderCheckout(
     );
   }
 
-  return session.checkout_url;
+  if (!session.session_id) {
+    throw PaymentError.invalidCheckoutResponse(
+      "No session ID returned from Dodo"
+    );
+  }
+
+  console.log("BIG BOLD WORDS", session);
+
+  return {
+    sessionId: session.session_id,
+    checkoutUrl: session.checkout_url,
+  };
 }
