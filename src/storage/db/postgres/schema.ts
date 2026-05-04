@@ -13,11 +13,20 @@ import { DateTime } from "luxon";
 
 export const usersTable = pgTable("users", {
   id: USER_ID_CONFIG.dbType("id").primaryKey(),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
   last_billed_timestamp: timestamp("last_billed_timestamp", {
     withTimezone: true,
     mode: "string",
   })
     .default(DateTime.utc(1).toString())
+    .notNull(),
+  payment_provider_user_id: text("payment_provider_user_id").unique().notNull(),
+  registered_timestamp: timestamp("registered_timestamp", {
+    withTimezone: true,
+    mode: "string",
+  })
+    .defaultNow()
     .notNull(),
 });
 

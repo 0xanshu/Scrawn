@@ -3,7 +3,7 @@ import { PaymentError } from "../../../errors/payment";
 
 let client: DodoPayments | null = null;
 
-function getClient(): DodoPayments {
+export function getDodoClient(): DodoPayments {
   if (!client) {
     const apiKey = process.env.DODO_PAYMENTS_API_KEY;
     if (!apiKey) {
@@ -13,6 +13,7 @@ function getClient(): DodoPayments {
       bearerToken: apiKey,
       environment:
         process.env.NODE_ENV === "production" ? "live_mode" : "test_mode",
+      webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SIGNING_SECRET,
     });
   }
   return client;
@@ -44,7 +45,7 @@ export async function createProviderCheckout(
   config: PaymentProviderConfig,
   params: CheckoutParams
 ): Promise<string> {
-  const client = getClient();
+  const client = getDodoClient();
 
   const session = await client.checkoutSessions.create({
     product_cart: [

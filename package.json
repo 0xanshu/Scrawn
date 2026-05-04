@@ -49,6 +49,7 @@
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.2",
     "postgres": "^3.4.7",
+    "standardwebhooks": "^1.0.0",
     "zod": "^4.1.12"
   }
 }

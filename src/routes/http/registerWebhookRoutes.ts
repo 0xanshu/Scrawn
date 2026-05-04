@@ -22,6 +22,7 @@ export async function registerWebhookRoutes(
       try {
         const signatureHeader = request.headers["webhook-signature"];
         const timestampHeader = request.headers["webhook-timestamp"];
+        const webhookIdHeader = request.headers["webhook-id"];
         const signature =
           typeof signatureHeader === "string"
             ? signatureHeader
@@ -33,6 +34,12 @@ export async function registerWebhookRoutes(
             ? timestampHeader
             : Array.isArray(timestampHeader)
               ? timestampHeader[0]
+              : undefined;
+        const webhookId =
+          typeof webhookIdHeader === "string"
+            ? webhookIdHeader
+            : Array.isArray(webhookIdHeader)
+              ? webhookIdHeader[0]
               : undefined;
 
         const requestWithRawBody = request as typeof request & {
@@ -49,7 +56,7 @@ export async function registerWebhookRoutes(
           return { error: "Missing raw webhook payload" };
         }
 
-        const result = await handleDodoWebhook(rawBody, signature, timestamp, builder);
+        const result = await handleDodoWebhook(rawBody, signature, timestamp, webhookId, builder);
 
         reply.code(result.statusCode);
         return result.body;
