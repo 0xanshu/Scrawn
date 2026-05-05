@@ -1,4 +1,3 @@
-import type { HandlerContext } from "@connectrpc/connect";
 import { apiKeyContextKey } from "../context/auth";
 import { AuthError } from "../errors/auth";
 import { EventError } from "../errors/event";
@@ -13,17 +12,12 @@ import type { Event } from "../interface/event/Event";
 import { SDKCall } from "../events/RawEvents/SDKCall";
 import { AITokenUsage } from "../events/AIEvents/AITokenUsage";
 import { StorageAdapterFactory } from "../factory";
-import type {
-  RegisterEventRequest,
-  StreamEventRequest,
-} from "../gen/event/v1/event_pb";
-import { toJson } from "@bufbuild/protobuf";
-import { RegisterEventRequestSchema, StreamEventRequestSchema } from "../gen/event/v1/event_pb";
+import { RegisterEventRequest, StreamEventRequest } from "../gen/event/v1/event_pb";
 
 /**
  * Extract API key ID from the request context
  */
-export function extractApiKeyFromContext(context: HandlerContext): string {
+export function extractApiKeyFromContext(context: any): string {
   const apiKeyId = context.values.get(apiKeyContextKey);
   if (!apiKeyId) {
     throw AuthError.invalidAPIKey("API key ID not found in context");
@@ -39,7 +33,12 @@ export async function validateAndParseRegisterEvent(
   req: RegisterEventRequest
 ): Promise<RegisterEventSchemaType> {
   try {
-    const json = toJson(RegisterEventRequestSchema, req);
+    const json = {
+      type: req.getType(),
+      userId: req.getUserid(),
+      reportedTimestamp: req.getReportedtimestamp(),
+      data: JSON.parse(req.getDatacase1()),
+    };
     return await registerEventSchema.parseAsync(json);
   } catch (error) {
     throw convertValidationError(error);
@@ -53,7 +52,12 @@ export async function validateAndParseStreamEvent(
   req: StreamEventRequest
 ): Promise<StreamEventSchemaType> {
   try {
-    const json = toJson(StreamEventRequestSchema, req);
+    const json = {
+      type: req.getType(),
+      userId: req.getUserid(),
+      reportedTimestamp: req.getReportedtimestamp(),
+      data: JSON.parse(req.getDatacase1()),
+    };
     return await streamEventSchema.parseAsync(json);
   } catch (error) {
     throw convertValidationError(error);

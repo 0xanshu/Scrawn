@@ -14,25 +14,25 @@
     "proto:pull": "git submodule update --remote --merge proto",
     "proto:push": "cd proto && git add . && git commit -s -m \"$1\" && git push && cd .."
   },
-"devDependencies": {
+  "devDependencies": {
+    "@bufbuild/buf": "^1.69.0",
     "@types/bun": "latest",
     "@types/expr-eval": "^1.1.2",
     "@types/luxon": "^3.7.1",
     "@vitest/ui": "^4.0.3",
-    "@bufbuild/buf": "^1.66.1",
+    "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.6",
-    "tsx": "^4.20.6",
-    "vitest": "^4.0.3",
     "fallow": "^2.64.0",
-    "dotenv": "^17.2.3"
+    "grpc-tools": "^1.13.1",
+    "ts-protoc-gen": "^0.15.0",
+    "tsx": "^4.20.6",
+    "vitest": "^4.0.3"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.12.0",
     "@connectrpc/connect": "^2.1.1",
-    "@connectrpc/connect-node": "^2.1.1",
     "@typescript/native-preview": "^7.0.0-dev.20260502.1",
     "bullmq": "^5.75.2",
     "dodopayments": "^2.30.0",
@@ -40,6 +40,7 @@
     "expr-eval": "^2.0.2",
     "fastify": "^5.8.5",
     "fastify-raw-body": "^5.0.0",
+    "google-protobuf": "^4.0.2",
     "ioredis": "^5.10.1",
     "luxon": "^3.7.2",
     "pino": "^10.1.0",

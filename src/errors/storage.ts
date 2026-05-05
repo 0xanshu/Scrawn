@@ -1,4 +1,4 @@
-import { Code, ConnectError } from "@connectrpc/connect";
+import { status } from "@grpc/grpc-js";
 
 enum StorageErrorType {
   CONNECTION_FAILED = "CONNECTION_FAILED",
@@ -6,7 +6,6 @@ enum StorageErrorType {
   INSERT_FAILED = "INSERT_FAILED",
   QUERY_FAILED = "QUERY_FAILED",
   CONSTRAINT_VIOLATION = "CONSTRAINT_VIOLATION",
-  DATA_NOT_FOUND = "DATA_NOT_FOUND",
   INVALID_DATA = "INVALID_DATA",
   SERIALIZATION_FAILED = "SERIALIZATION_FAILED",
   UNKNOWN_EVENT_TYPE = "UNKNOWN_EVENT_TYPE",
@@ -23,21 +22,20 @@ export interface StorageErrorContext {
   type: StorageErrorType;
   message: string;
   originalError?: Error;
-  code: Code;
+  code: number;
 }
 
-export class StorageError extends ConnectError {
+export class StorageError extends Error {
   readonly type: StorageErrorType;
   readonly originalError?: Error;
+  readonly code: number;
 
   constructor(context: StorageErrorContext) {
-    super(context.message, context.code);
+    super(context.message);
     this.name = "StorageError";
     this.type = context.type;
     this.originalError = context.originalError;
-
-    // Maintain proper prototype chain for instanceof checks
-    Object.setPrototypeOf(this, StorageError.prototype);
+    this.code = context.code;
   }
 
   static connectionFailed(
@@ -49,7 +47,7 @@ export class StorageError extends ConnectError {
       message: details
         ? `Storage connection failed: ${details}`
         : "Storage connection failed",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -63,7 +61,7 @@ export class StorageError extends ConnectError {
       message: details
         ? `Storage transaction failed: ${details}`
         : "Storage transaction failed",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -74,7 +72,7 @@ export class StorageError extends ConnectError {
       message: details
         ? `Failed to insert data into storage: ${details}`
         : "Failed to insert data into storage",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -85,7 +83,7 @@ export class StorageError extends ConnectError {
       message: details
         ? `Storage query failed: ${details}`
         : "Storage query failed",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -99,18 +97,18 @@ export class StorageError extends ConnectError {
       message: constraint
         ? `Database constraint violation: ${constraint}`
         : "Database constraint violation",
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
 
   static dataNotFound(entity?: string, originalError?: Error): StorageError {
     return new StorageError({
-      type: StorageErrorType.DATA_NOT_FOUND,
+      type: StorageErrorType.CONNECTION_FAILED,
       message: entity
         ? `${entity} not found in storage`
         : "Data not found in storage",
-      code: Code.NotFound,
+      code: status.NOT_FOUND,
       originalError,
     });
   }
@@ -121,7 +119,7 @@ export class StorageError extends ConnectError {
       message: details
         ? `Invalid data for storage operation: ${details}`
         : "Invalid data for storage operation",
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -135,7 +133,7 @@ export class StorageError extends ConnectError {
       message: details
         ? `Failed to serialize data for storage: ${details}`
         : "Failed to serialize data for storage",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -147,7 +145,7 @@ export class StorageError extends ConnectError {
     return new StorageError({
       type: StorageErrorType.UNKNOWN_EVENT_TYPE,
       message: `No storage logic implemented for event type: ${eventType}`,
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -156,7 +154,7 @@ export class StorageError extends ConnectError {
     return new StorageError({
       type: StorageErrorType.MISSING_API_KEY_ID,
       message: "API key ID is required for event storage",
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -170,7 +168,7 @@ export class StorageError extends ConnectError {
       message: details
         ? `Invalid timestamp: ${details}`
         : "Invalid or missing timestamp",
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -184,7 +182,7 @@ export class StorageError extends ConnectError {
       message: userId
         ? `Failed to insert user with ID: ${userId}`
         : "Failed to insert user",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -198,7 +196,7 @@ export class StorageError extends ConnectError {
       message: details
         ? `Failed to insert event: ${details}`
         : "Failed to insert event",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -212,7 +210,7 @@ export class StorageError extends ConnectError {
       message: userId
         ? `Failed to calculate price for user: ${userId}`
         : "Failed to calculate price",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -223,7 +221,7 @@ export class StorageError extends ConnectError {
       message: entity
         ? `Query returned empty result for: ${entity}`
         : "Query returned empty result",
-      code: Code.NotFound,
+      code: status.NOT_FOUND,
       originalError,
     });
   }
@@ -233,7 +231,7 @@ export class StorageError extends ConnectError {
     return new StorageError({
       type: StorageErrorType.UNKNOWN,
       message: `Unexpected storage error: ${details}`,
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }

@@ -1,23 +1,19 @@
-import type { CreateAPIKeyRequest, CreateAPIKeyResponse } from "../../../gen/auth/v1/auth_pb";
-import { CreateAPIKeyResponseSchema, CreateAPIKeyRequestSchema } from "../../../gen/auth/v1/auth_pb";
+import { CreateAPIKeyRequest, CreateAPIKeyResponse } from "../../../gen/auth/v1/auth_pb";
 import { createAPIKeySchema } from "../../../zod/apikey";
 import { APIKeyError } from "../../../errors/apikey";
 import { AuthError } from "../../../errors/auth";
 import { generateAPIKey } from "../../../utils/generateAPIKey";
 import { StorageAdapterFactory } from "../../../factory";
 import { AddKey } from "../../../events/RawEvents/AddKey";
-import type { HandlerContext } from "@connectrpc/connect";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import { hashAPIKey } from "../../../utils/hashAPIKey";
-import { create } from "@bufbuild/protobuf";
-import { toJson } from "@bufbuild/protobuf";
 import { formatZodError } from "../../../utils/formatZodError";
 import { DateTime } from "luxon";
 
 export async function createAPIKey(
   req: CreateAPIKeyRequest,
-  context: HandlerContext
+  context: any
 ): Promise<CreateAPIKeyResponse> {
   const wideEventBuilder = context.values.get(wideEventContextKey);
 
@@ -63,18 +59,21 @@ export async function createAPIKey(
     throw APIKeyError.creationFailed("Storage returned no ID");
   }
 
-  return create(CreateAPIKeyResponseSchema, {
-    apiKeyId: keyEventData.id,
-    apiKey: apiKey,
-    name: validatedData.name,
-    createdAt: now.toISO(),
-    expiresAt: expiresAt.toISO(),
-  });
+  const response = new CreateAPIKeyResponse();
+  response.setApikeyid(keyEventData.id);
+  response.setApikey(apiKey);
+  response.setName(validatedData.name);
+  response.setCreatedat(now.toISO());
+  response.setExpiresat(expiresAt.toISO());
+  return response;
 }
 
 function validateRequest(req: CreateAPIKeyRequest) {
   try {
-    const json = toJson(CreateAPIKeyRequestSchema, req);
+    const json = {
+      name: req.getName(),
+      expiresIn: req.getExpiresin(),
+    };
     return createAPIKeySchema.parse(json);
   } catch (error) {
     throw formatZodError(error, (msg) => APIKeyError.validationFailed(msg));

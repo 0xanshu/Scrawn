@@ -1,4 +1,4 @@
-import { Code, ConnectError } from "@connectrpc/connect";
+import { status as Status } from "@grpc/grpc-js";
 
 enum APIKeyErrorType {
   INVALID_EXPIRATION = "INVALID_EXPIRATION",
@@ -14,20 +14,20 @@ export interface APIKeyErrorContext {
   type: APIKeyErrorType;
   message: string;
   originalError?: Error;
-  code: Code;
+  code: number;
 }
 
-export class APIKeyError extends ConnectError {
+export class APIKeyError extends Error {
   readonly type: APIKeyErrorType;
   readonly originalError?: Error;
+  readonly code: Status;
 
   constructor(context: APIKeyErrorContext) {
-    super(context.message, context.code);
+    super(context.message);
     this.name = "APIKeyError";
     this.type = context.type;
     this.originalError = context.originalError;
-
-    Object.setPrototypeOf(this, APIKeyError.prototype);
+    this.code = context.code;
   }
 
   static invalidExpiration(
@@ -39,7 +39,7 @@ export class APIKeyError extends ConnectError {
       message: details
         ? `Invalid expiration: ${details}`
         : "Invalid expiration time",
-      code: Code.InvalidArgument,
+      code: Status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -48,7 +48,7 @@ export class APIKeyError extends ConnectError {
     return new APIKeyError({
       type: APIKeyErrorType.INVALID_NAME,
       message: details ? `Invalid name: ${details}` : "Invalid API key name",
-      code: Code.InvalidArgument,
+      code: Status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -59,7 +59,7 @@ export class APIKeyError extends ConnectError {
       message: details
         ? `Failed to create API key: ${details}`
         : "Failed to create API key",
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }
@@ -70,7 +70,7 @@ export class APIKeyError extends ConnectError {
       message: apiKeyId
         ? `API key not found: ${apiKeyId}`
         : "API key not found",
-      code: Code.NotFound,
+       code: Status.NOT_FOUND,
       originalError,
     });
   }
@@ -84,7 +84,7 @@ export class APIKeyError extends ConnectError {
       message: details
         ? `Failed to revoke API key: ${details}`
         : "Failed to revoke API key",
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }
@@ -93,7 +93,7 @@ export class APIKeyError extends ConnectError {
     return new APIKeyError({
       type: APIKeyErrorType.VALIDATION_FAILED,
       message: `API key validation failed: ${details}`,
-      code: Code.InvalidArgument,
+      code: Status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -103,7 +103,7 @@ export class APIKeyError extends ConnectError {
     return new APIKeyError({
       type: APIKeyErrorType.UNKNOWN,
       message: `Unexpected API key error: ${details}`,
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }

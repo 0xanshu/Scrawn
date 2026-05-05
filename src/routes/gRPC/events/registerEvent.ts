@@ -1,7 +1,4 @@
-import type { RegisterEventRequest, RegisterEventResponse } from "../../../gen/event/v1/event_pb";
-import { RegisterEventResponseSchema } from "../../../gen/event/v1/event_pb";
-import type { HandlerContext } from "@connectrpc/connect";
-import { create } from "@bufbuild/protobuf";
+import { RegisterEventRequest, RegisterEventResponse } from "../../../gen/event/v1/event_pb";
 import { wideEventContextKey } from "../../../context/requestContext";
 import {
   extractApiKeyFromContext,
@@ -12,7 +9,7 @@ import {
 
 export async function registerEvent(
   req: RegisterEventRequest,
-  context: HandlerContext
+  context: any
 ): Promise<RegisterEventResponse> {
   const wideEventBuilder = context.values.get(wideEventContextKey);
 
@@ -32,7 +29,7 @@ export async function registerEvent(
   // Store the event
   await storeEvent(event, apiKeyId);
 
-  return create(RegisterEventResponseSchema, {
-    random: "Event stored successfully",
-  });
+  const response = new RegisterEventResponse();
+  response.setRandom("Event stored successfully");
+  return response;
 }

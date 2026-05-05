@@ -1,18 +1,10 @@
-import type {
-  CreateCheckoutLinkRequest,
-  CreateCheckoutLinkResponse,
-} from "../../../gen/payment/v1/payment_pb";
-import {
-  CreateCheckoutLinkResponseSchema,
-  CreateCheckoutLinkRequestSchema,
-} from "../../../gen/payment/v1/payment_pb";
+import { CreateCheckoutLinkRequest, CreateCheckoutLinkResponse } from "../../../gen/payment/v1/payment_pb";
 import {
   createCheckoutLinkSchema,
   type CreateCheckoutLinkSchemaType,
 } from "../../../zod/payment";
 import { PaymentError } from "../../../errors/payment";
 import { AuthError } from "../../../errors/auth";
-import type { HandlerContext } from "@connectrpc/connect";
 import { formatZodError } from "../../../utils/formatZodError";
 import type {
   PaymentProviderConfig,
@@ -26,15 +18,13 @@ import {
 import { StorageAdapterFactory } from "../../../factory";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
-import { create } from "@bufbuild/protobuf";
-import { toJson } from "@bufbuild/protobuf";
 import type { UserId } from "../../../config/identifiers";
 import { DateTime } from "luxon";
 import { handleAddSession } from "../../../storage/adapter/postgres/handlers";
 
 export async function createCheckoutLink(
   req: CreateCheckoutLinkRequest,
-  context: HandlerContext
+  context: any
 ): Promise<CreateCheckoutLinkResponse> {
   const wideEventBuilder = context.values.get(wideEventContextKey);
 
@@ -77,16 +67,18 @@ export async function createCheckoutLink(
   );
   wideEventBuilder?.setPaymentContext({ sessionId: sessionResult.id });
 
-  return create(CreateCheckoutLinkResponseSchema, {
-    checkoutLink: checkoutResult.checkoutUrl,
-  });
+  const response = new CreateCheckoutLinkResponse();
+  response.setCheckoutlink(checkoutResult.checkoutUrl);
+  return response;
 }
 
 function validateRequest(
   req: CreateCheckoutLinkRequest
 ): CreateCheckoutLinkSchemaType {
   try {
-    const json = toJson(CreateCheckoutLinkRequestSchema, req);
+    const json = {
+      userId: req.getUserid(),
+    };
     return createCheckoutLinkSchema.parse(json);
   } catch (error) {
     throw formatZodError(error, (msg) => PaymentError.validationFailed(msg));

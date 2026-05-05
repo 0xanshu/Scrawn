@@ -1,4 +1,4 @@
-import { createContextKey } from "@connectrpc/connect";
+import { createContextKey } from "./auth";
 import { randomUUID } from "node:crypto";
 import type { WideEvent } from "../errors/logger";
 import { DateTime } from "luxon";

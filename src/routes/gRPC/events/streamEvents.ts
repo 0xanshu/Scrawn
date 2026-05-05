@@ -1,9 +1,6 @@
-import type { StreamEventRequest, StreamEventResponse } from "../../../gen/event/v1/event_pb";
-import { StreamEventResponseSchema } from "../../../gen/event/v1/event_pb";
+import { StreamEventRequest, StreamEventResponse } from "../../../gen/event/v1/event_pb";
 import { EventError } from "../../../errors/event";
-import type { HandlerContext } from "@connectrpc/connect";
 import { wideEventContextKey } from "../../../context/requestContext";
-import { create } from "@bufbuild/protobuf";
 import {
   extractApiKeyFromContext,
   validateAndParseStreamEvent,
@@ -13,7 +10,8 @@ import {
 
 export async function streamEvents(
   requestStream: AsyncIterable<StreamEventRequest>,
-  context: HandlerContext
+  context: any,
+  call?: any
 ): Promise<StreamEventResponse> {
   let eventsProcessed = 0;
   let userId: string | undefined;
@@ -44,10 +42,10 @@ export async function streamEvents(
       eventsProcessed += 1;
     }
 
-    return create(StreamEventResponseSchema, {
-      eventsProcessed,
-      message: `Successfully processed ${eventsProcessed} events`,
-    });
+    const response = new StreamEventResponse();
+    response.setEventsprocessed(eventsProcessed);
+    response.setMessage(`Successfully processed ${eventsProcessed} events`);
+    return response;
   } finally {
     // Always update the count, even on error
     wideEventBuilder?.setEventContext({ eventCount: eventsProcessed });
