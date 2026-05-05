@@ -1,149 +1,36 @@
-import type { Interceptor } from "@connectrpc/connect";
-import { ConnectError, Code } from "@connectrpc/connect";
+import { status as grpcStatus } from "@grpc/grpc-js";
 import { logger } from "../errors/logger";
 import {
   wideEventContextKey,
   generateRequestId,
   createWideEventBuilder,
 } from "../context/requestContext";
+import { apiKeyContextKey } from "../context/auth";
 
 /**
- * Map Connect error codes to HTTP status codes for logging.
- * Note: Code.OK (0) doesn't exist in Connect - successful responses don't throw.
+ * Logging interceptor for gRPC - implements wide events pattern
  */
-function connectCodeToHttpStatus(code: Code): number {
-  switch (code) {
-    case Code.Canceled:
-      return 499;
-    case Code.Unknown:
-      return 500;
-    case Code.InvalidArgument:
-      return 400;
-    case Code.DeadlineExceeded:
-      return 504;
-    case Code.NotFound:
-      return 404;
-    case Code.AlreadyExists:
-      return 409;
-    case Code.PermissionDenied:
-      return 403;
-    case Code.ResourceExhausted:
-      return 429;
-    case Code.FailedPrecondition:
-      return 400;
-    case Code.Aborted:
-      return 409;
-    case Code.OutOfRange:
-      return 400;
-    case Code.Unimplemented:
-      return 501;
-    case Code.Internal:
-      return 500;
-    case Code.Unavailable:
-      return 503;
-    case Code.DataLoss:
-      return 500;
-    case Code.Unauthenticated:
-      return 401;
-    default:
-      return 500;
-  }
-}
-
-interface ErrorDetails {
-  type: string;
-  message: string;
-  cause?: string;
-  code: Code;
-  stack?: string;
-}
-
-const isDev = process.env.NODE_ENV !== "production";
-
-/**
- * Extract error details from various error types.
- * Includes originalError from custom error classes and stack traces in development.
- */
-function extractErrorDetails(error: unknown): ErrorDetails {
-  // Handle our custom error classes (AuthError, APIKeyError, EventError, PaymentError, StorageError)
-  // They extend ConnectError and have `type` and `originalError` properties
-  if (error instanceof ConnectError) {
-    const customError = error as ConnectError & {
-      type?: string;
-      originalError?: Error;
-    };
-
-    // Build cause chain: prefer originalError (our custom errors), fallback to cause
-    let causeMessage: string | undefined;
-    if (customError.originalError) {
-      causeMessage = customError.originalError.message;
-      // If originalError itself has a cause, include it
-      if (customError.originalError.cause instanceof Error) {
-        causeMessage += ` -> ${customError.originalError.cause.message}`;
-      }
-    } else if (error.cause instanceof Error) {
-      causeMessage = error.cause.message;
-    }
-
-    return {
-      type: customError.type || error.name,
-      message: error.message,
-      cause: causeMessage,
-      code: error.code,
-      stack: isDev
-        ? customError.originalError?.stack || error.stack
-        : undefined,
-    };
-  }
-
-  if (error instanceof Error) {
-    return {
-      type: error.name,
-      message: error.message,
-      cause: error.cause instanceof Error ? error.cause.message : undefined,
-      code: Code.Internal,
-      stack: isDev ? error.stack : undefined,
-    };
-  }
-
-  return {
-    type: "UnknownError",
-    message: String(error),
-    cause: undefined,
-    code: Code.Internal,
-  };
-}
-
-/**
- * Logging interceptor that implements the wide events pattern.
- *
- * This interceptor:
- * 1. Generates a unique request ID
- * 2. Creates a WideEventBuilder and attaches it to the request context
- * 3. Captures timing information
- * 4. Emits a single wide event at request completion (success or failure)
- *
- * Place this interceptor FIRST in the chain to capture all requests,
- * including those that fail authentication.
- */
-export function loggingInterceptor(): Interceptor {
-  return (next) => async (req) => {
+export function loggingInterceptor(
+  methodPath: string,
+  handler: (call: any, callback: any) => void | Promise<void>
+): (call: any, callback: any) => void | Promise<void> {
+  return async (call: any, callback: any) => {
     const requestId = generateRequestId();
-    const method = String(req.method.kind); // "unary", "server_streaming", "client_streaming", "bidi_streaming"
-    const url = req.url;
+    const method = "unary"; // Simplified - can detect stream type from handler signature
+    const url = methodPath;
 
     const builder = createWideEventBuilder(requestId, method, url);
 
-    // Attach builder to request context for other interceptors and handlers
-    req.contextValues.set(wideEventContextKey, builder);
+  // Attach builder to call object
+  call[wideEventContextKey] = builder;
 
     try {
-      const response = await next(req);
+      const result = await handler(call, callback);
       builder.setSuccess(200);
-      return response;
+      return result;
     } catch (error) {
       const errorDetails = extractErrorDetails(error);
-      const statusCode = connectCodeToHttpStatus(errorDetails.code);
+      const statusCode = grpcStatusToHttpStatus(errorDetails.code);
 
       builder.setError(statusCode, {
         type: errorDetails.type,
@@ -157,5 +44,73 @@ export function loggingInterceptor(): Interceptor {
       const event = builder.build();
       logger.emit(event);
     }
+  };
+}
+
+function grpcStatusToHttpStatus(code: number): number {
+  switch (code) {
+    case grpcStatus.CANCELLED:
+      return 499;
+    case grpcStatus.UNKNOWN:
+      return 500;
+    case grpcStatus.INVALID_ARGUMENT:
+      return 400;
+    case grpcStatus.DEADLINE_EXCEEDED:
+      return 504;
+    case grpcStatus.NOT_FOUND:
+      return 404;
+    case grpcStatus.ALREADY_EXISTS:
+      return 409;
+    case grpcStatus.PERMISSION_DENIED:
+      return 403;
+    case grpcStatus.RESOURCE_EXHAUSTED:
+      return 429;
+    case grpcStatus.FAILED_PRECONDITION:
+      return 400;
+    case grpcStatus.ABORTED:
+      return 409;
+    case grpcStatus.OUT_OF_RANGE:
+      return 400;
+    case grpcStatus.UNIMPLEMENTED:
+      return 501;
+    case grpcStatus.INTERNAL:
+      return 500;
+    case grpcStatus.UNAVAILABLE:
+      return 503;
+    case grpcStatus.DATA_LOSS:
+      return 500;
+    case grpcStatus.UNAUTHENTICATED:
+      return 401;
+    default:
+      return 500;
+  }
+}
+
+interface ErrorDetails {
+  type: string;
+  message: string;
+  cause?: string;
+  code: number;
+  stack?: string;
+}
+
+const isDev = process.env.NODE_ENV !== "production";
+
+function extractErrorDetails(error: unknown): ErrorDetails {
+  if (error instanceof Error) {
+    return {
+      type: error.name,
+      message: error.message,
+      cause: error.cause instanceof Error ? error.cause.message : undefined,
+      code: (error as any).code || grpcStatus.INTERNAL,
+      stack: isDev ? error.stack : undefined,
+    };
+  }
+
+  return {
+    type: "UnknownError",
+    message: String(error),
+    cause: undefined,
+    code: grpcStatus.INTERNAL,
   };
 }

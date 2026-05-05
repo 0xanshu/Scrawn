@@ -1,4 +1,3 @@
-import { createContextKey } from "./auth";
 import { randomUUID } from "node:crypto";
 import type { WideEvent } from "../errors/logger";
 import { DateTime } from "luxon";
@@ -6,9 +5,7 @@ import { DateTime } from "luxon";
 /**
  * Context key for accessing the WideEventBuilder during request processing.
  */
-export const wideEventContextKey = createContextKey<WideEventBuilder | null>(
-  null
-);
+export const wideEventContextKey = Symbol("wideEventContextKey");
 
 /**
  * Generate a unique request ID using UUID v4.
@@ -78,9 +75,9 @@ export class WideEventBuilder {
     return this;
   }
 
-/**
-    * Set payment/pricing context.
-    */
+  /**
+   * Set payment/pricing context.
+   */
   setPaymentContext(data: {
     creditAmount?: number;
     debitAmount?: number;

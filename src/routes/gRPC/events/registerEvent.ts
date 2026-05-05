@@ -1,35 +1,40 @@
-import { RegisterEventRequest, RegisterEventResponse } from "../../../gen/event/v1/event_pb";
+import {
+  RegisterEventRequest,
+  RegisterEventResponse,
+} from "../../../gen/event/v1/event_pb.js";
+import type { WideEventBuilder } from "../../../context/requestContext";
+import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import {
-  extractApiKeyFromContext,
   validateAndParseRegisterEvent,
   createEventInstance,
   storeEvent,
 } from "../../../utils/eventHelpers";
+export async function registerEvent(call: any, callback: any): Promise<void> {
+  const req = call.request as RegisterEventRequest;
+  const wideEventBuilder = call[wideEventContextKey] as WideEventBuilder | null;
 
-export async function registerEvent(
-  req: RegisterEventRequest,
-  context: any
-): Promise<RegisterEventResponse> {
-  const wideEventBuilder = context.values.get(wideEventContextKey);
+  try {
+    // Extract API key ID from context
+    const apiKeyId = call[apiKeyContextKey] as string;
 
-  // Extract API key ID from context
-  const apiKeyId = extractApiKeyFromContext(context);
+    // Validate and parse the incoming event
+    const eventSkeleton = await validateAndParseRegisterEvent(req);
 
-  // Validate and parse the incoming event
-  const eventSkeleton = await validateAndParseRegisterEvent(req);
+    // Add business context to wide event
+    wideEventBuilder?.setUser(eventSkeleton.userId);
+    wideEventBuilder?.setEventContext({ eventType: eventSkeleton.type });
 
-  // Add business context to wide event
-  wideEventBuilder?.setUser(eventSkeleton.userId);
-  wideEventBuilder?.setEventContext({ eventType: eventSkeleton.type });
+    // Create the appropriate event instance
+    const event = createEventInstance(eventSkeleton);
 
-  // Create the appropriate event instance
-  const event = createEventInstance(eventSkeleton);
+    // Store the event
+    await storeEvent(event, apiKeyId);
 
-  // Store the event
-  await storeEvent(event, apiKeyId);
-
-  const response = new RegisterEventResponse();
-  response.setRandom("Event stored successfully");
-  return response;
+    const response = new RegisterEventResponse();
+    response.setRandom("Event stored successfully");
+    callback(null, response);
+  } catch (error) {
+    callback(error);
+  }
 }

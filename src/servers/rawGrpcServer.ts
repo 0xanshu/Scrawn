@@ -7,44 +7,44 @@ import { registerEvent } from "../routes/gRPC/events/registerEvent";
 import { streamEvents } from "../routes/gRPC/events/streamEvents";
 import { createCheckoutLink } from "../routes/gRPC/payment/createCheckoutLink";
 import { logger } from "../errors/logger";
+import { authInterceptor } from "../interceptors/auth";
+import { loggingInterceptor } from "../interceptors/logging";
 
 export function startRawGrpcServer(grpcPort: number): void {
   const server = new grpc.Server();
 
+  // Wrap handlers with interceptors
+  const wrappedCreateAPIKey = loggingInterceptor(
+    "/AuthService/CreateAPIKey",
+    authInterceptor("/AuthService/CreateAPIKey", createAPIKey)
+  );
+
+  const wrappedRegisterEvent = loggingInterceptor(
+    "/EventService/RegisterEvent",
+    authInterceptor("/EventService/RegisterEvent", registerEvent)
+  );
+
+  const wrappedStreamEvents = loggingInterceptor(
+    "/EventService/StreamEvents",
+    authInterceptor("/EventService/StreamEvents", streamEvents)
+  );
+
+  const wrappedCreateCheckoutLink = loggingInterceptor(
+    "/PaymentService/CreateCheckoutLink",
+    authInterceptor("/PaymentService/CreateCheckoutLink", createCheckoutLink)
+  );
+
   server.addService((authGrpc as any).AuthServiceService, {
-    createAPIKey: async (call: any, callback: any) => {
-      try {
-        const result = await createAPIKey(call.request, { values: new Map() } as any);
-        callback(null, result);
-      } catch (err) {
-        callback(err);
-      }
-    },
+    createAPIKey: wrappedCreateAPIKey,
   });
 
   server.addService((eventGrpc as any).EventServiceService, {
-    registerEvent: async (call: any, callback: any) => {
-      try {
-        const result = await registerEvent(call.request, { values: new Map() } as any);
-        callback(null, result);
-      } catch (err) {
-        callback(err);
-      }
-    },
-    streamEvents: (call: any) => {
-      streamEvents(call.request, call, { values: new Map() } as any);
-    },
+    registerEvent: wrappedRegisterEvent,
+    streamEvents: wrappedStreamEvents,
   });
 
   server.addService((paymentGrpc as any).PaymentServiceService, {
-    createCheckoutLink: async (call: any, callback: any) => {
-      try {
-        const result = await createCheckoutLink(call.request, { values: new Map() } as any);
-        callback(null, result);
-      } catch (err) {
-        callback(err);
-      }
-    },
+    createCheckoutLink: wrappedCreateCheckoutLink,
   });
 
   server.bindAsync(

@@ -1,29 +1,31 @@
-import { StreamEventRequest, StreamEventResponse } from "../../../gen/event/v1/event_pb";
+import {
+  StreamEventRequest,
+  StreamEventResponse,
+} from "../../../gen/event/v1/event_pb.js";
 import { EventError } from "../../../errors/event";
+import type { WideEventBuilder } from "../../../context/requestContext";
 import { wideEventContextKey } from "../../../context/requestContext";
 import {
-  extractApiKeyFromContext,
   validateAndParseStreamEvent,
   createEventInstance,
   storeEvent,
 } from "../../../utils/eventHelpers";
+import { apiKeyContextKey } from "../../../context/auth";
 
-export async function streamEvents(
-  requestStream: AsyncIterable<StreamEventRequest>,
-  context: any,
-  call?: any
-): Promise<StreamEventResponse> {
+export async function streamEvents(call: any): Promise<void> {
   let eventsProcessed = 0;
   let userId: string | undefined;
-
-  const wideEventBuilder = context.values.get(wideEventContextKey);
-
-  // Extract API key ID from context
-  const apiKeyId = extractApiKeyFromContext(context);
+  const wideEventBuilder = call[wideEventContextKey] as WideEventBuilder | null;
 
   try {
-    for await (const req of requestStream) {
-      const eventSkeleton = await validateAndParseStreamEvent(req);
+    // Extract API key ID from context
+    const apiKeyId = call[apiKeyContextKey] as string;
+
+    // Handle client stream
+    for await (const req of call) {
+      const eventSkeleton = await validateAndParseStreamEvent(
+        req as StreamEventRequest
+      );
 
       // Capture userId from first event for logging
       if (!userId) {
@@ -45,7 +47,9 @@ export async function streamEvents(
     const response = new StreamEventResponse();
     response.setEventsprocessed(eventsProcessed);
     response.setMessage(`Successfully processed ${eventsProcessed} events`);
-    return response;
+    call.end(response);
+  } catch (error) {
+    call.destroy(error);
   } finally {
     // Always update the count, even on error
     wideEventBuilder?.setEventContext({ eventCount: eventsProcessed });

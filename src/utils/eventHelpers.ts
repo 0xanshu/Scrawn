@@ -17,8 +17,8 @@ import { RegisterEventRequest, StreamEventRequest } from "../gen/event/v1/event_
 /**
  * Extract API key ID from the request context
  */
-export function extractApiKeyFromContext(context: any): string {
-  const apiKeyId = context.values.get(apiKeyContextKey);
+export function extractApiKeyFromContext(call: any): string {
+  const apiKeyId = call[apiKeyContextKey] as string;
   if (!apiKeyId) {
     throw AuthError.invalidAPIKey("API key ID not found in context");
   }
@@ -37,7 +37,7 @@ export async function validateAndParseRegisterEvent(
       type: req.getType(),
       userId: req.getUserid(),
       reportedTimestamp: req.getReportedtimestamp(),
-      data: JSON.parse(req.getDatacase1()),
+      data: req.getSdkcall() ? JSON.stringify(req.getSdkcall()!.toObject()) : "{}",
     };
     return await registerEventSchema.parseAsync(json);
   } catch (error) {
@@ -56,7 +56,11 @@ export async function validateAndParseStreamEvent(
       type: req.getType(),
       userId: req.getUserid(),
       reportedTimestamp: req.getReportedtimestamp(),
-      data: JSON.parse(req.getDatacase1()),
+      data: req.getSdkcall()
+        ? JSON.stringify(req.getSdkcall()!.toObject())
+        : req.getAitokenusage()
+        ? JSON.stringify(req.getAitokenusage()!.toObject())
+        : "{}",
     };
     return await streamEventSchema.parseAsync(json);
   } catch (error) {

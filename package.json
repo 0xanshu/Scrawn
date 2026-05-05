@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "gen": "cd proto && bunx buf generate",
+    "gen": "cd proto && bunx buf generate && bunx grpc_tools_node_protoc --js_out=import_style=commonjs,binary:../src/gen auth/v1/auth.proto event/v1/event.proto payment/v1/payment.proto",
     "dev:backend": "bun --watch src/server.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
@@ -15,7 +15,6 @@
     "proto:push": "cd proto && git add . && git commit -s -m \"$1\" && git push && cd .."
   },
   "devDependencies": {
-    "@bufbuild/buf": "^1.69.0",
     "@types/bun": "latest",
     "@types/expr-eval": "^1.1.2",
     "@types/luxon": "^3.7.1",
@@ -32,8 +31,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@connectrpc/connect": "^2.1.1",
-    "@typescript/native-preview": "^7.0.0-dev.20260502.1",
+
     "bullmq": "^5.75.2",
     "dodopayments": "^2.30.0",
     "drizzle-orm": "^0.44.7",
