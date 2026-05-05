@@ -1,48 +1,74 @@
 import { status as grpcStatus } from "@grpc/grpc-js";
+import type { sendUnaryData, ServerErrorResponse } from "@grpc/grpc-js";
 import { logger } from "../errors/logger";
 import {
   wideEventContextKey,
   generateRequestId,
   createWideEventBuilder,
 } from "../context/requestContext";
-import { apiKeyContextKey } from "../context/auth";
+import type { GrpcHandler, GrpcCall } from "./auth";
 
 /**
  * Logging interceptor for gRPC - implements wide events pattern
  */
-export function loggingInterceptor(
+export function loggingInterceptor<Req, Res>(
   methodPath: string,
-  handler: (call: any, callback: any) => void | Promise<void>
-): (call: any, callback: any) => void | Promise<void> {
-  return async (call: any, callback: any) => {
+  handler: GrpcHandler<Req, Res>
+): GrpcHandler<Req, Res> {
+  return (call: GrpcCall<Req, Res>, callback?: sendUnaryData<Res>) => {
     const requestId = generateRequestId();
     const method = "unary"; // Simplified - can detect stream type from handler signature
     const url = methodPath.startsWith("/") ? methodPath : `/${methodPath}`;
 
     const builder = createWideEventBuilder(requestId, method, url);
 
-  // Attach builder to call object
-  call[wideEventContextKey] = builder;
+    // Attach builder to call object
+    call[wideEventContextKey] = builder;
 
-    try {
-      const result = await handler(call, callback);
-      builder.setSuccess(200);
-      return result;
-    } catch (error) {
-      const errorDetails = extractErrorDetails(error);
-      const statusCode = grpcStatusToHttpStatus(errorDetails.code);
+    // Wrap callback to capture errors
+    const originalCallback = callback;
+    const wrappedCallback: sendUnaryData<Res> = (error, response, trailer, flags) => {
+      if (error) {
+        const errorDetails = extractErrorDetails(error);
+        const statusCode = grpcStatusToHttpStatus(errorDetails.code);
 
-      builder.setError(statusCode, {
-        type: errorDetails.type,
-        message: errorDetails.message,
-        cause: errorDetails.cause,
-        stack: errorDetails.stack,
-      });
+        builder.setError(statusCode, {
+          type: errorDetails.type,
+          message: errorDetails.message,
+          cause: errorDetails.cause,
+          stack: errorDetails.stack,
+        });
+      } else {
+        builder.setSuccess(200);
+      }
 
-      throw error;
-    } finally {
       const event = builder.build();
       logger.emit(event);
+
+      if (originalCallback) {
+        originalCallback(error, response, trailer, flags);
+      }
+    };
+
+    const result = handler(call, wrappedCallback);
+
+    // Handle async handlers that might throw
+    if (result && typeof result.then === 'function') {
+      return result.catch((error: unknown) => {
+        if (!builder['event'].outcome) {
+          const errorDetails = extractErrorDetails(error);
+          const statusCode = grpcStatusToHttpStatus(errorDetails.code);
+          builder.setError(statusCode, {
+            type: errorDetails.type,
+            message: errorDetails.message,
+            cause: errorDetails.cause,
+            stack: errorDetails.stack,
+          });
+          const event = builder.build();
+          logger.emit(event);
+        }
+        throw error;
+      });
     }
   };
 }
@@ -102,7 +128,7 @@ function extractErrorDetails(error: unknown): ErrorDetails {
       type: error.name,
       message: error.message,
       cause: error.cause instanceof Error ? error.cause.message : undefined,
-      code: (error as any).code || grpcStatus.INTERNAL,
+      code: "code" in error ? (error as { code: number }).code : grpcStatus.INTERNAL,
       stack: isDev ? error.stack : undefined,
     };
   }

@@ -7,43 +7,46 @@ import { registerEvent } from "../routes/gRPC/events/registerEvent";
 import { streamEvents } from "../routes/gRPC/events/streamEvents";
 import { createCheckoutLink } from "../routes/gRPC/payment/createCheckoutLink";
 import { logger } from "../errors/logger";
-import { authInterceptor } from "../interceptors/auth";
+import { authInterceptor, type GrpcUntypedHandler } from "../interceptors/auth";
 import { loggingInterceptor } from "../interceptors/logging";
 
 export function startRawGrpcServer(grpcPort: number): void {
   const server = new grpc.Server();
 
   // Wrap handlers with interceptors
-  const wrappedCreateAPIKey = loggingInterceptor(
+  const wrappedCreateAPIKey: GrpcUntypedHandler = loggingInterceptor(
     "/auth.v1.AuthService/CreateAPIKey",
     authInterceptor("/auth.v1.AuthService/CreateAPIKey", createAPIKey)
   );
 
-  const wrappedRegisterEvent = loggingInterceptor(
+  const wrappedRegisterEvent: GrpcUntypedHandler = loggingInterceptor(
     "/event.v1.EventService/RegisterEvent",
     authInterceptor("/event.v1.EventService/RegisterEvent", registerEvent)
   );
 
-  const wrappedStreamEvents = loggingInterceptor(
+  const wrappedStreamEvents: GrpcUntypedHandler = loggingInterceptor(
     "/event.v1.EventService/StreamEvents",
     authInterceptor("/event.v1.EventService/StreamEvents", streamEvents)
   );
 
-  const wrappedCreateCheckoutLink = loggingInterceptor(
+  const wrappedCreateCheckoutLink: GrpcUntypedHandler = loggingInterceptor(
     "/payment.v1.PaymentService/CreateCheckoutLink",
-    authInterceptor("/payment.v1.PaymentService/CreateCheckoutLink", createCheckoutLink)
+    authInterceptor(
+      "/payment.v1.PaymentService/CreateCheckoutLink",
+      createCheckoutLink
+    )
   );
 
-  server.addService((authGrpc as any).AuthServiceService, {
+  server.addService(authGrpc.AuthServiceService, {
     createAPIKey: wrappedCreateAPIKey,
   });
 
-  server.addService((eventGrpc as any).EventServiceService, {
+  server.addService(eventGrpc.EventServiceService, {
     registerEvent: wrappedRegisterEvent,
     streamEvents: wrappedStreamEvents,
   });
 
-  server.addService((paymentGrpc as any).PaymentServiceService, {
+  server.addService(paymentGrpc.PaymentServiceService, {
     createCheckoutLink: wrappedCreateCheckoutLink,
   });
 
