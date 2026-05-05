@@ -3,7 +3,6 @@ import { CreateAPIKeyResponseSchema, CreateAPIKeyRequestSchema } from "../../../
 import { createAPIKeySchema } from "../../../zod/apikey";
 import { APIKeyError } from "../../../errors/apikey";
 import { AuthError } from "../../../errors/auth";
-import { ZodError } from "zod";
 import { generateAPIKey } from "../../../utils/generateAPIKey";
 import { StorageAdapterFactory } from "../../../factory";
 import { AddKey } from "../../../events/RawEvents/AddKey";
@@ -13,6 +12,7 @@ import { wideEventContextKey } from "../../../context/requestContext";
 import { hashAPIKey } from "../../../utils/hashAPIKey";
 import { create } from "@bufbuild/protobuf";
 import { toJson } from "@bufbuild/protobuf";
+import { formatZodError } from "../../../utils/formatZodError";
 
 export async function createAPIKey(
   req: CreateAPIKeyRequest,
@@ -76,14 +76,6 @@ function validateRequest(req: CreateAPIKeyRequest) {
     const json = toJson(CreateAPIKeyRequestSchema, req);
     return createAPIKeySchema.parse(json);
   } catch (error) {
-    if (error instanceof ZodError) {
-      const issues = error.issues
-        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-        .join("; ");
-      throw APIKeyError.validationFailed(issues);
-    }
-    throw APIKeyError.validationFailed(
-      error instanceof Error ? error.message : String(error)
-    );
+    throw formatZodError(error, (msg) => APIKeyError.validationFailed(msg));
   }
 }

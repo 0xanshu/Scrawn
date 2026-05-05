@@ -12,8 +12,8 @@ import {
 } from "../../../zod/payment";
 import { PaymentError } from "../../../errors/payment";
 import { AuthError } from "../../../errors/auth";
-import { ZodError } from "zod";
 import type { HandlerContext } from "@connectrpc/connect";
+import { formatZodError } from "../../../utils/formatZodError";
 import type {
   PaymentProviderConfig,
   CheckoutParams,
@@ -89,15 +89,7 @@ function validateRequest(
     const json = toJson(CreateCheckoutLinkRequestSchema, req);
     return createCheckoutLinkSchema.parse(json);
   } catch (error) {
-    if (error instanceof ZodError) {
-      const issues = error.issues
-        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-        .join("; ");
-      throw PaymentError.validationFailed(issues);
-    }
-    throw PaymentError.validationFailed(
-      error instanceof Error ? error.message : String(error)
-    );
+    throw formatZodError(error, (msg) => PaymentError.validationFailed(msg));
   }
 }
 
