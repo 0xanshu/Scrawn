@@ -1,4 +1,4 @@
-// package: 
+// package: event.v1
 // file: event/v1/event.proto
 
 import * as jspb from "google-protobuf";

@@ -1,4 +1,4 @@
-// package: 
+// package: payment.v1
 // file: payment/v1/payment.proto
 
 import * as jspb from "google-protobuf";

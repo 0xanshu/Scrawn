@@ -1,4 +1,4 @@
-// package: 
+// package: auth.v1
 // file: auth/v1/auth.proto
 
 import * as jspb from "google-protobuf";

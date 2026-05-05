@@ -17,7 +17,7 @@ export function loggingInterceptor(
   return async (call: any, callback: any) => {
     const requestId = generateRequestId();
     const method = "unary"; // Simplified - can detect stream type from handler signature
-    const url = methodPath;
+    const url = methodPath.startsWith("/") ? methodPath : `/${methodPath}`;
 
     const builder = createWideEventBuilder(requestId, method, url);
 

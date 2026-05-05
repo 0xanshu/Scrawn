@@ -15,23 +15,23 @@ export function startRawGrpcServer(grpcPort: number): void {
 
   // Wrap handlers with interceptors
   const wrappedCreateAPIKey = loggingInterceptor(
-    "/AuthService/CreateAPIKey",
-    authInterceptor("/AuthService/CreateAPIKey", createAPIKey)
+    "/auth.v1.AuthService/CreateAPIKey",
+    authInterceptor("/auth.v1.AuthService/CreateAPIKey", createAPIKey)
   );
 
   const wrappedRegisterEvent = loggingInterceptor(
-    "/EventService/RegisterEvent",
-    authInterceptor("/EventService/RegisterEvent", registerEvent)
+    "/event.v1.EventService/RegisterEvent",
+    authInterceptor("/event.v1.EventService/RegisterEvent", registerEvent)
   );
 
   const wrappedStreamEvents = loggingInterceptor(
-    "/EventService/StreamEvents",
-    authInterceptor("/EventService/StreamEvents", streamEvents)
+    "/event.v1.EventService/StreamEvents",
+    authInterceptor("/event.v1.EventService/StreamEvents", streamEvents)
   );
 
   const wrappedCreateCheckoutLink = loggingInterceptor(
-    "/PaymentService/CreateCheckoutLink",
-    authInterceptor("/PaymentService/CreateCheckoutLink", createCheckoutLink)
+    "/payment.v1.PaymentService/CreateCheckoutLink",
+    authInterceptor("/payment.v1.PaymentService/CreateCheckoutLink", createCheckoutLink)
   );
 
   server.addService((authGrpc as any).AuthServiceService, {

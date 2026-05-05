@@ -1,5 +1,8 @@
 import { apiKeyContextKey } from "../context/auth";
-import { wideEventContextKey, type WideEventBuilder } from "../context/requestContext";
+import {
+  wideEventContextKey,
+  type WideEventBuilder,
+} from "../context/requestContext";
 import { AuthError } from "../errors/auth";
 import { apiKeyCache } from "../utils/apiKeyCache";
 import { getPostgresDB } from "../storage/db/postgres/db";
@@ -9,9 +12,7 @@ import { hashAPIKey } from "../utils/hashAPIKey";
 import { DateTime } from "luxon";
 
 // Whitelisted endpoints that don't require auth
-const no_auth = [
-  "/AuthService/CreateAPIKey",
-];
+const no_auth = ["/auth.v1.AuthService/CreateAPIKey", "CreateAPIKey"];
 
 export type GrpcHandler = (call: any, callback: any) => void | Promise<void>;
 
@@ -28,7 +29,9 @@ export function authInterceptor(
       return handler(call, callback);
     }
 
-    const wideEventBuilder = call[wideEventContextKey] as WideEventBuilder | null;
+    const wideEventBuilder = call[
+      wideEventContextKey
+    ] as WideEventBuilder | null;
 
     // Extract authorization from metadata
     const authorization = call.metadata?.get("authorization")?.[0];
