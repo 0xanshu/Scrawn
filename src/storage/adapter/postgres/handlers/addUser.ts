@@ -1,7 +1,6 @@
 import { getPostgresDB } from "../../../db/postgres/db";
 import { usersTable } from "../../../db/postgres/schema";
 import { type SqlRecord } from "../../../../interface/event/Event.ts";
-import { onConflictDoNothing } from "drizzle-orm";
 
 export async function handleAddUser(
   event_data: SqlRecord<"USER">

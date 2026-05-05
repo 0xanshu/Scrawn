@@ -24,7 +24,7 @@ import type { DateTime } from "luxon";
 export class PostgresAdapter implements StorageAdapter {
   connectionObject = getPostgresDB();
 
-  async add(serialized: SerializedEvent<EventKind>, apiKeyId: string) {
+  async add(serialized: SerializedEvent<EventKind>, apiKeyId?: string) {
     let event_data: SqlRecord<EventKind>;
 
     try {

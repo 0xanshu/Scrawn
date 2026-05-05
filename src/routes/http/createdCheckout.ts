@@ -113,7 +113,6 @@ export async function handleDodoWebhook(
       .where(eq(sessionsTable.sessionId, checkout_session_id))
       .limit(1);
 
-
     if (sessions.length === 0 || !sessions[0]) {
       builder.setError(404, {
         type: "NotFoundError",
@@ -130,12 +129,14 @@ export async function handleDodoWebhook(
     if (session.processed) {
       builder.setSuccess(200);
       builder.addContext({ ignored: true });
-      return { statusCode: 200, body: { message: "Session already processed" } };
+      return {
+        statusCode: 200,
+        body: { message: "Session already processed" },
+      };
     }
 
     const userId = session.userId;
     const billedUpto = session.billed_upto;
-
 
     if (!userId) {
       builder.setError(500, {
