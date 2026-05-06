@@ -1,5 +1,6 @@
-import { randomBytes, createHmac } from "crypto";
-import { randomUUID } from "crypto";
+import { createHmac, randomUUID } from "crypto";
+import { generateAPIKey } from "./generateAPIKey";
+import { DateTime } from "luxon";
 
 const HMAC_SECRET = process.env.HMAC_SECRET;
 
@@ -9,27 +10,7 @@ if (!HMAC_SECRET) {
   );
 }
 
-// Type assertion after validation
 const SECRET: string = HMAC_SECRET;
-
-/**
- * Generate an API key in the same format as the main system
- */
-function generateAPIKey(): string {
-  const randomPart = randomBytes(24)
-    .toString("base64")
-    .replace(/[+/=]/g, (char) => {
-      const replacements: { [key: string]: string } = {
-        "+": "a",
-        "/": "b",
-        "=": "c",
-      };
-      return replacements[char] || char;
-    })
-    .substring(0, 32);
-
-  return `scrn_${randomPart}`;
-}
 
 /**
  * Hash an API key using HMAC-SHA256
@@ -54,10 +35,8 @@ export function generateInitialApiKeyData(): InitialApiKeyData {
   const apiKey = generateAPIKey();
   const apiKeyHash = hashAPIKey(apiKey);
   const name = "Dashboard Key";
-  const createdAt = new Date().toISOString();
-  const expiresAt = new Date(
-    Date.now() + 365 * 24 * 60 * 60 * 1000
-  ).toISOString(); // 1 year from now
+  const createdAt = DateTime.utc().toISO();
+  const expiresAt = DateTime.utc().plus({ days: 365 }).toISO();
 
   const insertSql =
     "INSERT INTO api_keys (id, name, key, created_at, expires_at, revoked, revoked_at)\n" +

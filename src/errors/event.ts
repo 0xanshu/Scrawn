@@ -1,6 +1,6 @@
-import { Code, ConnectError } from "@connectrpc/connect";
+import { status } from "@grpc/grpc-js";
 
-export enum EventErrorType {
+enum EventErrorType {
   INVALID_PAYLOAD = "INVALID_PAYLOAD",
   UNSUPPORTED_EVENT_TYPE = "UNSUPPORTED_EVENT_TYPE",
   VALIDATION_FAILED = "VALIDATION_FAILED",
@@ -15,21 +15,20 @@ export interface EventErrorContext {
   type: EventErrorType;
   message: string;
   originalError?: Error;
-  code: Code;
+  code: status;
 }
 
-export class EventError extends ConnectError {
+export class EventError extends Error {
   readonly type: EventErrorType;
   readonly originalError?: Error;
+  readonly code: status;
 
   constructor(context: EventErrorContext) {
-    super(context.message, context.code);
+    super(context.message);
     this.name = "EventError";
     this.type = context.type;
     this.originalError = context.originalError;
-
-    // Maintain proper prototype chain for instanceof checks
-    Object.setPrototypeOf(this, EventError.prototype);
+    this.code = context.code;
   }
 
   static invalidPayload(details?: string, originalError?: Error): EventError {
@@ -38,7 +37,7 @@ export class EventError extends ConnectError {
       message: details
         ? `Invalid event payload: ${details}`
         : "Invalid event payload",
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -50,7 +49,7 @@ export class EventError extends ConnectError {
     return new EventError({
       type: EventErrorType.UNSUPPORTED_EVENT_TYPE,
       message: `Unsupported event type: ${eventType}`,
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -59,7 +58,7 @@ export class EventError extends ConnectError {
     return new EventError({
       type: EventErrorType.VALIDATION_FAILED,
       message: `Event validation failed: ${details}`,
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -73,7 +72,7 @@ export class EventError extends ConnectError {
       message: details
         ? `Failed to serialize event: ${details}`
         : "Failed to serialize event",
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }
@@ -82,7 +81,7 @@ export class EventError extends ConnectError {
     return new EventError({
       type: EventErrorType.INVALID_USER_ID,
       message: userId ? `Invalid user ID: ${userId}` : "Invalid user ID format",
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -91,7 +90,7 @@ export class EventError extends ConnectError {
     return new EventError({
       type: EventErrorType.MISSING_DATA,
       message: `Missing required event data: ${field}`,
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -104,7 +103,7 @@ export class EventError extends ConnectError {
     return new EventError({
       type: EventErrorType.INVALID_DATA_FORMAT,
       message: `Invalid data format for ${field}. Expected ${expectedFormat}`,
-      code: Code.InvalidArgument,
+      code: status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -114,7 +113,7 @@ export class EventError extends ConnectError {
     return new EventError({
       type: EventErrorType.UNKNOWN,
       message: `Unexpected event processing error: ${details}`,
-      code: Code.Internal,
+      code: status.INTERNAL,
       originalError,
     });
   }

@@ -1,6 +1,6 @@
-import { Code, ConnectError } from "@connectrpc/connect";
+import { status as Status } from "@grpc/grpc-js";
 
-export enum AuthErrorType {
+enum AuthErrorType {
   MISSING_HEADER = "MISSING_HEADER",
   INVALID_HEADER_FORMAT = "INVALID_HEADER_FORMAT",
   INVALID_API_KEY = "INVALID_API_KEY",
@@ -14,31 +14,27 @@ export interface AuthErrorContext {
   type: AuthErrorType;
   message: string;
   originalError?: Error;
-  code: Code;
+  code: Status;
 }
 
-export class AuthError extends ConnectError {
+export class AuthError extends Error {
   readonly type: AuthErrorType;
   readonly originalError?: Error;
+  readonly code: Status;
 
   constructor(context: AuthErrorContext) {
-    super(context.message, context.code);
+    super(context.message);
     this.name = "AuthError";
     this.type = context.type;
     this.originalError = context.originalError;
-
-    // Fix prototype chain for instanceof checks
-    // Must set AuthError.prototype after ConnectError constructor
-    if (Object.getPrototypeOf(this) !== AuthError.prototype) {
-      Object.setPrototypeOf(this, AuthError.prototype);
-    }
+    this.code = context.code;
   }
 
   static missingHeader(): AuthError {
     return new AuthError({
       type: AuthErrorType.MISSING_HEADER,
       message: "Missing Authorization header",
-      code: Code.Unauthenticated,
+      code: Status.UNAUTHENTICATED,
     });
   }
 
@@ -46,7 +42,7 @@ export class AuthError extends ConnectError {
     return new AuthError({
       type: AuthErrorType.INVALID_HEADER_FORMAT,
       message: 'Authorization header must be in format "Bearer <api_key>"',
-      code: Code.Unauthenticated,
+      code: Status.UNAUTHENTICATED,
     });
   }
 
@@ -54,7 +50,7 @@ export class AuthError extends ConnectError {
     return new AuthError({
       type: AuthErrorType.INVALID_API_KEY,
       message: details ? `Invalid API key: ${details}` : "Invalid API key",
-      code: Code.Unauthenticated,
+      code: Status.UNAUTHENTICATED,
     });
   }
 
@@ -62,7 +58,7 @@ export class AuthError extends ConnectError {
     return new AuthError({
       type: AuthErrorType.EXPIRED_API_KEY,
       message: "API key has expired",
-      code: Code.Unauthenticated,
+      code: Status.UNAUTHENTICATED,
     });
   }
 
@@ -70,7 +66,7 @@ export class AuthError extends ConnectError {
     return new AuthError({
       type: AuthErrorType.REVOKED_API_KEY,
       message: "API key has been revoked",
-      code: Code.Unauthenticated,
+      code: Status.UNAUTHENTICATED,
     });
   }
 
@@ -78,7 +74,7 @@ export class AuthError extends ConnectError {
     return new AuthError({
       type: AuthErrorType.DATABASE_ERROR,
       message: "Failed to verify API key",
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }
@@ -88,7 +84,7 @@ export class AuthError extends ConnectError {
     return new AuthError({
       type: AuthErrorType.UNKNOWN,
       message: `Unexpected authentication error: ${details}`,
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }

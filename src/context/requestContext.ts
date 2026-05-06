@@ -1,13 +1,11 @@
-import { createContextKey } from "@connectrpc/connect";
 import { randomUUID } from "node:crypto";
 import type { WideEvent } from "../errors/logger";
+import { DateTime } from "luxon";
 
 /**
  * Context key for accessing the WideEventBuilder during request processing.
  */
-export const wideEventContextKey = createContextKey<WideEventBuilder | null>(
-  null
-);
+export const wideEventContextKey = Symbol.for("wideEventContextKey");
 
 /**
  * Generate a unique request ID using UUID v4.
@@ -41,12 +39,12 @@ export class WideEventBuilder {
   private startTime: number;
 
   constructor(requestId: string, method: string, url: string) {
-    this.startTime = Date.now();
+    this.startTime = DateTime.utc().toMillis();
     this.event = {
       requestId,
       method,
       path: extractPath(url),
-      timestamp: new Date().toISOString(),
+      timestamp: DateTime.utc().toISO(),
       env: process.env.NODE_ENV || "development",
     };
   }
@@ -77,9 +75,9 @@ export class WideEventBuilder {
     return this;
   }
 
-/**
-    * Set payment/pricing context.
-    */
+  /**
+   * Set payment/pricing context.
+   */
   setPaymentContext(data: {
     creditAmount?: number;
     debitAmount?: number;
@@ -92,8 +90,7 @@ export class WideEventBuilder {
       this.event.debitAmount = data.debitAmount;
     if (data.priceAmount !== undefined)
       this.event.priceAmount = data.priceAmount;
-    if (data.sessionId !== undefined)
-      this.event.sessionId = data.sessionId;
+    if (data.sessionId !== undefined) this.event.sessionId = data.sessionId;
     return this;
   }
 
@@ -151,7 +148,7 @@ export class WideEventBuilder {
    * Build the final wide event with duration calculation.
    */
   build(): WideEvent {
-    const durationMs = Date.now() - this.startTime;
+    const durationMs = DateTime.utc().toMillis() - this.startTime;
 
     return {
       ...this.event,
