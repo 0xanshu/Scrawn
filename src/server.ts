@@ -4,6 +4,31 @@ import { startRawGrpcServer } from "./servers/rawGrpcServer.ts";
 import { startFastifyServer } from "./servers/fastifyServer.ts";
 import { OnboardingWorker } from "./workers/onboarding.ts";
 import { getRedisConnection } from "./storage/db/redis.ts";
+import * as Sentry from "@sentry/bun";
+
+const isProduction = process.env.NODE_ENV === "production";
+
+Sentry.init({
+  dsn: "https://091c0351d0cba083daa96d9ab520081e@o4511343702048768.ingest.de.sentry.io/4511343719678032",
+  environment: isProduction ? "production" : "development",
+  release: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev",
+  integrations: [
+    Sentry.fastifyIntegration(),
+    Sentry.httpIntegration(),
+  ],
+  tracesSampleRate: isProduction ? 0.1 : 1.0,
+  ignoreErrors: ["ConnectionRefusedError", "ECONNREFUSED"],
+});
+
+process.on("uncaughtException", (error) => {
+  Sentry.captureException(error);
+  Sentry.flush().then(() => process.exit(1));
+});
+
+process.on("unhandledRejection", (reason) => {
+  Sentry.captureException(reason);
+  Sentry.flush().then(() => process.exit(1));
+});
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const HMAC_SECRET = process.env.HMAC_SECRET;
@@ -44,6 +69,7 @@ process.on("beforeExit", async () => {
   if (onboardingWorker) {
     await onboardingWorker.close();
   }
+  await Sentry.flush(2000);
 });
 
 void main();
