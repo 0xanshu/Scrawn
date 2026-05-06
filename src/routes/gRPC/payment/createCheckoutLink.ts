@@ -26,16 +26,18 @@ import { wideEventContextKey } from "../../../context/requestContext";
 import type { UserId } from "../../../config/identifiers";
 import { DateTime } from "luxon";
 import { handleAddSession } from "../../../storage/adapter/postgres/handlers";
+import { type ContextUnaryCall } from "../../../interface/types/context.ts";
+
 export async function createCheckoutLink(
-  call: unknown,
+  call: ContextUnaryCall<CreateCheckoutLinkRequest, CreateCheckoutLinkResponse>,
   callback?: sendUnaryData<CreateCheckoutLinkResponse>
 ): Promise<void> {
-  const c = call as Record<string, unknown>;
-  const req = c.request as CreateCheckoutLinkRequest;
-  const wideEventBuilder = (call as Record<symbol, unknown>)[wideEventContextKey] as WideEventBuilder | null;
+  const c = call;
+  const req = c.request;
+  const wideEventBuilder = call[wideEventContextKey];
 
   try {
-    const apiKeyId = (call as Record<symbol, unknown>)[apiKeyContextKey] as string;
+    const apiKeyId = call[apiKeyContextKey];
     if (!apiKeyId) {
       return callback?.(
         AuthError.invalidAPIKey("API key ID not found in context")

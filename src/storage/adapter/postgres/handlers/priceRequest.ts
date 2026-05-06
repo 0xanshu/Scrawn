@@ -1,12 +1,17 @@
 import { getPostgresDB } from "../../../db/postgres/db";
 import { eventsTable, usersTable } from "../../../db/postgres/schema";
-import { sdkCallEventsTable, aiTokenUsageEventsTable } from "../../../db/postgres/schema";
+import {
+  sdkCallEventsTable,
+  aiTokenUsageEventsTable,
+} from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import { eq, sum, sql, and, type SQL } from "drizzle-orm";
 import type { DateTime } from "luxon";
 import type { UserId } from "../../../../config/identifiers";
 
-type PriceEventTable = typeof sdkCallEventsTable | typeof aiTokenUsageEventsTable;
+type PriceEventTable =
+  | typeof sdkCallEventsTable
+  | typeof aiTokenUsageEventsTable;
 
 export async function handlePriceRequest(
   userId: UserId,

@@ -23,7 +23,10 @@ export async function handlePriceRequestPayment(
       );
     }
 
-    const aiPrice = await handlePriceRequestAiTokenUsage(userId, beforeTimestamp);
+    const aiPrice = await handlePriceRequestAiTokenUsage(
+      userId,
+      beforeTimestamp
+    );
 
     if (typeof aiPrice !== "number" || isNaN(aiPrice)) {
       throw StorageError.priceCalculationFailed(
