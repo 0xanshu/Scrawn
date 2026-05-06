@@ -1,13 +1,14 @@
-import { Code, ConnectError } from "@connectrpc/connect";
+import { status as Status } from "@grpc/grpc-js";
 
-export enum PaymentErrorType {
+enum PaymentErrorType {
   INVALID_USER_ID = "INVALID_USER_ID",
   CHECKOUT_CREATION_FAILED = "CHECKOUT_CREATION_FAILED",
   VALIDATION_FAILED = "VALIDATION_FAILED",
-  LEMON_SQUEEZY_API_ERROR = "LEMON_SQUEEZY_API_ERROR",
+  PAYMENT_PROVIDER_API_ERROR = "PAYMENT_PROVIDER_API_ERROR",
   MISSING_API_KEY = "MISSING_API_KEY",
   MISSING_STORE_ID = "MISSING_STORE_ID",
   MISSING_VARIANT_ID = "MISSING_VARIANT_ID",
+  MISSING_PRODUCT_ID = "MISSING_PRODUCT_ID",
   INVALID_CHECKOUT_RESPONSE = "INVALID_CHECKOUT_RESPONSE",
   PRICE_CALCULATION_FAILED = "PRICE_CALCULATION_FAILED",
   STORAGE_ADAPTER_FAILED = "STORAGE_ADAPTER_FAILED",
@@ -19,27 +20,27 @@ export interface PaymentErrorContext {
   type: PaymentErrorType;
   message: string;
   originalError?: Error;
-  code: Code;
+  code: Status;
 }
 
-export class PaymentError extends ConnectError {
+export class PaymentError extends Error {
   readonly type: PaymentErrorType;
   readonly originalError?: Error;
+  readonly code: Status;
 
   constructor(context: PaymentErrorContext) {
-    super(context.message, context.code);
+    super(context.message);
     this.name = "PaymentError";
     this.type = context.type;
     this.originalError = context.originalError;
-
-    Object.setPrototypeOf(this, PaymentError.prototype);
+    this.code = context.code;
   }
 
   static invalidUserId(userId?: string, originalError?: Error): PaymentError {
     return new PaymentError({
       type: PaymentErrorType.INVALID_USER_ID,
       message: userId ? `Invalid user ID: ${userId}` : "Invalid user ID format",
-      code: Code.InvalidArgument,
+      code: Status.INVALID_ARGUMENT,
       originalError,
     });
   }
@@ -54,7 +55,7 @@ export class PaymentError extends ConnectError {
         details !== undefined
           ? `Failed to create checkout link: ${details}`
           : "Failed to create checkout link",
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }
@@ -66,21 +67,21 @@ export class PaymentError extends ConnectError {
     return new PaymentError({
       type: PaymentErrorType.VALIDATION_FAILED,
       message: `Payment validation failed: ${details}`,
-      code: Code.InvalidArgument,
+      code: Status.INVALID_ARGUMENT,
       originalError,
     });
   }
 
-  static lemonSqueezyApiError(
+  static paymentProviderApiError(
     details?: string,
     originalError?: Error
   ): PaymentError {
     return new PaymentError({
-      type: PaymentErrorType.LEMON_SQUEEZY_API_ERROR,
+      type: PaymentErrorType.PAYMENT_PROVIDER_API_ERROR,
       message: details
-        ? `Lemon Squeezy API error: ${details}`
-        : "Lemon Squeezy API error",
-      code: Code.Internal,
+        ? `Payment provider API error: ${details}`
+        : "Payment provider API error",
+      code: Status.INTERNAL,
       originalError,
     });
   }
@@ -88,8 +89,8 @@ export class PaymentError extends ConnectError {
   static missingApiKey(originalError?: Error): PaymentError {
     return new PaymentError({
       type: PaymentErrorType.MISSING_API_KEY,
-      message: "Lemon Squeezy API key is not configured",
-      code: Code.FailedPrecondition,
+      message: "Payment provider API key is not configured",
+      code: Status.FAILED_PRECONDITION,
       originalError,
     });
   }
@@ -97,8 +98,8 @@ export class PaymentError extends ConnectError {
   static missingStoreId(originalError?: Error): PaymentError {
     return new PaymentError({
       type: PaymentErrorType.MISSING_STORE_ID,
-      message: "Lemon Squeezy store ID is not configured",
-      code: Code.FailedPrecondition,
+      message: "Payment provider store ID is not configured",
+      code: Status.FAILED_PRECONDITION,
       originalError,
     });
   }
@@ -106,8 +107,17 @@ export class PaymentError extends ConnectError {
   static missingVariantId(originalError?: Error): PaymentError {
     return new PaymentError({
       type: PaymentErrorType.MISSING_VARIANT_ID,
-      message: "Lemon Squeezy variant ID is not configured",
-      code: Code.FailedPrecondition,
+      message: "Payment provider variant ID is not configured",
+      code: Status.FAILED_PRECONDITION,
+      originalError,
+    });
+  }
+
+  static missingProductId(originalError?: Error): PaymentError {
+    return new PaymentError({
+      type: PaymentErrorType.MISSING_PRODUCT_ID,
+      message: "Dodo product ID is not configured",
+      code: Status.FAILED_PRECONDITION,
       originalError,
     });
   }
@@ -121,7 +131,7 @@ export class PaymentError extends ConnectError {
       message: details
         ? `Invalid checkout response: ${details}`
         : "Invalid checkout response from payment provider",
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }
@@ -135,7 +145,7 @@ export class PaymentError extends ConnectError {
       message: userId
         ? `Failed to calculate price for user: ${userId}`
         : "Failed to calculate checkout price",
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }
@@ -149,7 +159,7 @@ export class PaymentError extends ConnectError {
       message: details
         ? `Storage adapter error: ${details}`
         : "Failed to retrieve data from storage",
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }
@@ -163,7 +173,7 @@ export class PaymentError extends ConnectError {
       message: details
         ? `Payment configuration error: ${details}`
         : "Payment system is not configured correctly",
-      code: Code.FailedPrecondition,
+      code: Status.FAILED_PRECONDITION,
       originalError,
     });
   }
@@ -173,7 +183,7 @@ export class PaymentError extends ConnectError {
     return new PaymentError({
       type: PaymentErrorType.UNKNOWN,
       message: `Unexpected payment error: ${details}`,
-      code: Code.Internal,
+      code: Status.INTERNAL,
       originalError,
     });
   }

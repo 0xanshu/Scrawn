@@ -5,6 +5,7 @@
 - **Dev server**: `bun run dev:backend` (gRPC - 8069, HTTP - 8070)
 - **Generate protobuf**: `bun run gen` (from proto/ directory)
 - **DB migrations**: `bunx drizzle-kit push`
+- **Type Checking: `bunx tsgo`
 
 ## Code Style
 

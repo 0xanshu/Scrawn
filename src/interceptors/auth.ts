@@ -1,41 +1,94 @@
-import type { Interceptor } from "@connectrpc/connect";
+import { status as grpcStatus } from "@grpc/grpc-js";
+import type {
+  ServerUnaryCall,
+  ServerReadableStream,
+  ServerWritableStream,
+  ServerDuplexStream,
+  sendUnaryData,
+  Metadata,
+} from "@grpc/grpc-js";
+import {
+  wideEventContextKey,
+  type WideEventBuilder,
+} from "../context/requestContext";
 import { apiKeyContextKey } from "../context/auth";
-import { wideEventContextKey } from "../context/requestContext";
 import { AuthError } from "../errors/auth";
 import { apiKeyCache } from "../utils/apiKeyCache";
 import { getPostgresDB } from "../storage/db/postgres/db";
 import { apiKeysTable } from "../storage/db/postgres/schema";
 import { eq } from "drizzle-orm";
 import { hashAPIKey } from "../utils/hashAPIKey";
+import { DateTime } from "luxon";
 
-export const no_auth: string[] = [] as const;
+// Whitelisted endpoints that don't require auth
+const no_auth = ["/auth.v1.AuthService/CreateAPIKey", "CreateAPIKey"];
 
-export function authInterceptor(): Interceptor {
-  return (next) => async (req) => {
+interface GrpcCallContext {
+  [wideEventContextKey]: WideEventBuilder | null;
+  [apiKeyContextKey]: string | undefined;
+  metadata: Metadata;
+}
+
+type GrpcCall<Req, Res> =
+  | (ServerUnaryCall<Req, Res> & GrpcCallContext)
+  | (ServerReadableStream<Req, Res> & GrpcCallContext)
+  | (ServerWritableStream<Req, Res> & GrpcCallContext)
+  | (ServerDuplexStream<Req, Res> & GrpcCallContext);
+
+export type { GrpcCall };
+
+export type GrpcHandler<Req, Res> = (
+  call: GrpcCall<Req, Res>,
+  callback?: sendUnaryData<Res>
+) => void | Promise<void>;
+
+// Untyped handler for gRPC server registration boundary
+export type GrpcUntypedHandler = (
+  call: unknown,
+  callback?: sendUnaryData<unknown>
+) => void | Promise<void>;
+
+// Handler with flexible call type for interceptors
+export type GrpcFlexibleHandler = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  call: any,
+  callback?: sendUnaryData<unknown>
+) => void | Promise<void>;
+
+/**
+ * Auth interceptor for gRPC - validates API key from metadata
+ */
+export function authInterceptor<Req, Res>(
+  methodPath: string,
+  handler: GrpcHandler<Req, Res>
+): GrpcHandler<Req, Res> {
+  return (call: GrpcCall<Req, Res>, callback) => {
     // Skip auth for whitelisted endpoints
-    for (const path of no_auth) {
-      if (req.url.endsWith(path)) {
-        return await next(req);
-      }
+    const fullPath = methodPath.startsWith("/") ? methodPath : `/${methodPath}`;
+    if (no_auth.some((path) => fullPath === path || fullPath.endsWith(path))) {
+      return handler(call, callback);
     }
 
-    const wideEventBuilder = req.contextValues.get(wideEventContextKey);
+    const wideEventBuilder = call[wideEventContextKey];
 
-    // Extract and validate authorization header
-    const authorization = req.header.get("Authorization");
-    if (!authorization) {
-      throw AuthError.missingHeader();
+    // Extract authorization from metadata
+    const authHeader = call.metadata.get("authorization")?.[0] as
+      | string
+      | undefined;
+
+    if (!authHeader) {
+      return callback?.(AuthError.missingHeader());
     }
 
-    if (!authorization.startsWith("Bearer ")) {
-      throw AuthError.invalidHeaderFormat();
+    if (!authHeader.startsWith("Bearer ")) {
+      return callback?.(AuthError.invalidHeaderFormat());
     }
 
-    const apiKey = authorization.slice("Bearer ".length).trim();
+    const apiKey = authHeader.slice("Bearer ".length).trim();
 
     // Validate API key format
     if (!apiKey.startsWith("scrn_") || apiKey.length !== 37) {
-      throw AuthError.invalidAPIKey("Invalid API key format");
+      return callback?.(AuthError.invalidAPIKey("Invalid API key format"));
     }
 
     const apiKeyHash = hashAPIKey(apiKey);
@@ -43,36 +96,40 @@ export function authInterceptor(): Interceptor {
     // Check cache first
     const cached = apiKeyCache.get(apiKeyHash);
     if (cached) {
-      req.contextValues.set(apiKeyContextKey, cached.id);
+      call[apiKeyContextKey] = cached.id;
       wideEventBuilder?.setAuth(cached.id, true);
-      return await next(req);
+      return handler(call, callback);
     }
 
     // Query database for API key
-    const apiKeyRecord = await lookupApiKey(apiKeyHash);
+    lookupApiKey(apiKeyHash)
+      .then((apiKeyRecord) => {
+        if (!apiKeyRecord) {
+          return callback?.(AuthError.invalidAPIKey("API key not found"));
+        }
 
-    if (!apiKeyRecord) {
-      throw AuthError.invalidAPIKey("API key not found");
-    }
+        if (apiKeyRecord.revoked) {
+          return callback?.(AuthError.revokedAPIKey());
+        }
 
-    if (apiKeyRecord.revoked) {
-      throw AuthError.revokedAPIKey();
-    }
+        if (DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt)) {
+          return callback?.(AuthError.expiredAPIKey());
+        }
 
-    if (new Date() > new Date(apiKeyRecord.expiresAt)) {
-      throw AuthError.expiredAPIKey();
-    }
+        // Cache and set context
+        apiKeyCache.set(apiKeyHash, {
+          id: apiKeyRecord.id,
+          expiresAt: apiKeyRecord.expiresAt,
+        });
 
-    // Cache and set context
-    apiKeyCache.set(apiKeyHash, {
-      id: apiKeyRecord.id,
-      expiresAt: apiKeyRecord.expiresAt,
-    });
+        call[apiKeyContextKey] = apiKeyRecord.id;
+        wideEventBuilder?.setAuth(apiKeyRecord.id, false);
 
-    req.contextValues.set(apiKeyContextKey, apiKeyRecord.id);
-    wideEventBuilder?.setAuth(apiKeyRecord.id, false);
-
-    return await next(req);
+        return handler(call, callback);
+      })
+      .catch((error) => {
+        return callback?.(error);
+      });
   };
 }
 

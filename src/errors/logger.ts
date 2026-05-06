@@ -28,6 +28,7 @@ export interface WideEvent {
   creditAmount?: number;
   debitAmount?: number;
   priceAmount?: number;
+  sessionId?: string;
 
   // API key creation context
   apiKeyName?: string;

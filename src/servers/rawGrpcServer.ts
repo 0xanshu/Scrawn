@@ -1,18 +1,66 @@
-import * as http2 from "node:http2";
-import { connectNodeAdapter } from "@connectrpc/connect-node";
-import { registerGrpcRoutes } from "../routes/gRPC/registerRoutes.ts";
-import { createConnectInterceptors } from "../interceptors/connectInterceptors.ts";
-import { logger } from "../errors/logger.ts";
+import * as grpc from "@grpc/grpc-js";
+import * as authGrpc from "../gen/auth/v1/auth_grpc_pb.js";
+import * as eventGrpc from "../gen/event/v1/event_grpc_pb.js";
+import * as paymentGrpc from "../gen/payment/v1/payment_grpc_pb.js";
+import { createAPIKey } from "../routes/gRPC/auth/createAPIKey";
+import { registerEvent } from "../routes/gRPC/events/registerEvent";
+import { streamEvents } from "../routes/gRPC/events/streamEvents";
+import { createCheckoutLink } from "../routes/gRPC/payment/createCheckoutLink";
+import { logger } from "../errors/logger";
+import { authInterceptor, type GrpcHandler, type GrpcUntypedHandler } from "../interceptors/auth";
+import { loggingInterceptor } from "../interceptors/logging";
 
 export function startRawGrpcServer(grpcPort: number): void {
-  const grpcHandler = connectNodeAdapter({
-    interceptors: createConnectInterceptors(),
-    routes: registerGrpcRoutes,
+  const server = new grpc.Server();
+
+  // Wrap handlers with interceptors - cast to GrpcUntypedHandler to accept flexible call types
+  const wrappedCreateAPIKey = loggingInterceptor(
+    "/auth.v1.AuthService/CreateAPIKey",
+    authInterceptor("/auth.v1.AuthService/CreateAPIKey", createAPIKey as GrpcHandler<unknown, unknown>)
+  ) as GrpcUntypedHandler;
+
+  const wrappedRegisterEvent = loggingInterceptor(
+    "/event.v1.EventService/RegisterEvent",
+    authInterceptor("/event.v1.EventService/RegisterEvent", registerEvent as GrpcHandler<unknown, unknown>)
+  ) as GrpcUntypedHandler;
+
+  const wrappedStreamEvents = loggingInterceptor(
+    "/event.v1.EventService/StreamEvents",
+    authInterceptor("/event.v1.EventService/StreamEvents", streamEvents as GrpcHandler<unknown, unknown>)
+  ) as GrpcUntypedHandler;
+
+  const wrappedCreateCheckoutLink = loggingInterceptor(
+    "/payment.v1.PaymentService/CreateCheckoutLink",
+    authInterceptor(
+      "/payment.v1.PaymentService/CreateCheckoutLink",
+      createCheckoutLink as GrpcHandler<unknown, unknown>
+    )
+  ) as GrpcUntypedHandler;
+
+  server.addService(authGrpc.AuthServiceService, {
+    createAPIKey: wrappedCreateAPIKey,
   });
 
-  http2.createServer(grpcHandler).listen(grpcPort);
-
-  logger.lifecycle("Raw gRPC h2c endpoint available", {
-    url: `http://localhost:${grpcPort}`,
+  server.addService(eventGrpc.EventServiceService, {
+    registerEvent: wrappedRegisterEvent,
+    streamEvents: wrappedStreamEvents,
   });
+
+  server.addService(paymentGrpc.PaymentServiceService, {
+    createCheckoutLink: wrappedCreateCheckoutLink,
+  });
+
+  server.bindAsync(
+    `0.0.0.0:${grpcPort}`,
+    grpc.ServerCredentials.createInsecure(),
+    (error, port) => {
+      if (error) {
+        logger.fatal("Failed to start gRPC server", error as Error);
+        throw error;
+      }
+      logger.lifecycle("gRPC server listening", {
+        url: `0.0.0.0:${port}`,
+      });
+    }
+  );
 }

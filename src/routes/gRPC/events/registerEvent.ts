@@ -1,38 +1,42 @@
-import type { RegisterEventRequest, RegisterEventResponse } from "../../../gen/event/v1/event_pb";
-import { RegisterEventResponseSchema } from "../../../gen/event/v1/event_pb";
-import type { HandlerContext } from "@connectrpc/connect";
-import { create } from "@bufbuild/protobuf";
-import { wideEventContextKey } from "../../../context/requestContext";
 import {
-  extractApiKeyFromContext,
-  validateAndParseRegisterEvent,
-  createEventInstance,
-  storeEvent,
-} from "../../../utils/eventHelpers";
+  RegisterEventRequest,
+  RegisterEventResponse,
+} from "../../../gen/event/v1/event_pb.js";
+import type { WideEventBuilder } from "../../../context/requestContext";
+import { apiKeyContextKey } from "../../../context/auth";
+import { wideEventContextKey } from "../../../context/requestContext";
+import { registerEventSchema } from "../../../zod/event";
+import { EventError } from "../../../errors/event";
+import { createEventInstance, storeEvent } from "../../../utils/eventHelpers";
+import { ZodError } from "zod";
+import type { ContextUnaryCall } from "../../../interface/types/context.js";
+import type { sendUnaryData } from "@grpc/grpc-js";
 
 export async function registerEvent(
-  req: RegisterEventRequest,
-  context: HandlerContext
-): Promise<RegisterEventResponse> {
-  const wideEventBuilder = context.values.get(wideEventContextKey);
+  call: ContextUnaryCall<RegisterEventRequest, RegisterEventResponse>,
+  callback: sendUnaryData<RegisterEventResponse>
+): Promise<void> {
+  const c = call;
+  const req = c.request;
+  const wideEventBuilder = call[wideEventContextKey];
 
-  // Extract API key ID from context
-  const apiKeyId = extractApiKeyFromContext(context);
+  try {
+    const apiKeyId = call[apiKeyContextKey] as string;
+    const eventSkeleton = await registerEventSchema.parseAsync(req.toObject());
 
-  // Validate and parse the incoming event
-  const eventSkeleton = await validateAndParseRegisterEvent(req);
+    wideEventBuilder?.setUser(eventSkeleton.userid);
+    wideEventBuilder?.setEventContext({ eventType: eventSkeleton.type });
 
-  // Add business context to wide event
-  wideEventBuilder?.setUser(eventSkeleton.userId);
-  wideEventBuilder?.setEventContext({ eventType: eventSkeleton.type });
+    // Create the appropriate event instance
+    const event = createEventInstance(eventSkeleton);
 
-  // Create the appropriate event instance
-  const event = createEventInstance(eventSkeleton);
+    // Store the event
+    await storeEvent(event, apiKeyId);
 
-  // Store the event
-  await storeEvent(event, apiKeyId);
-
-  return create(RegisterEventResponseSchema, {
-    random: "Event stored successfully",
-  });
+    const response = new RegisterEventResponse();
+    response.setRandom("Event stored successfully");
+    callback?.(null, response);
+  } catch (error) {
+    callback?.(error as Error);
+  }
 }

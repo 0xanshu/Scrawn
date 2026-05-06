@@ -1,102 +1,18 @@
-import { getPostgresDB } from "../../../db/postgres/db";
-import { sdkCallEventsTable, eventsTable, usersTable } from "../../../db/postgres/schema";
-import { StorageError } from "../../../../errors/storage";
-import { eq, sum, gt, sql } from "drizzle-orm";
-import { type UserId } from "../../../../config/identifiers";
+import { sdkCallEventsTable } from "../../../db/postgres/schema";
+import { handlePriceRequest } from "./priceRequest";
+import { sql } from "drizzle-orm";
+import type { DateTime } from "luxon";
+import type { UserId } from "../../../../config/identifiers";
 
 export async function handlePriceRequestSdkCall(
-  userId: UserId
+  userId: UserId,
+  beforeTimestamp: DateTime
 ): Promise<number> {
-  const connectionObject = getPostgresDB();
-
-  try {
-    if (!userId) {
-      throw StorageError.invalidData(
-        "Missing userId in REQUEST_SDK_CALL event"
-      );
-    }
-
-    if (typeof userId !== "string" || userId.trim().length === 0) {
-      throw StorageError.invalidData(`Invalid userId format: ${typeof userId}`);
-    }
-
-    let result;
-    try {
-      result = await connectionObject
-        .select({
-          price: sum(sdkCallEventsTable.debitAmount),
-        })
-        .from(sdkCallEventsTable)
-        .innerJoin(eventsTable, eq(sdkCallEventsTable.id, eventsTable.id))
-        .innerJoin(
-          usersTable,
-          eq(eventsTable.userId, usersTable.id)
-        )
-        .where(
-          sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId}`
-        )
-        .groupBy(eventsTable.userId);
-    } catch (e) {
-      throw StorageError.queryFailed(
-        `Failed to query SDK_CALL events for user ${userId}`,
-        e instanceof Error ? e : new Error(String(e))
-      );
-    }
-
-    if (!result) {
-      throw StorageError.emptyResult(
-        `Price query returned null for user ${userId}`
-      );
-    }
-
-    if (!Array.isArray(result)) {
-      throw StorageError.queryFailed(
-        `Query result is not an array for user ${userId}`
-      );
-    }
-
-    if (result.length === 0 || !result[0]) {
-      return 0;
-    }
-
-    const priceValue = result[0].price;
-
-    if (priceValue === null || priceValue === undefined) {
-      return 0;
-    }
-
-    let parsedPrice: number;
-    try {
-      parsedPrice = parseInt(priceValue);
-    } catch (e) {
-      throw StorageError.priceCalculationFailed(
-        userId,
-        new Error(`Failed to parse price value: ${priceValue}`)
-      );
-    }
-
-    if (isNaN(parsedPrice)) {
-      throw StorageError.priceCalculationFailed(
-        userId,
-        new Error(`Price parsed to NaN from value: ${priceValue}`)
-      );
-    }
-
-    return parsedPrice;
-  } catch (e) {
-    // Use duck typing instead of instanceof to work with mocked modules
-    if (
-      e &&
-      typeof e === "object" &&
-      "type" in e &&
-      (e as any).name === "StorageError"
-    ) {
-      throw e;
-    }
-
-    throw StorageError.priceCalculationFailed(
-      "Failed to calculate price for REQUEST_SDK_CALL event",
-      e instanceof Error ? e : new Error(String(e))
-    );
-  }
+  return handlePriceRequest(
+    userId,
+    sdkCallEventsTable,
+    sql`${sdkCallEventsTable.debitAmount}`,
+    "REQUEST_SDK_CALL",
+    beforeTimestamp
+  );
 }

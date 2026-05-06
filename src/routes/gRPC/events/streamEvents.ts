@@ -1,55 +1,57 @@
-import type { StreamEventRequest, StreamEventResponse } from "../../../gen/event/v1/event_pb";
-import { StreamEventResponseSchema } from "../../../gen/event/v1/event_pb";
-import { EventError } from "../../../errors/event";
-import type { HandlerContext } from "@connectrpc/connect";
-import { wideEventContextKey } from "../../../context/requestContext";
-import { create } from "@bufbuild/protobuf";
+import type { ServerReadableStream, sendUnaryData } from "@grpc/grpc-js";
 import {
-  extractApiKeyFromContext,
-  validateAndParseStreamEvent,
-  createEventInstance,
-  storeEvent,
-} from "../../../utils/eventHelpers";
+  StreamEventRequest,
+  StreamEventResponse,
+} from "../../../gen/event/v1/event_pb.js";
+import { EventError } from "../../../errors/event";
+import { streamEventSchema } from "../../../zod/event";
+import { createEventInstance, storeEvent } from "../../../utils/eventHelpers";
+import { apiKeyContextKey } from "../../../context/auth";
+import { wideEventContextKey } from "../../../context/requestContext";
+import type { ContextStreamCall } from "../../../interface/types/context";
 
 export async function streamEvents(
-  requestStream: AsyncIterable<StreamEventRequest>,
-  context: HandlerContext
-): Promise<StreamEventResponse> {
+  call: ContextStreamCall,
+  callback: sendUnaryData<StreamEventResponse>
+): Promise<void> {
   let eventsProcessed = 0;
-  let userId: string | undefined;
 
-  const wideEventBuilder = context.values.get(wideEventContextKey);
-
-  // Extract API key ID from context
-  const apiKeyId = extractApiKeyFromContext(context);
+  const wideEventBuilder = call[wideEventContextKey];
+  const apiKeyId = call[apiKeyContextKey];
 
   try {
-    for await (const req of requestStream) {
-      const eventSkeleton = await validateAndParseStreamEvent(req);
+    for await (const req of call) {
+      try {
+        const eventSkeleton = await streamEventSchema.parseAsync(
+          req.toObject()
+        );
 
-      // Capture userId from first event for logging
-      if (!userId) {
-        userId = eventSkeleton.userId;
-        wideEventBuilder?.setUser(userId);
+        wideEventBuilder?.setUser(eventSkeleton.userid);
         wideEventBuilder?.setEventContext({ eventType: "AI_TOKEN_USAGE" });
+
+        const event = createEventInstance(eventSkeleton);
+
+        if (event.type !== "AI_TOKEN_USAGE") {
+          throw EventError.unsupportedEventType(event.type);
+        }
+
+        await storeEvent(event, apiKeyId);
+        eventsProcessed++;
+      } catch (innerError) {
+        console.log(innerError);
+        callback(innerError as Error, null);
+        return;
       }
-
-      const event = createEventInstance(eventSkeleton);
-
-      if (event.type !== "AI_TOKEN_USAGE") {
-        throw EventError.unsupportedEventType(event.type);
-      }
-
-      await storeEvent(event, apiKeyId);
-      eventsProcessed += 1;
     }
 
-    return create(StreamEventResponseSchema, {
-      eventsProcessed,
-      message: `Successfully processed ${eventsProcessed} events`,
-    });
+    const response = new StreamEventResponse();
+    response.setEventsprocessed(eventsProcessed);
+    response.setMessage(`Successfully processed ${eventsProcessed} events`);
+
+    callback(null, response);
+  } catch (error) {
+    callback(error as Error, null);
   } finally {
-    // Always update the count, even on error
     wideEventBuilder?.setEventContext({ eventCount: eventsProcessed });
   }
 }

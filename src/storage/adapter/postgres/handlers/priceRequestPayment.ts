@@ -1,29 +1,20 @@
 import { StorageError } from "../../../../errors/storage";
-import { StorageAdapterFactory } from "../../../../factory";
 import { type SqlRecord } from "../../../../interface/event/Event";
 import type { UserId } from "../../../../config/identifiers";
+import type { DateTime } from "luxon";
+import { handlePriceRequestSdkCall } from "./priceRequestSdkCall";
+import { handlePriceRequestAiTokenUsage } from "./priceRequestAiTokenUsage";
 
 export async function handlePriceRequestPayment(
-  userId: UserId
+  userId: UserId,
+  beforeTimestamp: DateTime
 ): Promise<number> {
   try {
     if (!userId) {
       throw StorageError.invalidData("Missing userId in REQUEST_PAYMENT event");
     }
 
-    // Calculate SDK call price
-    const sdkStorageAdapter =
-      await StorageAdapterFactory.getEventStorageAdapter("SDK_CALL");
-
-    if (!sdkStorageAdapter) {
-      throw StorageError.unknown(
-        new Error(
-          "Storage adapter factory returned null or undefined for SDK calls"
-        )
-      );
-    }
-
-    const sdkPrice = await sdkStorageAdapter.price(userId, "SDK_CALL");
+    const sdkPrice = await handlePriceRequestSdkCall(userId, beforeTimestamp);
 
     if (typeof sdkPrice !== "number" || isNaN(sdkPrice)) {
       throw StorageError.priceCalculationFailed(
@@ -32,19 +23,10 @@ export async function handlePriceRequestPayment(
       );
     }
 
-    // Calculate AI token usage price
-    const aiStorageAdapter =
-      await StorageAdapterFactory.getEventStorageAdapter("AI_TOKEN_USAGE");
-
-    if (!aiStorageAdapter) {
-      throw StorageError.unknown(
-        new Error(
-          "Storage adapter factory returned null or undefined for AI token usage"
-        )
-      );
-    }
-
-    const aiPrice = await aiStorageAdapter.price(userId, "AI_TOKEN_USAGE");
+    const aiPrice = await handlePriceRequestAiTokenUsage(
+      userId,
+      beforeTimestamp
+    );
 
     if (typeof aiPrice !== "number" || isNaN(aiPrice)) {
       throw StorageError.priceCalculationFailed(
@@ -53,11 +35,9 @@ export async function handlePriceRequestPayment(
       );
     }
 
-    // Sum both prices
     const totalPrice = sdkPrice + aiPrice;
     return totalPrice;
   } catch (e) {
-    // Use duck typing instead of instanceof to work with mocked modules
     if (
       e &&
       typeof e === "object" &&
