@@ -1,3 +1,4 @@
+import type { sendUnaryData } from "@grpc/grpc-js";
 import {
   CreateCheckoutLinkRequest,
   CreateCheckoutLinkResponse,
@@ -26,16 +27,17 @@ import type { UserId } from "../../../config/identifiers";
 import { DateTime } from "luxon";
 import { handleAddSession } from "../../../storage/adapter/postgres/handlers";
 export async function createCheckoutLink(
-  call: any,
-  callback: any
+  call: unknown,
+  callback?: sendUnaryData<CreateCheckoutLinkResponse>
 ): Promise<void> {
-  const req = call.request as CreateCheckoutLinkRequest;
-  const wideEventBuilder = call[wideEventContextKey] as WideEventBuilder | null;
+  const c = call as Record<string, unknown>;
+  const req = c.request as CreateCheckoutLinkRequest;
+  const wideEventBuilder = (call as Record<symbol, unknown>)[wideEventContextKey] as WideEventBuilder | null;
 
   try {
-    const apiKeyId = call[apiKeyContextKey] as string;
+    const apiKeyId = (call as Record<symbol, unknown>)[apiKeyContextKey] as string;
     if (!apiKeyId) {
-      return callback(
+      return callback?.(
         AuthError.invalidAPIKey("API key ID not found in context")
       );
     }
@@ -76,9 +78,9 @@ export async function createCheckoutLink(
 
     const response = new CreateCheckoutLinkResponse();
     response.setCheckoutlink(checkoutResult.checkoutUrl);
-    callback(null, response);
+    callback?.(null, response);
   } catch (error) {
-    callback(error);
+    callback?.(error as Error);
   }
 }
 

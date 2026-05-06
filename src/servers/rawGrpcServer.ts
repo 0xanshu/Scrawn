@@ -7,35 +7,35 @@ import { registerEvent } from "../routes/gRPC/events/registerEvent";
 import { streamEvents } from "../routes/gRPC/events/streamEvents";
 import { createCheckoutLink } from "../routes/gRPC/payment/createCheckoutLink";
 import { logger } from "../errors/logger";
-import { authInterceptor, type GrpcUntypedHandler } from "../interceptors/auth";
+import { authInterceptor, type GrpcHandler, type GrpcUntypedHandler } from "../interceptors/auth";
 import { loggingInterceptor } from "../interceptors/logging";
 
 export function startRawGrpcServer(grpcPort: number): void {
   const server = new grpc.Server();
 
-  // Wrap handlers with interceptors
-  const wrappedCreateAPIKey: GrpcUntypedHandler = loggingInterceptor(
+  // Wrap handlers with interceptors - cast to GrpcUntypedHandler to accept flexible call types
+  const wrappedCreateAPIKey = loggingInterceptor(
     "/auth.v1.AuthService/CreateAPIKey",
-    authInterceptor("/auth.v1.AuthService/CreateAPIKey", createAPIKey)
-  );
+    authInterceptor("/auth.v1.AuthService/CreateAPIKey", createAPIKey as GrpcHandler<unknown, unknown>)
+  ) as GrpcUntypedHandler;
 
-  const wrappedRegisterEvent: GrpcUntypedHandler = loggingInterceptor(
+  const wrappedRegisterEvent = loggingInterceptor(
     "/event.v1.EventService/RegisterEvent",
-    authInterceptor("/event.v1.EventService/RegisterEvent", registerEvent)
-  );
+    authInterceptor("/event.v1.EventService/RegisterEvent", registerEvent as GrpcHandler<unknown, unknown>)
+  ) as GrpcUntypedHandler;
 
-  const wrappedStreamEvents: GrpcUntypedHandler = loggingInterceptor(
+  const wrappedStreamEvents = loggingInterceptor(
     "/event.v1.EventService/StreamEvents",
-    authInterceptor("/event.v1.EventService/StreamEvents", streamEvents)
-  );
+    authInterceptor("/event.v1.EventService/StreamEvents", streamEvents as GrpcHandler<unknown, unknown>)
+  ) as GrpcUntypedHandler;
 
-  const wrappedCreateCheckoutLink: GrpcUntypedHandler = loggingInterceptor(
+  const wrappedCreateCheckoutLink = loggingInterceptor(
     "/payment.v1.PaymentService/CreateCheckoutLink",
     authInterceptor(
       "/payment.v1.PaymentService/CreateCheckoutLink",
-      createCheckoutLink
+      createCheckoutLink as GrpcHandler<unknown, unknown>
     )
-  );
+  ) as GrpcUntypedHandler;
 
   server.addService(authGrpc.AuthServiceService, {
     createAPIKey: wrappedCreateAPIKey,

@@ -1,3 +1,4 @@
+import type { ServerReadableStream, sendUnaryData } from "@grpc/grpc-js";
 import {
   StreamEventRequest,
   StreamEventResponse,
@@ -9,11 +10,14 @@ import { streamEventSchema } from "../../../zod/event";
 import { createEventInstance, storeEvent } from "../../../utils/eventHelpers";
 import { apiKeyContextKey } from "../../../context/auth";
 
-export async function streamEvents(call: any, callback: any): Promise<void> {
+export async function streamEvents(
+  call: ServerReadableStream<StreamEventRequest, StreamEventResponse>,
+  callback: sendUnaryData<StreamEventResponse>
+): Promise<void> {
   let eventsProcessed = 0;
-  let userId: string | undefined;
-  const wideEventBuilder = call[wideEventContextKey] as WideEventBuilder | null;
-  const apiKeyId = call[apiKeyContextKey] as string;
+
+  const wideEventBuilder = (call as unknown as Record<symbol, unknown>)[wideEventContextKey] as WideEventBuilder | null;
+  const apiKeyId = (call as unknown as Record<symbol, unknown>)[apiKeyContextKey] as string;
 
   try {
     for await (const req of call) {
@@ -22,11 +26,8 @@ export async function streamEvents(call: any, callback: any): Promise<void> {
           req.toObject()
         );
 
-        if (!userId && eventSkeleton.userid) {
-          userId = eventSkeleton.userid;
-          wideEventBuilder?.setUser(userId);
-          wideEventBuilder?.setEventContext({ eventType: "AI_TOKEN_USAGE" });
-        }
+        wideEventBuilder?.setUser(eventSkeleton.userid);
+        wideEventBuilder?.setEventContext({ eventType: "AI_TOKEN_USAGE" });
 
         const event = createEventInstance(eventSkeleton);
 
@@ -38,7 +39,7 @@ export async function streamEvents(call: any, callback: any): Promise<void> {
         eventsProcessed++;
       } catch (innerError) {
         console.log(innerError);
-        callback(innerError, null);
+        callback(innerError as Error, null);
         return;
       }
     }
@@ -49,7 +50,7 @@ export async function streamEvents(call: any, callback: any): Promise<void> {
 
     callback(null, response);
   } catch (error) {
-    callback(error, null);
+    callback(error as Error, null);
   } finally {
     wideEventBuilder?.setEventContext({ eventCount: eventsProcessed });
   }

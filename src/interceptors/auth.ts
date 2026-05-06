@@ -44,6 +44,13 @@ export type GrpcHandler<Req, Res> = (
 
 // Untyped handler for gRPC server registration boundary
 export type GrpcUntypedHandler = (
+  call: unknown,
+  callback?: sendUnaryData<unknown>
+) => void | Promise<void>;
+
+// Handler with flexible call type for interceptors
+export type GrpcFlexibleHandler = (
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   call: any,
   callback?: sendUnaryData<unknown>
 ) => void | Promise<void>;

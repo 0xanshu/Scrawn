@@ -1,3 +1,4 @@
+import type { sendUnaryData } from "@grpc/grpc-js";
 import {
   CreateAPIKeyRequest,
   CreateAPIKeyResponse,
@@ -15,15 +16,19 @@ import { hashAPIKey } from "../../../utils/hashAPIKey";
 import { formatZodError } from "../../../utils/formatZodError";
 import { DateTime } from "luxon";
 
-export async function createAPIKey(call: any, callback: any): Promise<void> {
-  const req = call.request as CreateAPIKeyRequest;
-  const wideEventBuilder = call[wideEventContextKey] as WideEventBuilder | null;
+export async function createAPIKey(
+  call: unknown,
+  callback?: sendUnaryData<CreateAPIKeyResponse>
+): Promise<void> {
+  const c = call as Record<string, unknown>;
+  const req = c.request as CreateAPIKeyRequest;
+  const wideEventBuilder = (call as Record<symbol, unknown>)[wideEventContextKey] as WideEventBuilder | null;
 
   try {
     // Get API key ID from context (set by auth interceptor)
-    const apiKeyId = call[apiKeyContextKey] as string;
+    const apiKeyId = (call as Record<symbol, unknown>)[apiKeyContextKey] as string;
     if (!apiKeyId) {
-      return callback(
+      return callback?.(
         AuthError.invalidAPIKey("API key ID not found in context")
       );
     }
@@ -61,7 +66,7 @@ export async function createAPIKey(call: any, callback: any): Promise<void> {
     const keyEventData = await adapter.add(addKeyEvent.serialize(), "");
 
     if (!keyEventData) {
-      return callback(APIKeyError.creationFailed("Storage returned no ID"));
+      return callback?.(APIKeyError.creationFailed("Storage returned no ID"));
     }
 
     const response = new CreateAPIKeyResponse();
@@ -71,9 +76,9 @@ export async function createAPIKey(call: any, callback: any): Promise<void> {
     response.setCreatedat(now.toISO());
     response.setExpiresat(expiresAt.toISO());
 
-    callback(null, response);
+    callback?.(null, response);
   } catch (error) {
-    callback(error);
+    callback?.(error as Error);
   }
 }
 

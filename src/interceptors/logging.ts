@@ -6,16 +6,16 @@ import {
   generateRequestId,
   createWideEventBuilder,
 } from "../context/requestContext";
-import type { GrpcHandler, GrpcCall } from "./auth";
+import type { GrpcFlexibleHandler } from "./auth";
 
 /**
  * Logging interceptor for gRPC - implements wide events pattern
  */
-export function loggingInterceptor<Req, Res>(
+export function loggingInterceptor(
   methodPath: string,
-  handler: GrpcHandler<Req, Res>
-): GrpcHandler<Req, Res> {
-  return (call: GrpcCall<Req, Res>, callback?: sendUnaryData<Res>) => {
+  handler: GrpcFlexibleHandler
+): GrpcFlexibleHandler {
+  return (call, callback?: sendUnaryData<unknown>) => {
     const requestId = generateRequestId();
     const method = "unary"; // Simplified - can detect stream type from handler signature
     const url = methodPath.startsWith("/") ? methodPath : `/${methodPath}`;
@@ -27,7 +27,7 @@ export function loggingInterceptor<Req, Res>(
 
     // Wrap callback to capture errors
     const originalCallback = callback;
-    const wrappedCallback: sendUnaryData<Res> = (error, response, trailer, flags) => {
+    const wrappedCallback: sendUnaryData<unknown> = (error, response, trailer, flags) => {
       if (error) {
         const errorDetails = extractErrorDetails(error);
         const statusCode = grpcStatusToHttpStatus(errorDetails.code);
