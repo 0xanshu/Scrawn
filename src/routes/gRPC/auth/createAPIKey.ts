@@ -15,18 +15,20 @@ import { wideEventContextKey } from "../../../context/requestContext";
 import { hashAPIKey } from "../../../utils/hashAPIKey";
 import { formatZodError } from "../../../utils/formatZodError";
 import { DateTime } from "luxon";
+import type { ContextUnaryCall } from "../../../interface/types/context.js";
+import { StreamEventRequest } from "../../../gen/event/v1/event_pb.js";
 
 export async function createAPIKey(
-  call: unknown,
-  callback?: sendUnaryData<CreateAPIKeyResponse>
+  call: ContextUnaryCall<CreateAPIKeyRequest, CreateAPIKeyResponse>,
+  callback: sendUnaryData<CreateAPIKeyResponse>
 ): Promise<void> {
-  const c = call as Record<string, unknown>;
-  const req = c.request as CreateAPIKeyRequest;
-  const wideEventBuilder = (call as Record<symbol, unknown>)[wideEventContextKey] as WideEventBuilder | null;
+  const c = call;
+  const req = c.request;
+  const wideEventBuilder = call[wideEventContextKey];
 
   try {
     // Get API key ID from context (set by auth interceptor)
-    const apiKeyId = (call as Record<symbol, unknown>)[apiKeyContextKey] as string;
+    const apiKeyId = call[apiKeyContextKey] as string;
     if (!apiKeyId) {
       return callback?.(
         AuthError.invalidAPIKey("API key ID not found in context")

@@ -1,4 +1,3 @@
-import type { sendUnaryData } from "@grpc/grpc-js";
 import {
   RegisterEventRequest,
   RegisterEventResponse,
@@ -10,17 +9,19 @@ import { registerEventSchema } from "../../../zod/event";
 import { EventError } from "../../../errors/event";
 import { createEventInstance, storeEvent } from "../../../utils/eventHelpers";
 import { ZodError } from "zod";
+import type { ContextUnaryCall } from "../../../interface/types/context.js";
+import type { sendUnaryData } from "@grpc/grpc-js";
 
 export async function registerEvent(
-  call: unknown,
-  callback?: sendUnaryData<RegisterEventResponse>
+  call: ContextUnaryCall<RegisterEventRequest, RegisterEventResponse>,
+  callback: sendUnaryData<RegisterEventResponse>
 ): Promise<void> {
-  const c = call as Record<string, unknown>;
-  const req = c.request as RegisterEventRequest;
-  const wideEventBuilder = (call as Record<symbol, unknown>)[wideEventContextKey] as WideEventBuilder | null;
+  const c = call;
+  const req = c.request;
+  const wideEventBuilder = call[wideEventContextKey];
 
   try {
-    const apiKeyId = (call as Record<symbol, unknown>)[apiKeyContextKey] as string;
+    const apiKeyId = call[apiKeyContextKey] as string;
     const eventSkeleton = await registerEventSchema.parseAsync(req.toObject());
 
     wideEventBuilder?.setUser(eventSkeleton.userid);

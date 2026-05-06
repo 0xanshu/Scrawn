@@ -4,20 +4,20 @@ import {
   StreamEventResponse,
 } from "../../../gen/event/v1/event_pb.js";
 import { EventError } from "../../../errors/event";
-import type { WideEventBuilder } from "../../../context/requestContext";
-import { wideEventContextKey } from "../../../context/requestContext";
 import { streamEventSchema } from "../../../zod/event";
 import { createEventInstance, storeEvent } from "../../../utils/eventHelpers";
 import { apiKeyContextKey } from "../../../context/auth";
+import { wideEventContextKey } from "../../../context/requestContext";
+import type { ContextStreamCall } from "../../../interface/types/context";
 
 export async function streamEvents(
-  call: ServerReadableStream<StreamEventRequest, StreamEventResponse>,
+  call: ContextStreamCall,
   callback: sendUnaryData<StreamEventResponse>
 ): Promise<void> {
   let eventsProcessed = 0;
 
-  const wideEventBuilder = (call as unknown as Record<symbol, unknown>)[wideEventContextKey] as WideEventBuilder | null;
-  const apiKeyId = (call as unknown as Record<symbol, unknown>)[apiKeyContextKey] as string;
+  const wideEventBuilder = call[wideEventContextKey];
+  const apiKeyId = call[apiKeyContextKey];
 
   try {
     for await (const req of call) {

@@ -5,7 +5,7 @@ import { DateTime } from "luxon";
 /**
  * Context key for accessing the WideEventBuilder during request processing.
  */
-export const wideEventContextKey = Symbol("wideEventContextKey");
+export const wideEventContextKey = Symbol.for("wideEventContextKey");
 
 /**
  * Generate a unique request ID using UUID v4.
@@ -90,8 +90,7 @@ export class WideEventBuilder {
       this.event.debitAmount = data.debitAmount;
     if (data.priceAmount !== undefined)
       this.event.priceAmount = data.priceAmount;
-    if (data.sessionId !== undefined)
-      this.event.sessionId = data.sessionId;
+    if (data.sessionId !== undefined) this.event.sessionId = data.sessionId;
     return this;
   }
 
