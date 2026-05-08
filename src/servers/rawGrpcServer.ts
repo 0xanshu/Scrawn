@@ -10,7 +10,13 @@ import { logger } from "../errors/logger";
 import { authInterceptor, type GrpcHandler, type GrpcUntypedHandler } from "../interceptors/auth";
 import { loggingInterceptor } from "../interceptors/logging";
 
-export function startRawGrpcServer(grpcPort: number): void {
+export interface GrpcTlsOptions {
+  cert: Buffer;
+  key: Buffer;
+  ca?: Buffer;
+}
+
+export function startRawGrpcServer(grpcPort: number, tlsOptions?: GrpcTlsOptions): void {
   const server = new grpc.Server();
 
   // Wrap handlers with interceptors - cast to GrpcUntypedHandler to accept flexible call types
@@ -50,17 +56,26 @@ export function startRawGrpcServer(grpcPort: number): void {
     createCheckoutLink: wrappedCreateCheckoutLink,
   });
 
-  server.bindAsync(
-    `0.0.0.0:${grpcPort}`,
-    grpc.ServerCredentials.createInsecure(),
-    (error, port) => {
-      if (error) {
-        logger.fatal("Failed to start gRPC server", error as Error);
-        throw error;
-      }
-      logger.lifecycle("gRPC server listening", {
-        url: `0.0.0.0:${port}`,
-      });
+  const credentials = tlsOptions
+    ? grpc.ServerCredentials.createSsl(
+        tlsOptions.ca ?? null,
+        [
+          {
+            cert_chain: tlsOptions.cert,
+            private_key: tlsOptions.key,
+          },
+        ],
+        false
+      )
+    : grpc.ServerCredentials.createInsecure();
+
+  server.bindAsync(`0.0.0.0:${grpcPort}`, credentials, (error, port) => {
+    if (error) {
+      logger.fatal("Failed to start gRPC server", error as Error);
+      throw error;
     }
-  );
+    logger.lifecycle("gRPC server listening", {
+      url: `0.0.0.0:${port}`,
+    });
+  });
 }
