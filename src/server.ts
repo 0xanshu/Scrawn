@@ -4,6 +4,7 @@ import { startRawGrpcServer, type GrpcTlsOptions } from "./servers/rawGrpcServer
 import { startFastifyServer } from "./servers/fastifyServer.ts";
 import { OnboardingWorker } from "./workers/onboarding.ts";
 import { getRedisConnection } from "./storage/db/redis.ts";
+import { readFileSync } from "node:fs";
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const HMAC_SECRET = process.env.HMAC_SECRET;
@@ -34,7 +35,7 @@ const GRPC_TLS_KEY_PATH = process.env.GRPC_TLS_KEY_PATH;
 const GRPC_TLS_CA_PATH = process.env.GRPC_TLS_CA_PATH;
 const GRPC_TLS_ENABLED = process.env.GRPC_TLS_ENABLED === "true";
 
-async function loadGrpcTlsOptions(): Promise<GrpcTlsOptions | undefined> {
+function loadGrpcTlsOptions(): GrpcTlsOptions | undefined {
   if (!GRPC_TLS_ENABLED) {
     return undefined;
   }
@@ -44,26 +45,26 @@ async function loadGrpcTlsOptions(): Promise<GrpcTlsOptions | undefined> {
     throw new Error("gRPC TLS config incomplete");
   }
 
-  const cert = Bun.file(GRPC_TLS_CERT_PATH);
-  const key = Bun.file(GRPC_TLS_KEY_PATH);
-  if (!cert.size || !key.size) {
+  const cert = readFileSync(GRPC_TLS_CERT_PATH);
+  const key = readFileSync(GRPC_TLS_KEY_PATH);
+  if (!cert.length || !key.length) {
     logger.fatal("gRPC TLS cert or key file is empty");
     throw new Error("gRPC TLS cert or key file is empty");
   }
 
-  const ca = GRPC_TLS_CA_PATH ? Bun.file(GRPC_TLS_CA_PATH) : undefined;
+  const ca = GRPC_TLS_CA_PATH ? readFileSync(GRPC_TLS_CA_PATH) : undefined;
 
   return {
-    cert: Buffer.from(await cert.arrayBuffer()),
-    key: Buffer.from(await key.arrayBuffer()),
-    ca: ca ? Buffer.from(await ca.arrayBuffer()) : undefined,
+    cert,
+    key,
+    ca,
   };
 }
 
 let onboardingWorker: OnboardingWorker | undefined;
 
 async function main(): Promise<void> {
-  const tlsOptions = await loadGrpcTlsOptions();
+  const tlsOptions = loadGrpcTlsOptions();
   startRawGrpcServer(GRPC_PORT, tlsOptions);
   await startFastifyServer(PORT, GRPC_PORT);
 
