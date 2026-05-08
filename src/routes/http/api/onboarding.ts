@@ -1,4 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
+import * as Sentry from "@sentry/bun";
 import { ZodError } from "zod";
 import { onboardingCronSchema } from "../../../zod/internals.ts";
 import { addOnboardingCronJob } from "../../../queues/onboarding.ts";
@@ -53,6 +54,10 @@ export async function handleOnboarding(
     reply.code(201);
     return { crons };
   } catch (error) {
+    Sentry.captureException(error, {
+      extra: { context: "onboarding route handler" },
+    });
+
     if (error instanceof ZodError) {
       const issues = error.issues
         .map((issue) => `${issue.path.join(".")}: ${issue.message}`)

@@ -9,15 +9,13 @@ import * as Sentry from "@sentry/bun";
 const isProduction = process.env.NODE_ENV === "production";
 
 Sentry.init({
-  dsn: "https://091c0351d0cba083daa96d9ab520081e@o4511343702048768.ingest.de.sentry.io/4511343719678032",
+  dsn: process.env.SENTRY_DSN,
   environment: isProduction ? "production" : "development",
-  release: process.env.VERCEL_GIT_COMMIT_SHA ?? "dev",
-  integrations: [
-    Sentry.fastifyIntegration(),
-    Sentry.httpIntegration(),
-  ],
+  release: process.env.GIT_COMMIT_SHA ?? "dev",
+  integrations: [Sentry.fastifyIntegration(), Sentry.httpIntegration()],
   tracesSampleRate: isProduction ? 0.1 : 1.0,
   ignoreErrors: ["ConnectionRefusedError", "ECONNREFUSED"],
+  maxBreadcrumbs: 10,
 });
 
 process.on("uncaughtException", (error) => {
@@ -47,6 +45,10 @@ if (!HMAC_SECRET) {
 if (!REDIS_URL) {
   logger.fatal("REDIS_URL environmentvariable is not set");
   throw new Error("REDIS_URL environmentvariable is not set");
+}
+
+if (!process.env.SENTRY_DSN) {
+  logger.fatal("SENTRY_DSN environment variable is not set — errors will NOT be reported to Sentry");
 }
 
 getPostgresDB(DATABASE_URL);

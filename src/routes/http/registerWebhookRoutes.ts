@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
+import * as Sentry from "@sentry/bun";
 import { createWideEventBuilder, generateRequestId } from "../../context/requestContext.ts";
 import { logger } from "../../errors/logger.ts";
 import { handleDodoWebhook } from "./createdCheckout.ts";
@@ -61,6 +62,9 @@ export async function registerWebhookRoutes(
         reply.code(result.statusCode);
         return result.body;
       } catch (error) {
+        Sentry.captureException(error, {
+          extra: { context: "webhook route handler" },
+        });
         const err = error instanceof Error ? error : new Error(String(error));
         builder.setError(500, {
           type: "InternalError",

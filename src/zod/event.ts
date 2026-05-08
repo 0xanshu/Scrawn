@@ -35,7 +35,7 @@ const SDKCallDataSchema: z.ZodType<SDKCallEventData> = z
     } else if (v.expr) {
       debitAmount = await parseAndEvaluateExpr(v.expr);
     } else {
-      debitAmount = Math.floor(v.amount * 100);
+      debitAmount = v.amount;
     }
     return { sdkCallType: v.sdkcalltype, debitAmount };
   });
@@ -62,7 +62,7 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
     } else if (v.inputexpr) {
       inputDebitAmount = await parseAndEvaluateExpr(v.inputexpr);
     } else {
-      inputDebitAmount = Math.floor(v.inputamount * 100);
+      inputDebitAmount = v.inputamount;
     }
 
     let outputDebitAmount: number;
@@ -74,7 +74,7 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
     } else if (v.outputexpr) {
       outputDebitAmount = await parseAndEvaluateExpr(v.outputexpr);
     } else {
-      outputDebitAmount = Math.floor(v.outputamount * 100);
+      outputDebitAmount = v.outputamount;
     }
 
     return {

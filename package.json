@@ -32,6 +32,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@opentelemetry/instrumentation-pg": "^0.69.0",
     "@sentry/bun": "^10.51.0",
     "bullmq": "^5.75.2",
     "dodopayments": "^2.30.0",
