@@ -1,4 +1,5 @@
 import type { ServerReadableStream, sendUnaryData } from "@grpc/grpc-js";
+import * as Sentry from "@sentry/bun";
 import {
   StreamEventRequest,
   StreamEventResponse,
@@ -38,7 +39,12 @@ export async function streamEvents(
         await storeEvent(event, apiKeyId);
         eventsProcessed++;
       } catch (innerError) {
-        console.log(innerError);
+        Sentry.addBreadcrumb({
+          category: "streamEvents",
+          message: `Event processing failed: ${innerError instanceof Error ? innerError.message : String(innerError)}`,
+          level: "error",
+        });
+        Sentry.captureException(innerError);
         callback(innerError as Error, null);
         return;
       }
