@@ -1,5 +1,6 @@
 import { status as grpcStatus } from "@grpc/grpc-js";
 import type { sendUnaryData, ServerErrorResponse } from "@grpc/grpc-js";
+import * as Sentry from "@sentry/bun";
 import { logger } from "../errors/logger";
 import {
   wideEventContextKey,
@@ -25,12 +26,23 @@ export function loggingInterceptor(
     // Attach builder to call object
     call[wideEventContextKey] = builder;
 
+    Sentry.addBreadcrumb({
+      category: "request",
+      message: `gRPC: ${url}`,
+      data: { requestId, method },
+      level: "info",
+    });
+
     // Wrap callback to capture errors
     const originalCallback = callback;
     const wrappedCallback: sendUnaryData<unknown> = (error, response, trailer, flags) => {
       if (error) {
         const errorDetails = extractErrorDetails(error);
         const statusCode = grpcStatusToHttpStatus(errorDetails.code);
+
+        Sentry.captureException(error, {
+          extra: { requestId, method: url, statusCode },
+        });
 
         builder.setError(statusCode, {
           type: errorDetails.type,
@@ -58,6 +70,11 @@ export function loggingInterceptor(
         if (!builder['event'].outcome) {
           const errorDetails = extractErrorDetails(error);
           const statusCode = grpcStatusToHttpStatus(errorDetails.code);
+
+          Sentry.captureException(error, {
+            extra: { requestId, method: url, statusCode },
+          });
+
           builder.setError(statusCode, {
             type: errorDetails.type,
             message: errorDetails.message,

@@ -1,4 +1,5 @@
 import pino, { type Logger as PinoLogger } from "pino";
+import * as Sentry from "@sentry/bun";
 
 /**
  * Wide Event interface for structured logging.
@@ -124,6 +125,12 @@ class WideEventLogger {
    * Log fatal errors that prevent the server from operating.
    */
   fatal(message: string, error?: Error): void {
+    if (error) {
+      Sentry.captureException(error, { level: "fatal" });
+    } else {
+      Sentry.captureMessage(message, { level: "fatal" });
+    }
+
     this.pino.fatal(
       {
         error: error

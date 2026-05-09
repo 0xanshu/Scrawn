@@ -5,6 +5,29 @@ import { startFastifyServer } from "./servers/fastifyServer.ts";
 import { OnboardingWorker } from "./workers/onboarding.ts";
 import { getRedisConnection } from "./storage/db/redis.ts";
 import { readFileSync } from "node:fs";
+import * as Sentry from "@sentry/bun";
+
+const isProduction = process.env.NODE_ENV === "production";
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  environment: isProduction ? "production" : "development",
+  release: process.env.GIT_COMMIT_SHA ?? "dev",
+  integrations: [Sentry.fastifyIntegration(), Sentry.httpIntegration()],
+  tracesSampleRate: isProduction ? 0.1 : 1.0,
+  ignoreErrors: ["ConnectionRefusedError", "ECONNREFUSED"],
+  maxBreadcrumbs: 10,
+});
+
+process.on("uncaughtException", (error) => {
+  Sentry.captureException(error);
+  Sentry.flush().then(() => process.exit(1));
+});
+
+process.on("unhandledRejection", (reason) => {
+  Sentry.captureException(reason);
+  Sentry.flush().then(() => process.exit(1));
+});
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const HMAC_SECRET = process.env.HMAC_SECRET;
@@ -23,6 +46,10 @@ if (!HMAC_SECRET) {
 if (!REDIS_URL) {
   logger.fatal("REDIS_URL environmentvariable is not set");
   throw new Error("REDIS_URL environmentvariable is not set");
+}
+
+if (!process.env.SENTRY_DSN) {
+  logger.fatal("SENTRY_DSN environment variable is not set — errors will NOT be reported to Sentry");
 }
 
 getPostgresDB(DATABASE_URL);
@@ -82,6 +109,7 @@ process.on("beforeExit", async () => {
   if (onboardingWorker) {
     await onboardingWorker.close();
   }
+  await Sentry.flush(2000);
 });
 
 void main();

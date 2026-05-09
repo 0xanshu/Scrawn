@@ -1,4 +1,5 @@
 import DodoPayments from "dodopayments";
+import * as Sentry from "@sentry/bun";
 import { Payment } from "../../events/RawEvents/Payment.ts";
 import { StorageAdapterFactory } from "../../factory/EventStorageAdapterFactory.ts";
 import type { WideEventBuilder } from "../../context/requestContext.ts";
@@ -55,7 +56,10 @@ export async function handleDodoWebhook(
       webhookPayload = client.webhooks.unwrap(rawBody, {
         headers,
       }) as unknown as DodoWebhookPayload;
-    } catch {
+    } catch (error) {
+      Sentry.captureException(error, {
+        extra: { context: "webhook signature verification" },
+      });
       builder.setError(401, {
         type: "AuthenticationError",
         message: "Invalid webhook signature",
@@ -186,6 +190,13 @@ export async function handleDodoWebhook(
         body: { message: "Webhook processed successfully" },
       };
     } catch (dbError) {
+      Sentry.captureException(dbError, {
+        extra: {
+          context: "payment event storage",
+          checkoutSessionId: checkout_session_id,
+          paymentId: payment_id,
+        },
+      });
       const errorMessage =
         dbError instanceof Error ? dbError.message : String(dbError);
       builder.setError(500, {
@@ -197,6 +208,9 @@ export async function handleDodoWebhook(
       return { statusCode: 500, body: { error: "Database error" } };
     }
   } catch (error) {
+    Sentry.captureException(error, {
+      extra: { context: "unexpected webhook error" },
+    });
     const errorMessage = error instanceof Error ? error.message : String(error);
     builder.setError(500, {
       type: "InternalError",
