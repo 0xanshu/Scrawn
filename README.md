@@ -76,6 +76,20 @@ bun start
 
 The server will start on `http://localhost:8070`
 
+## TLS Configuration (gRPC)
+
+By default, the gRPC server runs without TLS. In production, put the backend behind a TLS-terminating proxy or enable TLS directly.
+
+To enable gRPC TLS, set:
+
+```env
+GRPC_TLS_ENABLED=true
+GRPC_TLS_CERT_PATH="/path/to/server.crt"
+GRPC_TLS_KEY_PATH="/path/to/server.key"
+# Optional
+GRPC_TLS_CA_PATH="/path/to/ca.pem"
+```
+
 ## Endpoints
 
 - **Connect / gRPC-Web / gRPC (h2c / HTTP/2 cleartext)**: `http://localhost:8069` (raw gRPC)

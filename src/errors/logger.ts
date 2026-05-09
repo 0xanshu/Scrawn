@@ -115,6 +115,13 @@ class WideEventLogger {
   }
 
   /**
+   * Log lifecycle warnings (startup, shutdown) without emitting request logs.
+   */
+  lifecycleWarning(message: string, context?: Record<string, unknown>): void {
+    this.pino.warn({ ...context, lifecycle: true }, message);
+  }
+
+  /**
    * Log fatal errors that prevent the server from operating.
    */
   fatal(message: string, error?: Error): void {
