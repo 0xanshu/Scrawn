@@ -9,7 +9,7 @@ import { createAPIKeySchema } from "../../../zod/apikey";
 import { APIKeyError } from "../../../errors/apikey";
 import { AuthError } from "../../../errors/auth";
 import { generateAPIKey } from "../../../utils/generateAPIKey";
-import { StorageAdapterFactory } from "../../../factory";
+import { PostgresAdapter } from "../../../storage/adapter/postgres/postgres";
 import { AddKey } from "../../../events/RawEvents/AddKey";
 import { wideEventContextKey } from "../../../context/requestContext";
 import { hashAPIKey } from "../../../utils/hashAPIKey";
@@ -62,9 +62,7 @@ export async function createAPIKey(
       expiresAt: expiresAt.toISO(),
     });
 
-    const adapter = await StorageAdapterFactory.getEventStorageAdapter(
-      addKeyEvent.type
-    );
+    const adapter = new PostgresAdapter();
     const keyEventData = await adapter.add(addKeyEvent.serialize(), "");
 
     if (!keyEventData) {

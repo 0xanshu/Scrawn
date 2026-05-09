@@ -19,7 +19,7 @@ import {
   createProviderCheckout,
   type CheckoutResult,
 } from "./paymentProvider.ts";
-import { StorageAdapterFactory } from "../../../factory";
+import { PostgresAdapter } from "../../../storage/adapter/postgres/postgres";
 import type { WideEventBuilder } from "../../../context/requestContext";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
@@ -103,8 +103,7 @@ async function calculatePrice(
   userId: UserId,
   beforeTimestamp: DateTime
 ): Promise<number> {
-  const storageAdapter =
-    await StorageAdapterFactory.getEventStorageAdapter("PAYMENT");
+  const storageAdapter = new PostgresAdapter();
 
   if (!storageAdapter) {
     throw PaymentError.storageAdapterFailed("Storage adapter not available");

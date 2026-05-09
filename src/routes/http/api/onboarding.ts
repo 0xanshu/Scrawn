@@ -8,7 +8,7 @@ import {
   generateRequestId,
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
-import { StorageAdapterFactory } from "../../../factory/index.ts";
+import { PostgresAdapter } from "../../../storage/adapter/postgres/postgres.ts";
 import { Metadata } from "../../../events/RawEvents/Metadata.ts";
 
 export async function handleOnboarding(
@@ -42,9 +42,7 @@ export async function handleOnboarding(
       payment_webhook: webhookUrl,
     });
 
-    const adapter = await StorageAdapterFactory.getEventStorageAdapter(
-      metadataEvent.type
-    );
+    const adapter = new PostgresAdapter();
     await adapter.add(metadataEvent.serialize(), "");
 
     builder.setSuccess(200).addContext({

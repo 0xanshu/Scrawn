@@ -2,7 +2,7 @@ import { EventError } from "../errors/event";
 import type { Event, SDKCallEventData, AITokenUsageEventData } from "../interface/event/Event";
 import { SDKCall } from "../events/RawEvents/SDKCall";
 import { AITokenUsage } from "../events/AIEvents/AITokenUsage";
-import { StorageAdapterFactory } from "../factory";
+import { PostgresAdapter } from "../storage/adapter/postgres/postgres";
 import type { RegisterEventSchemaType, StreamEventSchemaType } from "../zod/event";
 
 export function createEventInstance(
@@ -31,8 +31,6 @@ export async function storeEvent(
   event: Event,
   apiKeyId: string
 ): Promise<void> {
-  const adapter = await StorageAdapterFactory.getEventStorageAdapter(
-    event.type
-  );
+  const adapter = new PostgresAdapter();
   await adapter.add(event.serialize(), apiKeyId);
 }
