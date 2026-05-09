@@ -8,27 +8,8 @@ import { getPostgresDB } from "../../storage/db/postgres/db";
 import { usersTable, sessionsTable } from "../../storage/db/postgres/schema";
 import { eq } from "drizzle-orm";
 
-const isDev = process.env.NODE_ENV !== "production";
 
-interface DodoWebhookPayload {
-  type: string;
-  business_id: string;
-  timestamp: string;
-  data: {
-    payload_type: string;
-    payment_id: string;
-    checkout_session_id?: string;
-    total_amount: number;
-    currency: string;
-    status: string;
-    customer_id?: string;
-    customer?: {
-      customer_id: string;
-      email?: string;
-      name?: string;
-    };
-  };
-}
+const isDev = process.env.NODE_ENV !== "production";
 
 interface WebhookResponse {
   statusCode: number;
@@ -51,11 +32,11 @@ export async function handleDodoWebhook(
       "webhook-timestamp": timestamp || "",
     };
 
-    let webhookPayload: DodoWebhookPayload;
+    let webhookPayload: DodoPayments.Webhooks.UnwrapWebhookEvent;
     try {
       webhookPayload = client.webhooks.unwrap(rawBody, {
         headers,
-      }) as unknown as DodoWebhookPayload;
+      });
     } catch (error) {
       Sentry.captureException(error, {
         extra: { context: "webhook signature verification" },
@@ -78,16 +59,16 @@ export async function handleDodoWebhook(
       };
     }
 
-    builder.setWebhookContext({
-      webhookEvent: webhookPayload.type,
-      orderId: webhookPayload.data.payment_id,
-    });
-
     if (webhookPayload.type !== "payment.succeeded") {
       builder.setSuccess(200);
       builder.addContext({ ignored: true });
       return { statusCode: 200, body: { message: "Event ignored" } };
     }
+
+    builder.setWebhookContext({
+      webhookEvent: webhookPayload.type,
+      orderId: webhookPayload.data.payment_id,
+    });
 
     const { payment_id, checkout_session_id, total_amount, status } =
       webhookPayload.data;
