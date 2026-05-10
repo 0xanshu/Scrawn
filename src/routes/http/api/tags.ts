@@ -4,8 +4,7 @@ import { createWideEventBuilder, generateRequestId } from "../../../context/requ
 import { logger } from "../../../errors/logger.ts";
 import { AuthError } from "../../../errors/auth.ts";
 import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
-import { getPostgresDB } from "../../../storage/db/postgres/db.ts";
-import { tagsTable } from "../../../storage/db/postgres/schema.ts";
+import { listTags } from "../../../storage/db/postgres/helpers/tags.ts";
 
 interface ListTagsResponse {
   tags: string[];
@@ -25,10 +24,7 @@ export async function handleListTags(
     const authHeader = request.headers.authorization;
     await authenticateHttpApiKey(authHeader);
 
-    const db = getPostgresDB();
-    const rows = await db.select({ key: tagsTable.key }).from(tagsTable);
-
-    const tags = rows.map((row) => row.key);
+    const tags = await listTags();
 
     builder.setSuccess(200).addContext({ tagCount: tags.length });
     reply.code(200);
