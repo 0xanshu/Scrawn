@@ -3,7 +3,7 @@
 
 import * as jspb from "google-protobuf";
 
-export class Filter extends jspb.Message {
+export class FilterCondition extends jspb.Message {
   getField(): string;
   setField(value: string): void;
 
@@ -14,29 +14,53 @@ export class Filter extends jspb.Message {
   setValue(value: string): void;
 
   serializeBinary(): Uint8Array;
-  toObject(includeInstance?: boolean): Filter.AsObject;
-  static toObject(includeInstance: boolean, msg: Filter): Filter.AsObject;
-  static extensions: { [key: number]: jspb.ExtensionFieldInfo<jspb.Message> };
-  static extensionsBinary: {
-    [key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>;
-  };
-  static serializeBinaryToWriter(
-    message: Filter,
-    writer: jspb.BinaryWriter
-  ): void;
-  static deserializeBinary(bytes: Uint8Array): Filter;
-  static deserializeBinaryFromReader(
-    message: Filter,
-    reader: jspb.BinaryReader
-  ): Filter;
+  toObject(includeInstance?: boolean): FilterCondition.AsObject;
+  static toObject(includeInstance: boolean, msg: FilterCondition): FilterCondition.AsObject;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: FilterCondition, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): FilterCondition;
+  static deserializeBinaryFromReader(message: FilterCondition, reader: jspb.BinaryReader): FilterCondition;
 }
 
-export namespace Filter {
+export namespace FilterCondition {
   export type AsObject = {
-    field: string;
-    operator: OperatorMap[keyof OperatorMap];
-    value: string;
-  };
+    field: string,
+    operator: OperatorMap[keyof OperatorMap],
+    value: string,
+  }
+}
+
+export class FilterGroup extends jspb.Message {
+  getLogical(): LogicalOperatorMap[keyof LogicalOperatorMap];
+  setLogical(value: LogicalOperatorMap[keyof LogicalOperatorMap]): void;
+
+  clearConditionsList(): void;
+  getConditionsList(): Array<FilterCondition>;
+  setConditionsList(value: Array<FilterCondition>): void;
+  addConditions(value?: FilterCondition, index?: number): FilterCondition;
+
+  clearGroupsList(): void;
+  getGroupsList(): Array<FilterGroup>;
+  setGroupsList(value: Array<FilterGroup>): void;
+  addGroups(value?: FilterGroup, index?: number): FilterGroup;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): FilterGroup.AsObject;
+  static toObject(includeInstance: boolean, msg: FilterGroup): FilterGroup.AsObject;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: FilterGroup, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): FilterGroup;
+  static deserializeBinaryFromReader(message: FilterGroup, reader: jspb.BinaryReader): FilterGroup;
+}
+
+export namespace FilterGroup {
+  export type AsObject = {
+    logical: LogicalOperatorMap[keyof LogicalOperatorMap],
+    conditionsList: Array<FilterCondition.AsObject>,
+    groupsList: Array<FilterGroup.AsObject>,
+  }
 }
 
 export class Aggregation extends jspb.Message {
@@ -48,30 +72,19 @@ export class Aggregation extends jspb.Message {
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): Aggregation.AsObject;
-  static toObject(
-    includeInstance: boolean,
-    msg: Aggregation
-  ): Aggregation.AsObject;
-  static extensions: { [key: number]: jspb.ExtensionFieldInfo<jspb.Message> };
-  static extensionsBinary: {
-    [key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>;
-  };
-  static serializeBinaryToWriter(
-    message: Aggregation,
-    writer: jspb.BinaryWriter
-  ): void;
+  static toObject(includeInstance: boolean, msg: Aggregation): Aggregation.AsObject;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: Aggregation, writer: jspb.BinaryWriter): void;
   static deserializeBinary(bytes: Uint8Array): Aggregation;
-  static deserializeBinaryFromReader(
-    message: Aggregation,
-    reader: jspb.BinaryReader
-  ): Aggregation;
+  static deserializeBinaryFromReader(message: Aggregation, reader: jspb.BinaryReader): Aggregation;
 }
 
 export namespace Aggregation {
   export type AsObject = {
-    type: AggregationTypeMap[keyof AggregationTypeMap];
-    field: string;
-  };
+    type: AggregationTypeMap[keyof AggregationTypeMap],
+    field: string,
+  }
 }
 
 export class GroupBy extends jspb.Message {
@@ -81,32 +94,24 @@ export class GroupBy extends jspb.Message {
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): GroupBy.AsObject;
   static toObject(includeInstance: boolean, msg: GroupBy): GroupBy.AsObject;
-  static extensions: { [key: number]: jspb.ExtensionFieldInfo<jspb.Message> };
-  static extensionsBinary: {
-    [key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>;
-  };
-  static serializeBinaryToWriter(
-    message: GroupBy,
-    writer: jspb.BinaryWriter
-  ): void;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: GroupBy, writer: jspb.BinaryWriter): void;
   static deserializeBinary(bytes: Uint8Array): GroupBy;
-  static deserializeBinaryFromReader(
-    message: GroupBy,
-    reader: jspb.BinaryReader
-  ): GroupBy;
+  static deserializeBinaryFromReader(message: GroupBy, reader: jspb.BinaryReader): GroupBy;
 }
 
 export namespace GroupBy {
   export type AsObject = {
-    field: string;
-  };
+    field: string,
+  }
 }
 
 export class QueryEventsRequest extends jspb.Message {
-  clearFiltersList(): void;
-  getFiltersList(): Array<Filter>;
-  setFiltersList(value: Array<Filter>): void;
-  addFilters(value?: Filter, index?: number): Filter;
+  hasWhere(): boolean;
+  clearWhere(): void;
+  getWhere(): FilterGroup | undefined;
+  setWhere(value?: FilterGroup): void;
 
   hasAggregation(): boolean;
   clearAggregation(): void;
@@ -126,33 +131,22 @@ export class QueryEventsRequest extends jspb.Message {
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): QueryEventsRequest.AsObject;
-  static toObject(
-    includeInstance: boolean,
-    msg: QueryEventsRequest
-  ): QueryEventsRequest.AsObject;
-  static extensions: { [key: number]: jspb.ExtensionFieldInfo<jspb.Message> };
-  static extensionsBinary: {
-    [key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>;
-  };
-  static serializeBinaryToWriter(
-    message: QueryEventsRequest,
-    writer: jspb.BinaryWriter
-  ): void;
+  static toObject(includeInstance: boolean, msg: QueryEventsRequest): QueryEventsRequest.AsObject;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: QueryEventsRequest, writer: jspb.BinaryWriter): void;
   static deserializeBinary(bytes: Uint8Array): QueryEventsRequest;
-  static deserializeBinaryFromReader(
-    message: QueryEventsRequest,
-    reader: jspb.BinaryReader
-  ): QueryEventsRequest;
+  static deserializeBinaryFromReader(message: QueryEventsRequest, reader: jspb.BinaryReader): QueryEventsRequest;
 }
 
 export namespace QueryEventsRequest {
   export type AsObject = {
-    filtersList: Array<Filter.AsObject>;
-    aggregation?: Aggregation.AsObject;
-    groupBy?: GroupBy.AsObject;
-    limit: number;
-    offset: number;
-  };
+    where?: FilterGroup.AsObject,
+    aggregation?: Aggregation.AsObject,
+    groupBy?: GroupBy.AsObject,
+    limit: number,
+    offset: number,
+  }
 }
 
 export class EventRow extends jspb.Message {
@@ -214,37 +208,29 @@ export class EventRow extends jspb.Message {
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): EventRow.AsObject;
   static toObject(includeInstance: boolean, msg: EventRow): EventRow.AsObject;
-  static extensions: { [key: number]: jspb.ExtensionFieldInfo<jspb.Message> };
-  static extensionsBinary: {
-    [key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>;
-  };
-  static serializeBinaryToWriter(
-    message: EventRow,
-    writer: jspb.BinaryWriter
-  ): void;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: EventRow, writer: jspb.BinaryWriter): void;
   static deserializeBinary(bytes: Uint8Array): EventRow;
-  static deserializeBinaryFromReader(
-    message: EventRow,
-    reader: jspb.BinaryReader
-  ): EventRow;
+  static deserializeBinaryFromReader(message: EventRow, reader: jspb.BinaryReader): EventRow;
 }
 
 export namespace EventRow {
   export type AsObject = {
-    eventId: string;
-    eventType: string;
-    userId: string;
-    reportedTimestamp: string;
-    ingestedTimestamp: string;
-    sdkCallType: string;
-    debitAmount: number;
-    creditAmount: number;
-    model: string;
-    inputTokens: number;
-    outputTokens: number;
-    inputDebitAmount: number;
-    outputDebitAmount: number;
-  };
+    eventId: string,
+    eventType: string,
+    userId: string,
+    reportedTimestamp: string,
+    ingestedTimestamp: string,
+    sdkCallType: string,
+    debitAmount: number,
+    creditAmount: number,
+    model: string,
+    inputTokens: number,
+    outputTokens: number,
+    inputDebitAmount: number,
+    outputDebitAmount: number,
+  }
 }
 
 export class AggregationRow extends jspb.Message {
@@ -258,30 +244,19 @@ export class AggregationRow extends jspb.Message {
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): AggregationRow.AsObject;
-  static toObject(
-    includeInstance: boolean,
-    msg: AggregationRow
-  ): AggregationRow.AsObject;
-  static extensions: { [key: number]: jspb.ExtensionFieldInfo<jspb.Message> };
-  static extensionsBinary: {
-    [key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>;
-  };
-  static serializeBinaryToWriter(
-    message: AggregationRow,
-    writer: jspb.BinaryWriter
-  ): void;
+  static toObject(includeInstance: boolean, msg: AggregationRow): AggregationRow.AsObject;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: AggregationRow, writer: jspb.BinaryWriter): void;
   static deserializeBinary(bytes: Uint8Array): AggregationRow;
-  static deserializeBinaryFromReader(
-    message: AggregationRow,
-    reader: jspb.BinaryReader
-  ): AggregationRow;
+  static deserializeBinaryFromReader(message: AggregationRow, reader: jspb.BinaryReader): AggregationRow;
 }
 
 export namespace AggregationRow {
   export type AsObject = {
-    groupValue: string;
-    aggValue: string;
-  };
+    groupValue: string,
+    aggValue: string,
+  }
 }
 
 export class QueryEventsResponse extends jspb.Message {
@@ -300,31 +275,20 @@ export class QueryEventsResponse extends jspb.Message {
 
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): QueryEventsResponse.AsObject;
-  static toObject(
-    includeInstance: boolean,
-    msg: QueryEventsResponse
-  ): QueryEventsResponse.AsObject;
-  static extensions: { [key: number]: jspb.ExtensionFieldInfo<jspb.Message> };
-  static extensionsBinary: {
-    [key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>;
-  };
-  static serializeBinaryToWriter(
-    message: QueryEventsResponse,
-    writer: jspb.BinaryWriter
-  ): void;
+  static toObject(includeInstance: boolean, msg: QueryEventsResponse): QueryEventsResponse.AsObject;
+  static extensions: {[key: number]: jspb.ExtensionFieldInfo<jspb.Message>};
+  static extensionsBinary: {[key: number]: jspb.ExtensionFieldBinaryInfo<jspb.Message>};
+  static serializeBinaryToWriter(message: QueryEventsResponse, writer: jspb.BinaryWriter): void;
   static deserializeBinary(bytes: Uint8Array): QueryEventsResponse;
-  static deserializeBinaryFromReader(
-    message: QueryEventsResponse,
-    reader: jspb.BinaryReader
-  ): QueryEventsResponse;
+  static deserializeBinaryFromReader(message: QueryEventsResponse, reader: jspb.BinaryReader): QueryEventsResponse;
 }
 
 export namespace QueryEventsResponse {
   export type AsObject = {
-    rowsList: Array<EventRow.AsObject>;
-    aggRowsList: Array<AggregationRow.AsObject>;
-    total: number;
-  };
+    rowsList: Array<EventRow.AsObject>,
+    aggRowsList: Array<AggregationRow.AsObject>,
+    total: number,
+  }
 }
 
 export interface OperatorMap {
@@ -346,3 +310,12 @@ export interface AggregationTypeMap {
 }
 
 export const AggregationType: AggregationTypeMap;
+
+export interface LogicalOperatorMap {
+  LOGICAL_OPERATOR_UNSPECIFIED: 0;
+  AND: 1;
+  OR: 2;
+}
+
+export const LogicalOperator: LogicalOperatorMap;
+

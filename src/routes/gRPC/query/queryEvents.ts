@@ -5,6 +5,7 @@ import {
   EventRow,
   AggregationRow,
 } from "../../../gen/query/v1/query_pb.js";
+import type { FilterGroup } from "../../../gen/query/v1/query_pb.js";
 import {
   queryEventsSchema,
   type QueryEventsSchemaType,
@@ -16,12 +17,24 @@ import type {
   StorageAdapter,
   QueryRequest,
   QueryResponse,
+  QueryFilterGroup,
+  QueryFilter,
 } from "../../../interface/storage/Storage";
 import type { WideEventBuilder } from "../../../context/requestContext";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import type { ContextUnaryCall } from "../../../interface/types/context.js";
 import type { EventKind } from "../../../interface/event/Event";
+
+const OPERATOR_MAP: Record<number, QueryFilter["operator"]> = {
+  0: "EQ",
+  1: "EQ",
+  2: "GT",
+  3: "GTE",
+  4: "LT",
+  5: "LTE",
+  6: "NEQ",
+};
 
 export async function queryEvents(
   call: ContextUnaryCall<QueryEventsRequest, QueryEventsResponse>,
@@ -35,11 +48,9 @@ export async function queryEvents(
     const validated = validateRequest(req);
 
     const queryRequest: QueryRequest = {
-      filters: validated.filtersList.map((f) => ({
-        field: f.field,
-        operator: f.operator,
-        value: f.value,
-      })),
+      where: validated.where
+        ? convertFilterGroup(validated.where)
+        : { logical: "AND", conditions: [], groups: [] },
       aggregation: validated.aggregation
         ? {
             type: validated.aggregation.type,
@@ -51,9 +62,12 @@ export async function queryEvents(
       offset: validated.offset,
     };
 
-    wideEventBuilder?.addContext({ queryFilters: queryRequest.filters.length });
+    wideEventBuilder?.addContext({
+      queryConditions:
+        countConditions(queryRequest.where),
+    });
 
-    const eventTypes = resolveEventTypes(queryRequest.filters);
+    const eventTypes = resolveEventTypes(queryRequest.where);
     const adapters = await getUniqueAdapters(eventTypes);
 
     const allResponses = await Promise.all(
@@ -69,6 +83,34 @@ export async function queryEvents(
   }
 }
 
+function convertFilterGroup(
+  pg: QueryEventsSchemaType["where"]
+): QueryFilterGroup {
+  if (!pg) return { logical: "AND", conditions: [], groups: [] };
+  return {
+    logical:
+      (pg as { logical: number }).logical === 2 ? "OR" : "AND",
+    conditions:
+      (pg as { conditionsList: Array<{ field: string; operator: string; value: string }> }).conditionsList?.map((c) => ({
+        field: c.field,
+        operator: c.operator as QueryFilter["operator"],
+        value: c.value,
+      })) ?? [],
+    groups:
+      (pg as { groupsList: QueryEventsSchemaType["where"][] }).groupsList?.map(
+        (g) => convertFilterGroup(g)
+      ) ?? [],
+  };
+}
+
+function countConditions(group: QueryFilterGroup): number {
+  let count = group.conditions.length;
+  for (const g of group.groups) {
+    count += countConditions(g);
+  }
+  return count;
+}
+
 function validateRequest(req: QueryEventsRequest): QueryEventsSchemaType {
   try {
     return queryEventsSchema.parse(req.toObject());
@@ -77,16 +119,25 @@ function validateRequest(req: QueryEventsRequest): QueryEventsSchemaType {
   }
 }
 
-function resolveEventTypes(filters: QueryRequest["filters"]): EventKind[] {
-  const eventTypeFilter = filters.find((f) => f.field === "eventType");
-  if (eventTypeFilter) {
-    const v = eventTypeFilter.value;
-    if (v === "SDK_CALL" || v === "AI_TOKEN_USAGE" || v === "PAYMENT") {
-      return [v];
+function resolveEventTypes(where: QueryFilterGroup): EventKind[] {
+  const collectTypes = (group: QueryFilterGroup): string[] => {
+    const types: string[] = [];
+    const et = group.conditions.find((c) => c.field === "eventType");
+    if (et) types.push(et.value);
+    for (const sub of group.groups) {
+      types.push(...collectTypes(sub));
     }
-    return [];
+    return types;
+  };
+
+  const types = collectTypes(where);
+  if (types.length > 0) {
+    return types.filter(
+      (t): t is EventKind =>
+        t === "SDK_CALL" || t === "AI_TOKEN_USAGE"
+    );
   }
-  return ["SDK_CALL", "AI_TOKEN_USAGE", "PAYMENT"];
+  return ["SDK_CALL", "AI_TOKEN_USAGE"];
 }
 
 async function getUniqueAdapters(
@@ -121,12 +172,10 @@ function mergeResponses(
   const isAgg = !!request.aggregation;
 
   if (isAgg) {
-    // For aggregations, concatenate rows (each adapter returns its own group/sum)
     const allRows = responses.flatMap((r) => r.rows);
     return { rows: allRows, total: allRows.length };
   }
 
-  // For list queries, merge and sort by timestamp
   const allRows = responses.flatMap((r) => r.rows);
   allRows.sort((a, b) => {
     const aTs = String(a.reportedTimestamp ?? "");

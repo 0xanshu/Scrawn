@@ -3,166 +3,140 @@ import {
   eventsTable,
   sdkCallEventsTable,
   aiTokenUsageEventsTable,
-  paymentEventsTable,
 } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
-import { eq, gt, gte, lt, lte, ne, and, sql, count, sum } from "drizzle-orm";
+import { eq, gt, gte, lt, lte, ne, and, or, sql, count, sum } from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type {
   QueryRequest,
   QueryFilter,
+  QueryFilterGroup,
   QueryResponse,
   QueryResultRow,
 } from "../../../../interface/storage/Storage";
 
-type EventTypeName = "SDK_CALL" | "AI_TOKEN_USAGE" | "PAYMENT";
+type EventTypeName = "SDK_CALL" | "AI_TOKEN_USAGE";
 
-// Accept any value that drizzle operators accept
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyColumn = any;
-
-function applyEq(col: AnyColumn, v: string): SQL {
-  return eq(col, v);
-}
-function applyGt(col: AnyColumn, v: string): SQL {
-  return gt(col, v);
-}
-function applyGte(col: AnyColumn, v: string): SQL {
-  return gte(col, v);
-}
-function applyLt(col: AnyColumn, v: string): SQL {
-  return lt(col, v);
-}
-function applyLte(col: AnyColumn, v: string): SQL {
-  return lte(col, v);
-}
-function applyNe(col: AnyColumn, v: string): SQL {
-  return ne(col, v);
-}
 
 function applyOp(col: AnyColumn, filter: QueryFilter): SQL {
   switch (filter.operator) {
     case "EQ":
-      return applyEq(col, filter.value);
+      return eq(col, filter.value);
     case "GT":
-      return applyGt(col, filter.value);
+      return gt(col, filter.value);
     case "GTE":
-      return applyGte(col, filter.value);
+      return gte(col, filter.value);
     case "LT":
-      return applyLt(col, filter.value);
+      return lt(col, filter.value);
     case "LTE":
-      return applyLte(col, filter.value);
+      return lte(col, filter.value);
     case "NEQ":
-      return applyNe(col, filter.value);
+      return ne(col, filter.value);
     default:
-      return applyEq(col, filter.value);
+      return eq(col, filter.value);
   }
 }
 
-function buildSdkCallConditions(filters: QueryFilter[]): SQL[] {
-  const conditions: SQL[] = [];
-  for (const filter of filters) {
-    if (filter.field === "eventType") continue;
+function buildSdkCallConditionsFromGroup(
+  group: QueryFilterGroup
+): SQL | undefined {
+  return buildConditionsFromGroup(group, (filter) => {
     switch (filter.field) {
       case "reportedTimestamp":
-        conditions.push(applyOp(eventsTable.reported_timestamp, filter));
-        break;
+        return applyOp(eventsTable.reported_timestamp, filter);
       case "ingestedTimestamp":
-        conditions.push(applyOp(eventsTable.ingested_timestamp, filter));
-        break;
+        return applyOp(eventsTable.ingested_timestamp, filter);
       case "userId":
-        conditions.push(applyOp(eventsTable.userId, filter));
-        break;
+        return applyOp(eventsTable.userId, filter);
       case "apiKeyId":
-        conditions.push(applyOp(eventsTable.api_keyId, filter));
-        break;
+        return applyOp(eventsTable.api_keyId, filter);
       case "sdkCallType":
-        conditions.push(applyOp(sdkCallEventsTable.type, filter));
-        break;
+        return applyOp(sdkCallEventsTable.type, filter);
       case "debitAmount":
-        conditions.push(applyOp(sdkCallEventsTable.debitAmount, filter));
-        break;
+        return applyOp(sdkCallEventsTable.debitAmount, filter);
+      default:
+        return null;
     }
-  }
-  return conditions;
+  });
 }
 
-function buildAiTokenConditions(filters: QueryFilter[]): SQL[] {
-  const conditions: SQL[] = [];
-  for (const filter of filters) {
-    if (filter.field === "eventType") continue;
+function buildAiTokenConditionsFromGroup(
+  group: QueryFilterGroup
+): SQL | undefined {
+  return buildConditionsFromGroup(group, (filter) => {
     switch (filter.field) {
       case "reportedTimestamp":
-        conditions.push(applyOp(eventsTable.reported_timestamp, filter));
-        break;
+        return applyOp(eventsTable.reported_timestamp, filter);
       case "ingestedTimestamp":
-        conditions.push(applyOp(eventsTable.ingested_timestamp, filter));
-        break;
+        return applyOp(eventsTable.ingested_timestamp, filter);
       case "userId":
-        conditions.push(applyOp(eventsTable.userId, filter));
-        break;
+        return applyOp(eventsTable.userId, filter);
       case "apiKeyId":
-        conditions.push(applyOp(eventsTable.api_keyId, filter));
-        break;
+        return applyOp(eventsTable.api_keyId, filter);
       case "model":
-        conditions.push(applyOp(aiTokenUsageEventsTable.model, filter));
-        break;
+        return applyOp(aiTokenUsageEventsTable.model, filter);
       case "inputTokens":
-        conditions.push(applyOp(aiTokenUsageEventsTable.inputTokens, filter));
-        break;
+        return applyOp(aiTokenUsageEventsTable.inputTokens, filter);
       case "outputTokens":
-        conditions.push(applyOp(aiTokenUsageEventsTable.outputTokens, filter));
-        break;
+        return applyOp(aiTokenUsageEventsTable.outputTokens, filter);
       case "inputDebitAmount":
-        conditions.push(
-          applyOp(aiTokenUsageEventsTable.inputDebitAmount, filter)
+        return applyOp(
+          aiTokenUsageEventsTable.inputDebitAmount,
+          filter
         );
-        break;
       case "outputDebitAmount":
-        conditions.push(
-          applyOp(aiTokenUsageEventsTable.outputDebitAmount, filter)
+        return applyOp(
+          aiTokenUsageEventsTable.outputDebitAmount,
+          filter
         );
-        break;
+      default:
+        return null;
     }
-  }
-  return conditions;
+  });
 }
 
-function buildPaymentConditions(filters: QueryFilter[]): SQL[] {
-  const conditions: SQL[] = [];
-  for (const filter of filters) {
-    if (filter.field === "eventType") continue;
-    switch (filter.field) {
-      case "reportedTimestamp":
-        conditions.push(applyOp(eventsTable.reported_timestamp, filter));
-        break;
-      case "ingestedTimestamp":
-        conditions.push(applyOp(eventsTable.ingested_timestamp, filter));
-        break;
-      case "userId":
-        conditions.push(applyOp(eventsTable.userId, filter));
-        break;
-      case "apiKeyId":
-        conditions.push(applyOp(eventsTable.api_keyId, filter));
-        break;
-      case "creditAmount":
-        conditions.push(applyOp(paymentEventsTable.creditAmount, filter));
-        break;
-    }
+function buildConditionsFromGroup(
+  group: QueryFilterGroup,
+  resolveColumn: (filter: QueryFilter) => SQL | null
+): SQL | undefined {
+  const parts: SQL[] = [];
+
+  for (const condition of group.conditions) {
+    if (condition.field === "eventType") continue;
+    const clause = resolveColumn(condition);
+    if (clause) parts.push(clause);
   }
-  return conditions;
+
+  for (const subGroup of group.groups) {
+    const subWhere = buildConditionsFromGroup(subGroup, resolveColumn);
+    if (subWhere) parts.push(subWhere);
+  }
+
+  if (parts.length === 0) return undefined;
+  return group.logical === "OR" ? or(...parts) : and(...parts);
 }
 
-function getEventTypes(filters: QueryFilter[]): EventTypeName[] {
-  const eventTypeFilter = filters.find((f) => f.field === "eventType");
-  if (eventTypeFilter) {
-    const v = eventTypeFilter.value;
-    if (v === "SDK_CALL" || v === "AI_TOKEN_USAGE" || v === "PAYMENT") {
-      return [v];
+function getEventTypes(where: QueryFilterGroup): EventTypeName[] {
+  const collect = (group: QueryFilterGroup): string[] => {
+    const types: string[] = [];
+    const et = group.conditions.find((c) => c.field === "eventType");
+    if (et) types.push(et.value);
+    for (const sub of group.groups) {
+      types.push(...collect(sub));
     }
-    return [];
+    return types;
+  };
+
+  const types = collect(where);
+  if (types.length > 0) {
+    return types.filter(
+      (t): t is EventTypeName =>
+        t === "SDK_CALL" || t === "AI_TOKEN_USAGE"
+    );
   }
-  return ["SDK_CALL", "AI_TOKEN_USAGE", "PAYMENT"];
+  return ["SDK_CALL", "AI_TOKEN_USAGE"];
 }
 
 function buildSdkCallSelect() {
@@ -201,51 +175,29 @@ function buildAiTokenSelect() {
   };
 }
 
-function buildPaymentSelect() {
-  return {
-    eventId: eventsTable.id,
-    eventType: sql<string>`'PAYMENT'`.as("eventType"),
-    userId: eventsTable.userId,
-    reportedTimestamp: eventsTable.reported_timestamp,
-    ingestedTimestamp: eventsTable.ingested_timestamp,
-    sdkCallType: sql<string>`NULL`.as("sdkCallType"),
-    debitAmount: sql<number>`NULL::integer`.as("debitAmount"),
-    creditAmount: paymentEventsTable.creditAmount,
-    model: sql<string>`NULL`.as("model"),
-    inputTokens: sql<number>`NULL::integer`.as("inputTokens"),
-    outputTokens: sql<number>`NULL::integer`.as("outputTokens"),
-    inputDebitAmount: sql<number>`NULL::integer`.as("inputDebitAmount"),
-    outputDebitAmount: sql<number>`NULL::integer`.as("outputDebitAmount"),
-  };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getSubtypeTable(eventType: EventTypeName): any {
+function getSubtypeTable(eventType: EventTypeName): typeof sdkCallEventsTable | typeof aiTokenUsageEventsTable {
   if (eventType === "SDK_CALL") return sdkCallEventsTable;
-  if (eventType === "AI_TOKEN_USAGE") return aiTokenUsageEventsTable;
-  return paymentEventsTable;
+  return aiTokenUsageEventsTable;
 }
 
 function getSelect(eventType: EventTypeName) {
   if (eventType === "SDK_CALL") return buildSdkCallSelect();
-  if (eventType === "AI_TOKEN_USAGE") return buildAiTokenSelect();
-  return buildPaymentSelect();
+  return buildAiTokenSelect();
 }
 
 function getConditions(
   eventType: EventTypeName,
-  filters: QueryFilter[]
-): SQL[] {
-  if (eventType === "SDK_CALL") return buildSdkCallConditions(filters);
-  if (eventType === "AI_TOKEN_USAGE") return buildAiTokenConditions(filters);
-  return buildPaymentConditions(filters);
+  where: QueryFilterGroup
+): SQL | undefined {
+  if (eventType === "SDK_CALL") return buildSdkCallConditionsFromGroup(where);
+  return buildAiTokenConditionsFromGroup(where);
 }
 
 export async function handleQueryEvents(
   request: QueryRequest
 ): Promise<QueryResponse> {
   const db = getPostgresDB();
-  const eventTypes = getEventTypes(request.filters);
+  const eventTypes = getEventTypes(request.where);
   const isAgg = !!request.aggregation;
 
   if (eventTypes.length === 0) {
@@ -280,9 +232,7 @@ async function queryListForType(
 ): Promise<{ rows: QueryResultRow[]; total: number }> {
   const subtypeTable = getSubtypeTable(eventType);
   const selectCols = getSelect(eventType);
-  const whereConditions = getConditions(eventType, request.filters);
-  const whereClause =
-    whereConditions.length > 0 ? and(...whereConditions) : undefined;
+  const whereClause = getConditions(eventType, request.where);
 
   // Count
   const countResult = await db
@@ -344,9 +294,7 @@ async function handleAggregationQuery(
 
   for (const eventType of eventTypes) {
     const subtypeTable = getSubtypeTable(eventType);
-    const whereConditions = getConditions(eventType, request.filters);
-    const whereClause =
-      whereConditions.length > 0 ? and(...whereConditions) : undefined;
+    const whereClause = getConditions(eventType, request.where);
 
     if (request.groupBy && request.groupBy !== "eventType") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -359,9 +307,6 @@ async function handleAggregationQuery(
         if (request.groupBy === "model") gbCol = aiTokenUsageEventsTable.model;
         if (request.groupBy === "userId") gbCol = eventsTable.userId;
       }
-      if (eventType === "PAYMENT") {
-        if (request.groupBy === "userId") gbCol = eventsTable.userId;
-      }
       if (!gbCol) continue;
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -371,21 +316,19 @@ async function handleAggregationQuery(
           aggCol = sum(sdkCallEventsTable.debitAmount).mapWith(Number);
         else if (eventType === "AI_TOKEN_USAGE") {
           if (agg.field === "inputDebitAmount")
-            aggCol = sum(aiTokenUsageEventsTable.inputDebitAmount).mapWith(
-              Number
-            );
+            aggCol = sum(
+              aiTokenUsageEventsTable.inputDebitAmount
+            ).mapWith(Number);
           else if (agg.field === "outputDebitAmount")
-            aggCol = sum(aiTokenUsageEventsTable.outputDebitAmount).mapWith(
-              Number
-            );
+            aggCol = sum(
+              aiTokenUsageEventsTable.outputDebitAmount
+            ).mapWith(Number);
           else if (agg.field === "inputTokens")
             aggCol = sum(aiTokenUsageEventsTable.inputTokens).mapWith(Number);
           else if (agg.field === "outputTokens")
             aggCol = sum(aiTokenUsageEventsTable.outputTokens).mapWith(Number);
           else aggCol = count().mapWith(Number);
-        } else if (eventType === "PAYMENT" && agg.field === "creditAmount")
-          aggCol = sum(paymentEventsTable.creditAmount).mapWith(Number);
-        else aggCol = count().mapWith(Number);
+        } else aggCol = count().mapWith(Number);
       } else {
         aggCol = count().mapWith(Number);
       }
@@ -415,21 +358,19 @@ async function handleAggregationQuery(
           aggCol = sum(sdkCallEventsTable.debitAmount).mapWith(Number);
         else if (eventType === "AI_TOKEN_USAGE") {
           if (agg.field === "inputDebitAmount")
-            aggCol = sum(aiTokenUsageEventsTable.inputDebitAmount).mapWith(
-              Number
-            );
+            aggCol = sum(
+              aiTokenUsageEventsTable.inputDebitAmount
+            ).mapWith(Number);
           else if (agg.field === "outputDebitAmount")
-            aggCol = sum(aiTokenUsageEventsTable.outputDebitAmount).mapWith(
-              Number
-            );
+            aggCol = sum(
+              aiTokenUsageEventsTable.outputDebitAmount
+            ).mapWith(Number);
           else if (agg.field === "inputTokens")
             aggCol = sum(aiTokenUsageEventsTable.inputTokens).mapWith(Number);
           else if (agg.field === "outputTokens")
             aggCol = sum(aiTokenUsageEventsTable.outputTokens).mapWith(Number);
           else aggCol = count().mapWith(Number);
-        } else if (eventType === "PAYMENT" && agg.field === "creditAmount")
-          aggCol = sum(paymentEventsTable.creditAmount).mapWith(Number);
-        else aggCol = count().mapWith(Number);
+        } else aggCol = count().mapWith(Number);
       } else {
         aggCol = count().mapWith(Number);
       }

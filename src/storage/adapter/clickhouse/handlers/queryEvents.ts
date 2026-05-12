@@ -3,6 +3,7 @@ import { StorageError } from "../../../../errors/storage";
 import type {
   QueryRequest,
   QueryFilter,
+  QueryFilterGroup,
   QueryResponse,
   QueryResultRow,
 } from "../../../../interface/storage/Storage";
@@ -86,20 +87,26 @@ const OPERATOR_SQL: Record<string, string> = {
   NEQ: "!=",
 };
 
-function getTablesForRequest(filters: QueryFilter[]): string[] {
-  const eventTypeFilter = filters.find((f) => f.field === "eventType");
-  if (eventTypeFilter) {
-    const v = eventTypeFilter.value;
-    if (v === "SDK_CALL") return ["sdk_call_events"];
-    if (v === "AI_TOKEN_USAGE") return ["ai_token_usage_events"];
-    return [];
+function getTablesForRequest(where: QueryFilterGroup): string[] {
+  const eventTypes = collectEventTypes(where);
+  if (eventTypes.length > 0) {
+    const tables: string[] = [];
+    if (eventTypes.includes("SDK_CALL")) tables.push("sdk_call_events");
+    if (eventTypes.includes("AI_TOKEN_USAGE"))
+      tables.push("ai_token_usage_events");
+    return tables;
   }
   return ["sdk_call_events", "ai_token_usage_events"];
 }
 
-function isAggregationField(field: string, table: string): boolean {
-  const cols = FIELD_TO_CH_COLUMN[table];
-  return cols ? field in cols : false;
+function collectEventTypes(group: QueryFilterGroup): string[] {
+  const types: string[] = [];
+  const et = group.conditions.find((c) => c.field === "eventType");
+  if (et) types.push(et.value);
+  for (const sub of group.groups) {
+    types.push(...collectEventTypes(sub));
+  }
+  return types;
 }
 
 function buildSelectColumns(table: string, outputAliases: boolean): string {
@@ -118,32 +125,61 @@ function buildSelectColumns(table: string, outputAliases: boolean): string {
   return parts.join(", ");
 }
 
-function buildWhereClause(
-  filters: QueryFilter[],
+function buildGroupCondition(
+  condition: QueryFilter,
+  table: string,
+  params: Record<string, unknown>,
+  paramIndex: { value: number }
+): string | null {
+  const col = FIELD_TO_CH_COLUMN[table]?.[condition.field];
+  if (!col) return null;
+  const op = OPERATOR_SQL[condition.operator];
+  if (!op) return null;
+  const paramName = `p_${paramIndex.value++}`;
+  const paramType = CH_PARAM_TYPE[condition.field] ?? "String";
+  params[paramName] = condition.value;
+  return `${col} ${op} {${paramName}:${paramType}}`;
+}
+
+function buildWhereFromGroup(
+  group: QueryFilterGroup,
   table: string,
   params: Record<string, unknown>,
   paramIndex: { value: number }
 ): string {
-  const clauses: string[] = [];
-  for (const filter of filters) {
-    if (filter.field === "eventType") continue;
-    const col = FIELD_TO_CH_COLUMN[table]?.[filter.field];
-    if (!col) continue;
-    const op = OPERATOR_SQL[filter.operator];
-    if (!op) continue;
-    const paramName = `p_${paramIndex.value++}`;
-    const paramType = CH_PARAM_TYPE[filter.field] ?? "String";
-    clauses.push(`${col} ${op} {${paramName}:${paramType}}`);
-    params[paramName] = filter.value;
+  const parts: string[] = [];
+
+  for (const condition of group.conditions) {
+    if (condition.field === "eventType") continue;
+    const clause = buildGroupCondition(
+      condition,
+      table,
+      params,
+      paramIndex
+    );
+    if (clause) parts.push(clause);
   }
-  return clauses.length > 0 ? `WHERE ${clauses.join(" AND ")}` : "";
+
+  for (const subGroup of group.groups) {
+    const subClause = buildWhereFromGroup(
+      subGroup,
+      table,
+      params,
+      paramIndex
+    );
+    if (subClause) parts.push(`(${subClause})`);
+  }
+
+  if (parts.length === 0) return "";
+  const joiner = group.logical === "OR" ? " OR " : " AND ";
+  return parts.join(joiner);
 }
 
 export async function handleQueryEvents(
   request: QueryRequest
 ): Promise<QueryResponse> {
   const client = getClickHouseDB();
-  const tables = getTablesForRequest(request.filters);
+  const tables = getTablesForRequest(request.where);
   const isAgg = !!request.aggregation;
 
   if (tables.length === 0) {
@@ -178,25 +214,25 @@ async function handleListQuery(
 ): Promise<QueryResponse> {
   const paramIndex = { value: 0 };
   const params: Record<string, unknown> = {};
-  const selects = tables.map(
-    (t) => `SELECT ${buildSelectColumns(t, true)} FROM ${t}`
-  );
-  const wheres = tables.map((t) => {
-    const idx = { value: paramIndex.value };
-    const clause = buildWhereClause(request.filters, t, params, idx);
-    paramIndex.value = idx.value;
-    return clause;
-  });
 
-  const queries = tables.map((t, i) => {
+  const queries = tables.map((t) => {
+    const whereClause = buildWhereFromGroup(
+      request.where,
+      t,
+      params,
+      paramIndex
+    );
     let q = `SELECT ${buildSelectColumns(t, true)} FROM ${t}`;
-    if (wheres[i]) q += ` ${wheres[i]}`;
+    if (whereClause) q += ` WHERE ${whereClause}`;
     return q;
   });
 
   const unionQuery = queries.join(" UNION ALL ");
-
-  const orderLimitOffset = buildOrderLimitOffset(request, params, paramIndex);
+  const orderLimitOffset = buildOrderLimitOffset(
+    request,
+    params,
+    paramIndex
+  );
   const finalQuery = `${unionQuery} ${orderLimitOffset}`;
 
   const rs = await client.query({
@@ -250,11 +286,14 @@ async function handleAggregationQuery(
       cols.push("1 as agg_value");
     }
 
-    const idx = { value: paramIndex.value };
+    const whereClause = buildWhereFromGroup(
+      request.where,
+      t,
+      params,
+      paramIndex
+    );
     let q = `SELECT ${cols.join(", ")} FROM ${t}`;
-    const where = buildWhereClause(request.filters, t, params, idx);
-    paramIndex.value = idx.value;
-    if (where) q += ` ${where}`;
+    if (whereClause) q += ` WHERE ${whereClause}`;
     return q;
   });
 
@@ -279,7 +318,10 @@ async function handleAggregationQuery(
     query_params: params,
     format: "JSONEachRow",
   });
-  const data = await rs.json<{ group_value?: string; agg_value: string }>();
+  const data = await rs.json<{
+    group_value?: string;
+    agg_value: string;
+  }>();
 
   const rows: QueryResultRow[] = (
     data as unknown as Record<string, string>[]
@@ -300,15 +342,20 @@ async function getTotalCount(
   const params: Record<string, unknown> = {};
 
   const subQueries = tables.map((t) => {
-    const idx = { value: paramIndex.value };
+    const whereClause = buildWhereFromGroup(
+      request.where,
+      t,
+      params,
+      paramIndex
+    );
     let q = `SELECT count() as cnt FROM ${t}`;
-    const where = buildWhereClause(request.filters, t, params, idx);
-    paramIndex.value = idx.value;
-    if (where) q += ` ${where}`;
+    if (whereClause) q += ` WHERE ${whereClause}`;
     return q;
   });
 
-  const query = `SELECT sum(cnt) as total FROM (${subQueries.join(" UNION ALL ")})`;
+  const query = `SELECT sum(cnt) as total FROM (${subQueries.join(
+    " UNION ALL "
+  )})`;
 
   const rs = await client.query({
     query,
@@ -332,18 +379,14 @@ function buildOrderLimitOffset(
 
   if (request.limit) {
     const limitParam = `p_${paramIndex.value++}`;
-    if (typeof request.limit === "number") {
-      parts.push(`LIMIT {${limitParam}:Int32}`);
-      params[limitParam] = request.limit;
-    }
+    parts.push(`LIMIT {${limitParam}:Int32}`);
+    params[limitParam] = request.limit;
   }
 
   if (request.offset) {
     const offsetParam = `p_${paramIndex.value++}`;
-    if (typeof request.offset === "number") {
-      parts.push(`OFFSET {${offsetParam}:Int32}`);
-      params[offsetParam] = request.offset;
-    }
+    parts.push(`OFFSET {${offsetParam}:Int32}`);
+    params[offsetParam] = request.offset;
   }
 
   return parts.join(" ");

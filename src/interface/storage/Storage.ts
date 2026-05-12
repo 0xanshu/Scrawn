@@ -10,13 +10,19 @@ export interface QueryFilter {
   value: string;
 }
 
+export interface QueryFilterGroup {
+  logical: "AND" | "OR";
+  conditions: QueryFilter[];
+  groups: QueryFilterGroup[];
+}
+
 export interface QueryAggregation {
   type: "SUM" | "COUNT";
   field?: string;
 }
 
 export interface QueryRequest {
-  filters: QueryFilter[];
+  where: QueryFilterGroup;
   aggregation?: QueryAggregation;
   groupBy?: string;
   limit?: number;

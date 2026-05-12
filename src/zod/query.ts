@@ -31,7 +31,7 @@ const AGGREGATION_TYPE_MAP = {
   2: "COUNT",
 } as const;
 
-const filterSchema = z.object({
+const filterConditionSchema = z.object({
   field: z.enum(ALLOWED_FIELDS),
   operator: z
     .number()
@@ -41,6 +41,18 @@ const filterSchema = z.object({
     .transform((v) => OPERATOR_MAP[v as keyof typeof OPERATOR_MAP]),
   value: z.string(),
 });
+
+const filterGroupSchema: z.ZodType<{
+  logical: number;
+  conditionsList: z.infer<typeof filterConditionSchema>[];
+  groupsList: unknown[];
+}> = z.lazy(() =>
+  z.object({
+    logical: z.number().int().min(0).max(2).default(1),
+    conditionsList: z.array(filterConditionSchema).default([]),
+    groupsList: z.array(filterGroupSchema).default([]),
+  })
+);
 
 const aggregationSchema = z.object({
   type: z
@@ -59,7 +71,7 @@ const groupBySchema = z.object({
 });
 
 export const queryEventsSchema = z.object({
-  filtersList: z.array(filterSchema).default([]),
+  where: filterGroupSchema.optional(),
   aggregation: aggregationSchema.optional(),
   groupBy: groupBySchema.optional(),
   limit: z.number().int().min(1).max(1000).default(100),
