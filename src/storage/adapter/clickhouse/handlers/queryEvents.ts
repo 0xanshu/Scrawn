@@ -8,58 +8,43 @@ import type {
   QueryResultRow,
 } from "../../../../interface/storage/Storage";
 
-const CH_COLUMNS: Record<string, Record<string, string | null>> = {
-  sdk_call_events: {
-    eventId: "toString(id)",
-    eventType: "'SDK_CALL'",
-    userId: "user_id",
-    reportedTimestamp: "toString(reported_timestamp)",
-    ingestedTimestamp: "toString(ingested_timestamp)",
-    sdkCallType: "sdk_call_type",
-    debitAmount: "toString(debit_amount)",
-    creditAmount: null,
-    model: null,
-    inputTokens: null,
-    outputTokens: null,
-    inputDebitAmount: null,
-    outputDebitAmount: null,
-  },
-  ai_token_usage_events: {
-    eventId: "toString(id)",
-    eventType: "'AI_TOKEN_USAGE'",
-    userId: "user_id",
-    reportedTimestamp: "toString(reported_timestamp)",
-    ingestedTimestamp: "toString(ingested_timestamp)",
-    sdkCallType: null,
-    debitAmount: null,
-    creditAmount: null,
-    model: "model",
-    inputTokens: "toString(input_tokens)",
-    outputTokens: "toString(output_tokens)",
-    inputDebitAmount: "toString(input_debit_amount)",
-    outputDebitAmount: "toString(output_debit_amount)",
-  },
-};
+interface ChFieldDef {
+  select: string | null;
+  where?: string;
+}
 
-const FIELD_TO_CH_COLUMN: Record<string, Record<string, string>> = {
+const CH_FIELDS: Record<string, Record<string, ChFieldDef>> = {
   sdk_call_events: {
-    reportedTimestamp: "reported_timestamp",
-    ingestedTimestamp: "ingested_timestamp",
-    userId: "user_id",
-    apiKeyId: "api_key_id",
-    sdkCallType: "sdk_call_type",
-    debitAmount: "debit_amount",
+    eventId:           { select: "toString(id)" },
+    eventType:         { select: "'SDK_CALL'" },
+    userId:            { select: "user_id", where: "user_id" },
+    apiKeyId:          { select: "api_key_id", where: "api_key_id" },
+    reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
+    ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
+    sdkCallType:       { select: "sdk_call_type", where: "sdk_call_type" },
+    debitAmount:       { select: "toString(debit_amount)", where: "debit_amount" },
+    creditAmount:      { select: null },
+    model:             { select: null },
+    inputTokens:       { select: null },
+    outputTokens:      { select: null },
+    inputDebitAmount:  { select: null },
+    outputDebitAmount: { select: null },
   },
   ai_token_usage_events: {
-    reportedTimestamp: "reported_timestamp",
-    ingestedTimestamp: "ingested_timestamp",
-    userId: "user_id",
-    apiKeyId: "api_key_id",
-    model: "model",
-    inputTokens: "input_tokens",
-    outputTokens: "output_tokens",
-    inputDebitAmount: "input_debit_amount",
-    outputDebitAmount: "output_debit_amount",
+    eventId:           { select: "toString(id)" },
+    eventType:         { select: "'AI_TOKEN_USAGE'" },
+    userId:            { select: "user_id", where: "user_id" },
+    apiKeyId:          { select: "api_key_id", where: "api_key_id" },
+    reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
+    ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
+    sdkCallType:       { select: null },
+    debitAmount:       { select: null },
+    creditAmount:      { select: null },
+    model:             { select: "model", where: "model" },
+    inputTokens:       { select: "toString(input_tokens)", where: "input_tokens" },
+    outputTokens:      { select: "toString(output_tokens)", where: "output_tokens" },
+    inputDebitAmount:  { select: "toString(input_debit_amount)", where: "input_debit_amount" },
+    outputDebitAmount: { select: "toString(output_debit_amount)", where: "output_debit_amount" },
   },
 };
 
@@ -110,16 +95,16 @@ function collectEventTypes(group: QueryFilterGroup): string[] {
 }
 
 function buildSelectColumns(table: string, outputAliases: boolean): string {
-  const cols = CH_COLUMNS[table];
-  if (!cols) return "*";
+  const defs = CH_FIELDS[table];
+  if (!defs) return "*";
   const parts: string[] = [];
-  for (const [alias, expr] of Object.entries(cols)) {
-    if (expr === null) {
+  for (const [alias, def] of Object.entries(defs)) {
+    if (def.select === null) {
       parts.push(`NULL as ${alias}`);
     } else if (outputAliases) {
-      parts.push(`${expr} as ${alias}`);
+      parts.push(`${def.select} as ${alias}`);
     } else {
-      parts.push(expr);
+      parts.push(def.select);
     }
   }
   return parts.join(", ");
@@ -131,7 +116,7 @@ function buildGroupCondition(
   params: Record<string, unknown>,
   paramIndex: { value: number }
 ): string | null {
-  const col = FIELD_TO_CH_COLUMN[table]?.[condition.field];
+  const col = CH_FIELDS[table]?.[condition.field]?.where;
   if (!col) return null;
   const op = OPERATOR_SQL[condition.operator];
   if (!op) return null;
@@ -265,7 +250,7 @@ async function handleAggregationQuery(
     const cols: string[] = [];
 
     if (request.groupBy) {
-      const gbCol = FIELD_TO_CH_COLUMN[t]?.[request.groupBy];
+      const gbCol = CH_FIELDS[t]?.[request.groupBy]?.where;
       if (gbCol) {
         cols.push(`${gbCol} as group_value`);
       } else if (request.groupBy === "eventType") {
@@ -276,7 +261,7 @@ async function handleAggregationQuery(
     }
 
     if (isSum && agg.field) {
-      const aggCol = FIELD_TO_CH_COLUMN[t]?.[agg.field];
+      const aggCol = CH_FIELDS[t]?.[agg.field]?.where;
       if (aggCol) {
         cols.push(`${aggCol} as agg_value`);
       } else {

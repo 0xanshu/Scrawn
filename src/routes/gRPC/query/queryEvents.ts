@@ -9,7 +9,10 @@ import { queryEventsSchema } from "../../../zod/query";
 import { EventError } from "../../../errors/event";
 import { formatZodError } from "../../../utils/formatZodError";
 import { StorageAdapterFactory } from "../../../factory";
-import type { QueryRequest, QueryResponse } from "../../../interface/storage/Storage";
+import type {
+  QueryRequest,
+  QueryResponse,
+} from "../../../interface/storage/Storage";
 import type { WideEventBuilder } from "../../../context/requestContext";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
@@ -30,7 +33,8 @@ export async function queryEvents(
       queryConditions: countConditions(queryRequest.where),
     });
 
-    const adapter = await StorageAdapterFactory.getEventStorageAdapter("SDK_CALL");
+    const adapter =
+      await StorageAdapterFactory.getEventStorageAdapter("SDK_CALL");
     const result = await adapter.query(queryRequest);
 
     const response = buildProtoResponse(result, queryRequest);
@@ -50,7 +54,7 @@ function countConditions(group: QueryRequest["where"]): number {
 
 function validateRequest(req: QueryEventsRequest): QueryRequest {
   try {
-    return queryEventsSchema.parse(req.toObject()) as QueryRequest;
+    return queryEventsSchema.parse(req.toObject());
   } catch (error) {
     throw formatZodError(error, (msg) => EventError.validationFailed(msg));
   }
