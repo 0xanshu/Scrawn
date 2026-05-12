@@ -31,6 +31,12 @@ const AGGREGATION_TYPE_MAP = {
   2: "COUNT",
 } as const;
 
+const LOGICAL_MAP = {
+  0: "AND",
+  1: "AND",
+  2: "OR",
+} as const;
+
 const filterConditionSchema = z.object({
   field: z.enum(ALLOWED_FIELDS),
   operator: z
@@ -42,16 +48,31 @@ const filterConditionSchema = z.object({
   value: z.string(),
 });
 
-const filterGroupSchema: z.ZodType<{
-  logical: number;
-  conditionsList: z.infer<typeof filterConditionSchema>[];
-  groupsList: unknown[];
-}> = z.lazy(() =>
-  z.object({
-    logical: z.number().int().min(0).max(2).default(1),
-    conditionsList: z.array(filterConditionSchema).default([]),
-    groupsList: z.array(filterGroupSchema).default([]),
-  })
+interface FilterGroupOutput {
+  logical: "AND" | "OR";
+  conditions: Array<z.output<typeof filterConditionSchema>>;
+  groups: FilterGroupOutput[];
+}
+
+const filterGroupSchema: z.ZodType<FilterGroupOutput> = z.lazy(() =>
+  z
+    .object({
+      logical: z
+        .number()
+        .int()
+        .min(0)
+        .max(2)
+        .transform(
+          (v) => LOGICAL_MAP[v as keyof typeof LOGICAL_MAP]
+        ),
+      conditionsList: z.array(filterConditionSchema).default([]),
+      groupsList: z.array(filterGroupSchema).default([]),
+    })
+    .transform((v) => ({
+      logical: v.logical,
+      conditions: v.conditionsList,
+      groups: v.groupsList,
+    }))
 );
 
 const aggregationSchema = z.object({
@@ -70,12 +91,26 @@ const groupBySchema = z.object({
   field: z.enum(ALLOWED_FIELDS),
 });
 
-export const queryEventsSchema = z.object({
-  where: filterGroupSchema.optional(),
-  aggregation: aggregationSchema.optional(),
-  groupBy: groupBySchema.optional(),
-  limit: z.number().int().min(1).max(1000).default(100),
-  offset: z.number().int().min(0).default(0),
-});
+export const queryEventsSchema = z
+  .object({
+    where: filterGroupSchema.optional(),
+    aggregation: aggregationSchema.optional(),
+    groupBy: groupBySchema.optional(),
+    limit: z.number().int().min(1).max(1000).default(100),
+    offset: z.number().int().min(0).default(0),
+  })
+  .transform((v) => ({
+    where: v.where ?? {
+      logical: "AND" as const,
+      conditions: [],
+      groups: [],
+    },
+    aggregation: v.aggregation
+      ? { type: v.aggregation.type, field: v.aggregation.field }
+      : undefined,
+    groupBy: v.groupBy?.field,
+    limit: v.limit,
+    offset: v.offset,
+  }));
 
 export type QueryEventsSchemaType = z.output<typeof queryEventsSchema>;

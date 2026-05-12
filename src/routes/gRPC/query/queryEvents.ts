@@ -5,11 +5,7 @@ import {
   EventRow,
   AggregationRow,
 } from "../../../gen/query/v1/query_pb.js";
-import type { FilterGroup } from "../../../gen/query/v1/query_pb.js";
-import {
-  queryEventsSchema,
-  type QueryEventsSchemaType,
-} from "../../../zod/query";
+import { queryEventsSchema } from "../../../zod/query";
 import { EventError } from "../../../errors/event";
 import { formatZodError } from "../../../utils/formatZodError";
 import { StorageAdapterFactory } from "../../../factory";
@@ -18,23 +14,12 @@ import type {
   QueryRequest,
   QueryResponse,
   QueryFilterGroup,
-  QueryFilter,
 } from "../../../interface/storage/Storage";
 import type { WideEventBuilder } from "../../../context/requestContext";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import type { ContextUnaryCall } from "../../../interface/types/context.js";
 import type { EventKind } from "../../../interface/event/Event";
-
-const OPERATOR_MAP: Record<number, QueryFilter["operator"]> = {
-  0: "EQ",
-  1: "EQ",
-  2: "GT",
-  3: "GTE",
-  4: "LT",
-  5: "LTE",
-  6: "NEQ",
-};
 
 export async function queryEvents(
   call: ContextUnaryCall<QueryEventsRequest, QueryEventsResponse>,
@@ -45,26 +30,10 @@ export async function queryEvents(
   const wideEventBuilder = call[wideEventContextKey];
 
   try {
-    const validated = validateRequest(req);
-
-    const queryRequest: QueryRequest = {
-      where: validated.where
-        ? convertFilterGroup(validated.where)
-        : { logical: "AND", conditions: [], groups: [] },
-      aggregation: validated.aggregation
-        ? {
-            type: validated.aggregation.type,
-            field: validated.aggregation.field,
-          }
-        : undefined,
-      groupBy: validated.groupBy?.field,
-      limit: validated.limit,
-      offset: validated.offset,
-    };
+    const queryRequest = validateRequest(req);
 
     wideEventBuilder?.addContext({
-      queryConditions:
-        countConditions(queryRequest.where),
+      queryConditions: countConditions(queryRequest.where),
     });
 
     const eventTypes = resolveEventTypes(queryRequest.where);
@@ -83,26 +52,6 @@ export async function queryEvents(
   }
 }
 
-function convertFilterGroup(
-  pg: QueryEventsSchemaType["where"]
-): QueryFilterGroup {
-  if (!pg) return { logical: "AND", conditions: [], groups: [] };
-  return {
-    logical:
-      (pg as { logical: number }).logical === 2 ? "OR" : "AND",
-    conditions:
-      (pg as { conditionsList: Array<{ field: string; operator: string; value: string }> }).conditionsList?.map((c) => ({
-        field: c.field,
-        operator: c.operator as QueryFilter["operator"],
-        value: c.value,
-      })) ?? [],
-    groups:
-      (pg as { groupsList: QueryEventsSchemaType["where"][] }).groupsList?.map(
-        (g) => convertFilterGroup(g)
-      ) ?? [],
-  };
-}
-
 function countConditions(group: QueryFilterGroup): number {
   let count = group.conditions.length;
   for (const g of group.groups) {
@@ -111,9 +60,9 @@ function countConditions(group: QueryFilterGroup): number {
   return count;
 }
 
-function validateRequest(req: QueryEventsRequest): QueryEventsSchemaType {
+function validateRequest(req: QueryEventsRequest): QueryRequest {
   try {
-    return queryEventsSchema.parse(req.toObject());
+    return queryEventsSchema.parse(req.toObject()) as QueryRequest;
   } catch (error) {
     throw formatZodError(error, (msg) => EventError.validationFailed(msg));
   }
