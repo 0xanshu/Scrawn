@@ -8,8 +8,10 @@ import { StorageError } from "../../../errors/storage";
 import {
   handleAddSdkCall,
   handleAddAiTokenUsage,
+  handleAddPayment,
   handlePriceRequestSdkCall,
   handlePriceRequestAiTokenUsage,
+  handlePriceRequestPayment,
   handleQueryEvents,
 } from "./handlers";
 import type {
@@ -65,8 +67,12 @@ export class ClickHouseAdapter implements StorageAdapter {
         return await handleAddAiTokenUsage([event_data], apiKeyId);
       }
 
+      case "PAYMENT": {
+        return await handleAddPayment(event_data, apiKeyId);
+      }
+
       default: {
-        throw StorageError.unknownEventType(event_data.type);
+        throw StorageError.unknownEventType((event_data as SqlRecord).type);
       }
     }
   }
@@ -85,8 +91,12 @@ export class ClickHouseAdapter implements StorageAdapter {
         return await handlePriceRequestAiTokenUsage(userID, beforeTimestamp);
       }
 
+      case "PAYMENT": {
+        return await handlePriceRequestPayment(userID, beforeTimestamp);
+      }
+
       default: {
-        throw StorageError.unknownEventType(event_type);
+        throw StorageError.unknownEventType(event_type as string);
       }
     }
   }
