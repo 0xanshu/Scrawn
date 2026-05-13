@@ -22,7 +22,7 @@ import { DateTime } from "luxon";
 import { parseRoleFromApiKey, getModeForRole, isValidApiKeyFormat } from "../utils/keyFormat";
 import type { ApiKeyRole } from "../utils/keyFormat";
 
-const no_auth = ["/auth.v1.AuthService/CreateAPIKey", "CreateAPIKey"];
+const no_auth: string[] = [];
 
 interface GrpcCallContext {
   [wideEventContextKey]: WideEventBuilder | null;
