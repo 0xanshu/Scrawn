@@ -33,6 +33,7 @@ const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
     outputTokens:      { select: null },
     inputDebitAmount:  { select: null },
     outputDebitAmount: { select: null },
+    creditAmount:      { select: null },
   },
   ai_token_usage_events: {
     eventId:           { select: "toString(id)" },
@@ -48,6 +49,23 @@ const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
     outputTokens:      { select: "toString(output_tokens)", where: "output_tokens" },
     inputDebitAmount:  { select: "toString(input_debit_amount)", where: "input_debit_amount" },
     outputDebitAmount: { select: "toString(output_debit_amount)", where: "output_debit_amount" },
+    creditAmount:      { select: null },
+  },
+  payment_events: {
+    eventId:           { select: "toString(id)" },
+    eventType:         { select: "'PAYMENT'" },
+    userId:            { select: "user_id", where: "user_id" },
+    apiKeyId:          { select: null },
+    reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
+    ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
+    sdkCallType:       { select: null },
+    debitAmount:       { select: null },
+    model:             { select: null },
+    inputTokens:       { select: null },
+    outputTokens:      { select: null },
+    inputDebitAmount:  { select: null },
+    outputDebitAmount: { select: null },
+    creditAmount:      { select: "toString(credit_amount)", where: "credit_amount" },
   },
 };
 
@@ -64,6 +82,7 @@ const CH_PARAM_TYPE: Record<QueryFieldName, string> = {
   outputTokens: "Int64",
   inputDebitAmount: "Int64",
   outputDebitAmount: "Int64",
+  creditAmount: "Int64",
 };
 
 const OPERATOR_SQL: Record<string, string> = {
@@ -82,9 +101,10 @@ function getTablesForRequest(where: QueryFilterGroup): string[] {
     if (eventTypes.includes("SDK_CALL")) tables.push("sdk_call_events");
     if (eventTypes.includes("AI_TOKEN_USAGE"))
       tables.push("ai_token_usage_events");
+    if (eventTypes.includes("PAYMENT")) tables.push("payment_events");
     return tables;
   }
-  return ["sdk_call_events", "ai_token_usage_events"];
+    return ["sdk_call_events", "ai_token_usage_events", "payment_events"];
 }
 
 function collectEventTypes(group: QueryFilterGroup): string[] {
@@ -267,7 +287,7 @@ async function handleAggregationQuery(
         cols.push(`${gbCol} as group_value`);
       } else if (request.groupBy === "eventType") {
         cols.push(
-          `'${t === "sdk_call_events" ? "SDK_CALL" : "AI_TOKEN_USAGE"}' as group_value`
+          `'${t === "sdk_call_events" ? "SDK_CALL" : t === "ai_token_usage_events" ? "AI_TOKEN_USAGE" : "PAYMENT"}' as group_value`
         );
       }
     }
