@@ -3,6 +3,7 @@ import {
   eventsTable,
   sdkCallEventsTable,
   aiTokenUsageEventsTable,
+  paymentEventsTable,
 } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import {
@@ -28,7 +29,7 @@ import type {
 } from "../../../../interface/storage/Storage";
 import { type AnyPgColumn } from "drizzle-orm/pg-core";
 
-type EventTypeName = "SDK_CALL" | "AI_TOKEN_USAGE";
+type EventTypeName = "SDK_CALL" | "AI_TOKEN_USAGE" | "PAYMENT";
 
 interface PgFieldDef {
   column: AnyPgColumn | null;
@@ -56,6 +57,7 @@ const PG_FIELDS: Record<EventTypeName, Record<string, PgFieldDef>> = {
     outputTokens: { column: null, cast: "integer" },
     inputDebitAmount: { column: null, cast: "integer" },
     outputDebitAmount: { column: null, cast: "integer" },
+    creditAmount: { column: null, cast: "integer" },
   },
   AI_TOKEN_USAGE: {
     eventId: { column: eventsTable.id, cast: "uuid" },
@@ -89,6 +91,29 @@ const PG_FIELDS: Record<EventTypeName, Record<string, PgFieldDef>> = {
       column: aiTokenUsageEventsTable.outputDebitAmount,
       cast: "integer",
     },
+    creditAmount: { column: null, cast: "integer" },
+  },
+  PAYMENT: {
+    eventId: { column: eventsTable.id, cast: "uuid" },
+    eventType: { column: null, cast: "text" },
+    userId: { column: eventsTable.userId, cast: "uuid" },
+    apiKeyId: { column: eventsTable.api_keyId, cast: "uuid" },
+    reportedTimestamp: {
+      column: eventsTable.reported_timestamp,
+      cast: "timestamptz",
+    },
+    ingestedTimestamp: {
+      column: eventsTable.ingested_timestamp,
+      cast: "timestamptz",
+    },
+    sdkCallType: { column: null, cast: "text" },
+    debitAmount: { column: null, cast: "integer" },
+    model: { column: null, cast: "text" },
+    inputTokens: { column: null, cast: "integer" },
+    outputTokens: { column: null, cast: "integer" },
+    inputDebitAmount: { column: null, cast: "integer" },
+    outputDebitAmount: { column: null, cast: "integer" },
+    creditAmount: { column: paymentEventsTable.creditAmount, cast: "integer" },
   },
 };
 
@@ -160,10 +185,11 @@ function getEventTypes(where: QueryFilterGroup): EventTypeName[] {
   const types = collect(where);
   if (types.length > 0) {
     return types.filter(
-      (t): t is EventTypeName => t === "SDK_CALL" || t === "AI_TOKEN_USAGE"
+      (t): t is EventTypeName =>
+        t === "SDK_CALL" || t === "AI_TOKEN_USAGE" || t === "PAYMENT"
     );
   }
-  return ["SDK_CALL", "AI_TOKEN_USAGE"];
+  return ["SDK_CALL", "AI_TOKEN_USAGE", "PAYMENT"];
 }
 
 function buildSelect(eventType: EventTypeName) {
@@ -188,8 +214,9 @@ function buildSelect(eventType: EventTypeName) {
 
 function getSubtypeTable(
   eventType: EventTypeName
-): typeof sdkCallEventsTable | typeof aiTokenUsageEventsTable {
+): typeof sdkCallEventsTable | typeof aiTokenUsageEventsTable | typeof paymentEventsTable {
   if (eventType === "SDK_CALL") return sdkCallEventsTable;
+  if (eventType === "PAYMENT") return paymentEventsTable;
   return aiTokenUsageEventsTable;
 }
 
