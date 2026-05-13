@@ -5,7 +5,19 @@ import {
   aiTokenUsageEventsTable,
 } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
-import { eq, gt, gte, lt, lte, ne, and, or, sql, count, sum } from "drizzle-orm";
+import {
+  eq,
+  gt,
+  gte,
+  lt,
+  lte,
+  ne,
+  and,
+  or,
+  sql,
+  count,
+  sum,
+} from "drizzle-orm";
 import type { SQL } from "drizzle-orm";
 import type {
   QueryRequest,
@@ -14,13 +26,73 @@ import type {
   QueryResponse,
   QueryResultRow,
 } from "../../../../interface/storage/Storage";
+import { type AnyPgColumn } from "drizzle-orm/pg-core";
 
 type EventTypeName = "SDK_CALL" | "AI_TOKEN_USAGE";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyColumn = any;
+interface PgFieldDef {
+  column: AnyPgColumn | null;
+  cast: "text" | "integer" | "uuid" | "timestamptz";
+}
 
-function applyOp(col: AnyColumn, filter: QueryFilter): SQL {
+const PG_FIELDS: Record<EventTypeName, Record<string, PgFieldDef>> = {
+  SDK_CALL: {
+    eventId: { column: eventsTable.id, cast: "uuid" },
+    eventType: { column: null, cast: "text" },
+    userId: { column: eventsTable.userId, cast: "uuid" },
+    apiKeyId: { column: eventsTable.api_keyId, cast: "uuid" },
+    reportedTimestamp: {
+      column: eventsTable.reported_timestamp,
+      cast: "timestamptz",
+    },
+    ingestedTimestamp: {
+      column: eventsTable.ingested_timestamp,
+      cast: "timestamptz",
+    },
+    sdkCallType: { column: sdkCallEventsTable.type, cast: "text" },
+    debitAmount: { column: sdkCallEventsTable.debitAmount, cast: "integer" },
+    model: { column: null, cast: "text" },
+    inputTokens: { column: null, cast: "integer" },
+    outputTokens: { column: null, cast: "integer" },
+    inputDebitAmount: { column: null, cast: "integer" },
+    outputDebitAmount: { column: null, cast: "integer" },
+  },
+  AI_TOKEN_USAGE: {
+    eventId: { column: eventsTable.id, cast: "uuid" },
+    eventType: { column: null, cast: "text" },
+    userId: { column: eventsTable.userId, cast: "uuid" },
+    apiKeyId: { column: eventsTable.api_keyId, cast: "uuid" },
+    reportedTimestamp: {
+      column: eventsTable.reported_timestamp,
+      cast: "timestamptz",
+    },
+    ingestedTimestamp: {
+      column: eventsTable.ingested_timestamp,
+      cast: "timestamptz",
+    },
+    sdkCallType: { column: null, cast: "text" },
+    debitAmount: { column: null, cast: "integer" },
+    model: { column: aiTokenUsageEventsTable.model, cast: "text" },
+    inputTokens: {
+      column: aiTokenUsageEventsTable.inputTokens,
+      cast: "integer",
+    },
+    outputTokens: {
+      column: aiTokenUsageEventsTable.outputTokens,
+      cast: "integer",
+    },
+    inputDebitAmount: {
+      column: aiTokenUsageEventsTable.inputDebitAmount,
+      cast: "integer",
+    },
+    outputDebitAmount: {
+      column: aiTokenUsageEventsTable.outputDebitAmount,
+      cast: "integer",
+    },
+  },
+};
+
+function applyOp(col: AnyPgColumn, filter: QueryFilter): SQL {
   switch (filter.operator) {
     case "EQ":
       return eq(col, filter.value);
@@ -39,62 +111,18 @@ function applyOp(col: AnyColumn, filter: QueryFilter): SQL {
   }
 }
 
-function buildSdkCallConditionsFromGroup(
+function buildConditions(
+  eventType: EventTypeName,
   group: QueryFilterGroup
 ): SQL | undefined {
-  return buildConditionsFromGroup(group, (filter) => {
-    switch (filter.field) {
-      case "reportedTimestamp":
-        return applyOp(eventsTable.reported_timestamp, filter);
-      case "ingestedTimestamp":
-        return applyOp(eventsTable.ingested_timestamp, filter);
-      case "userId":
-        return applyOp(eventsTable.userId, filter);
-      case "apiKeyId":
-        return applyOp(eventsTable.api_keyId, filter);
-      case "sdkCallType":
-        return applyOp(sdkCallEventsTable.type, filter);
-      case "debitAmount":
-        return applyOp(sdkCallEventsTable.debitAmount, filter);
-      default:
-        return null;
-    }
-  });
-}
-
-function buildAiTokenConditionsFromGroup(
-  group: QueryFilterGroup
-): SQL | undefined {
-  return buildConditionsFromGroup(group, (filter) => {
-    switch (filter.field) {
-      case "reportedTimestamp":
-        return applyOp(eventsTable.reported_timestamp, filter);
-      case "ingestedTimestamp":
-        return applyOp(eventsTable.ingested_timestamp, filter);
-      case "userId":
-        return applyOp(eventsTable.userId, filter);
-      case "apiKeyId":
-        return applyOp(eventsTable.api_keyId, filter);
-      case "model":
-        return applyOp(aiTokenUsageEventsTable.model, filter);
-      case "inputTokens":
-        return applyOp(aiTokenUsageEventsTable.inputTokens, filter);
-      case "outputTokens":
-        return applyOp(aiTokenUsageEventsTable.outputTokens, filter);
-      case "inputDebitAmount":
-        return applyOp(
-          aiTokenUsageEventsTable.inputDebitAmount,
-          filter
-        );
-      case "outputDebitAmount":
-        return applyOp(
-          aiTokenUsageEventsTable.outputDebitAmount,
-          filter
-        );
-      default:
-        return null;
-    }
-  });
+  const fields = PG_FIELDS[eventType];
+  const resolveColumn = (filter: QueryFilter): SQL | null => {
+    if (filter.field === "eventType") return null;
+    const def = fields[filter.field];
+    if (!def?.column) return null;
+    return applyOp(def.column, filter);
+  };
+  return buildConditionsFromGroup(group, resolveColumn);
 }
 
 function buildConditionsFromGroup(
@@ -132,65 +160,48 @@ function getEventTypes(where: QueryFilterGroup): EventTypeName[] {
   const types = collect(where);
   if (types.length > 0) {
     return types.filter(
-      (t): t is EventTypeName =>
-        t === "SDK_CALL" || t === "AI_TOKEN_USAGE"
+      (t): t is EventTypeName => t === "SDK_CALL" || t === "AI_TOKEN_USAGE"
     );
   }
   return ["SDK_CALL", "AI_TOKEN_USAGE"];
 }
 
-function buildSdkCallSelect() {
-  return {
-    eventId: eventsTable.id,
-    eventType: sql<string>`'SDK_CALL'`.as("eventType"),
-    userId: eventsTable.userId,
-    reportedTimestamp: eventsTable.reported_timestamp,
-    ingestedTimestamp: eventsTable.ingested_timestamp,
-    sdkCallType: sdkCallEventsTable.type,
-    debitAmount: sdkCallEventsTable.debitAmount,
-    creditAmount: sql<number>`NULL::integer`.as("creditAmount"),
-    model: sql<string>`NULL`.as("model"),
-    inputTokens: sql<number>`NULL::integer`.as("inputTokens"),
-    outputTokens: sql<number>`NULL::integer`.as("outputTokens"),
-    inputDebitAmount: sql<number>`NULL::integer`.as("inputDebitAmount"),
-    outputDebitAmount: sql<number>`NULL::integer`.as("outputDebitAmount"),
-  };
+function buildSelect(eventType: EventTypeName) {
+  const fields = PG_FIELDS[eventType];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const result: Record<string, any> = {};
+
+  for (const [field, def] of Object.entries(fields)) {
+    if (field === "eventType") {
+      result[field] = sql<string>`${sql.raw(`'${eventType}'`)}`.as("eventType");
+    } else if (def.column) {
+      result[field] = def.column;
+    } else {
+      const nullSql =
+        def.cast === "integer" ? sql<number>`NULL::integer` : sql<string>`NULL`;
+      result[field] = (nullSql as ReturnType<typeof sql>).as(field);
+    }
+  }
+
+  return result;
 }
 
-function buildAiTokenSelect() {
-  return {
-    eventId: eventsTable.id,
-    eventType: sql<string>`'AI_TOKEN_USAGE'`.as("eventType"),
-    userId: eventsTable.userId,
-    reportedTimestamp: eventsTable.reported_timestamp,
-    ingestedTimestamp: eventsTable.ingested_timestamp,
-    sdkCallType: sql<string>`NULL`.as("sdkCallType"),
-    debitAmount: sql<number>`NULL::integer`.as("debitAmount"),
-    creditAmount: sql<number>`NULL::integer`.as("creditAmount"),
-    model: aiTokenUsageEventsTable.model,
-    inputTokens: aiTokenUsageEventsTable.inputTokens,
-    outputTokens: aiTokenUsageEventsTable.outputTokens,
-    inputDebitAmount: aiTokenUsageEventsTable.inputDebitAmount,
-    outputDebitAmount: aiTokenUsageEventsTable.outputDebitAmount,
-  };
-}
-
-function getSubtypeTable(eventType: EventTypeName): typeof sdkCallEventsTable | typeof aiTokenUsageEventsTable {
+function getSubtypeTable(
+  eventType: EventTypeName
+): typeof sdkCallEventsTable | typeof aiTokenUsageEventsTable {
   if (eventType === "SDK_CALL") return sdkCallEventsTable;
   return aiTokenUsageEventsTable;
 }
 
 function getSelect(eventType: EventTypeName) {
-  if (eventType === "SDK_CALL") return buildSdkCallSelect();
-  return buildAiTokenSelect();
+  return buildSelect(eventType);
 }
 
 function getConditions(
   eventType: EventTypeName,
   where: QueryFilterGroup
 ): SQL | undefined {
-  if (eventType === "SDK_CALL") return buildSdkCallConditionsFromGroup(where);
-  return buildAiTokenConditionsFromGroup(where);
+  return buildConditions(eventType, where);
 }
 
 export async function handleQueryEvents(
@@ -235,25 +246,25 @@ async function queryListForType(
   const whereClause = getConditions(eventType, request.where);
 
   // Count
-  const countResult = await db
-    .select({ cnt: count() })
-    .from(eventsTable)
-    .innerJoin(subtypeTable, eq(eventsTable.id, subtypeTable.id))
-    .where(whereClause)
-    .execute();
+  const [countResult, rows] = await Promise.all([
+    db
+      .select({ cnt: count() })
+      .from(eventsTable)
+      .innerJoin(subtypeTable, eq(eventsTable.id, subtypeTable.id))
+      .where(whereClause)
+      .execute(),
+    db
+      .select(selectCols)
+      .from(eventsTable)
+      .innerJoin(subtypeTable, eq(eventsTable.id, subtypeTable.id))
+      .where(whereClause)
+      .orderBy(sql`${eventsTable.reported_timestamp} DESC`)
+      .execute(),
+  ]);
 
   const total = Number(countResult[0]?.cnt ?? 0);
 
-  // Data
-  const rows = await db
-    .select(selectCols)
-    .from(eventsTable)
-    .innerJoin(subtypeTable, eq(eventsTable.id, subtypeTable.id))
-    .where(whereClause)
-    .orderBy(sql`${eventsTable.reported_timestamp} DESC`)
-    .execute();
-
-  return { rows: rows as unknown as QueryResultRow[], total };
+  return { rows, total };
 }
 
 async function handleListQuery(
@@ -284,22 +295,15 @@ async function handleListQuery(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveAggCol(eventType: EventTypeName, isSum: boolean, field?: string): any {
-  if (isSum && field) {
-    if (eventType === "SDK_CALL" && field === "debitAmount")
-      return sum(sdkCallEventsTable.debitAmount).mapWith(Number);
-    if (eventType === "AI_TOKEN_USAGE") {
-      if (field === "inputDebitAmount")
-        return sum(aiTokenUsageEventsTable.inputDebitAmount).mapWith(Number);
-      if (field === "outputDebitAmount")
-        return sum(aiTokenUsageEventsTable.outputDebitAmount).mapWith(Number);
-      if (field === "inputTokens")
-        return sum(aiTokenUsageEventsTable.inputTokens).mapWith(Number);
-      if (field === "outputTokens")
-        return sum(aiTokenUsageEventsTable.outputTokens).mapWith(Number);
-    }
-  }
-  return count().mapWith(Number);
+function resolveAggCol(
+  eventType: EventTypeName,
+  isSum: boolean,
+  field?: string
+): any {
+  if (!isSum || !field) return count().mapWith(Number);
+  const col = PG_FIELDS[eventType]?.[field]?.column;
+  if (!col) return count().mapWith(Number);
+  return sum(col).mapWith(Number);
 }
 
 async function handleAggregationQuery(
@@ -316,16 +320,7 @@ async function handleAggregationQuery(
     const whereClause = getConditions(eventType, request.where);
 
     if (request.groupBy && request.groupBy !== "eventType") {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let gbCol: any = null;
-      if (eventType === "SDK_CALL") {
-        if (request.groupBy === "sdkCallType") gbCol = sdkCallEventsTable.type;
-        if (request.groupBy === "userId") gbCol = eventsTable.userId;
-      }
-      if (eventType === "AI_TOKEN_USAGE") {
-        if (request.groupBy === "model") gbCol = aiTokenUsageEventsTable.model;
-        if (request.groupBy === "userId") gbCol = eventsTable.userId;
-      }
+      const gbCol = PG_FIELDS[eventType]?.[request.groupBy]?.column;
       if (!gbCol) continue;
 
       const aggCol = resolveAggCol(eventType, isSum, agg.field);

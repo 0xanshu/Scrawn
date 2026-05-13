@@ -1275,7 +1275,6 @@ proto.query.v1.EventRow.toObject = function(includeInstance, msg) {
     ingestedTimestamp: jspb.Message.getFieldWithDefault(msg, 5, ""),
     sdkCallType: jspb.Message.getFieldWithDefault(msg, 6, ""),
     debitAmount: jspb.Message.getFieldWithDefault(msg, 7, 0),
-    creditAmount: jspb.Message.getFieldWithDefault(msg, 8, 0),
     model: jspb.Message.getFieldWithDefault(msg, 9, ""),
     inputTokens: jspb.Message.getFieldWithDefault(msg, 10, 0),
     outputTokens: jspb.Message.getFieldWithDefault(msg, 11, 0),
@@ -1344,10 +1343,6 @@ proto.query.v1.EventRow.deserializeBinaryFromReader = function(msg, reader) {
     case 7:
       var value = /** @type {number} */ (reader.readInt64());
       msg.setDebitAmount(value);
-      break;
-    case 8:
-      var value = /** @type {number} */ (reader.readInt64());
-      msg.setCreditAmount(value);
       break;
     case 9:
       var value = /** @type {string} */ (reader.readString());
@@ -1444,13 +1439,6 @@ proto.query.v1.EventRow.serializeBinaryToWriter = function(message, writer) {
   if (f != null) {
     writer.writeInt64(
       7,
-      f
-    );
-  }
-  f = /** @type {number} */ (jspb.Message.getField(message, 8));
-  if (f != null) {
-    writer.writeInt64(
-      8,
       f
     );
   }
@@ -1651,42 +1639,6 @@ proto.query.v1.EventRow.prototype.clearDebitAmount = function() {
  */
 proto.query.v1.EventRow.prototype.hasDebitAmount = function() {
   return jspb.Message.getField(this, 7) != null;
-};
-
-
-/**
- * optional int64 credit_amount = 8;
- * @return {number}
- */
-proto.query.v1.EventRow.prototype.getCreditAmount = function() {
-  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 8, 0));
-};
-
-
-/**
- * @param {number} value
- * @return {!proto.query.v1.EventRow} returns this
- */
-proto.query.v1.EventRow.prototype.setCreditAmount = function(value) {
-  return jspb.Message.setField(this, 8, value);
-};
-
-
-/**
- * Clears the field making it undefined.
- * @return {!proto.query.v1.EventRow} returns this
- */
-proto.query.v1.EventRow.prototype.clearCreditAmount = function() {
-  return jspb.Message.setField(this, 8, undefined);
-};
-
-
-/**
- * Returns whether this field is set.
- * @return {boolean}
- */
-proto.query.v1.EventRow.prototype.hasCreditAmount = function() {
-  return jspb.Message.getField(this, 8) != null;
 };
 
 

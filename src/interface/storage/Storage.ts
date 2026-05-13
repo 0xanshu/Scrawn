@@ -4,8 +4,25 @@ import type { DateTime } from "luxon";
 
 export type QueryOperator = "EQ" | "GT" | "GTE" | "LT" | "LTE" | "NEQ";
 
+export const QUERY_FIELD_NAMES = [
+  "eventType",
+  "reportedTimestamp",
+  "ingestedTimestamp",
+  "userId",
+  "apiKeyId",
+  "sdkCallType",
+  "debitAmount",
+  "model",
+  "inputTokens",
+  "outputTokens",
+  "inputDebitAmount",
+  "outputDebitAmount",
+] as const;
+
+export type QueryFieldName = (typeof QUERY_FIELD_NAMES)[number];
+
 export interface QueryFilter {
-  field: string;
+  field: QueryFieldName;
   operator: QueryOperator;
   value: string;
 }

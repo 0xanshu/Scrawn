@@ -1,20 +1,5 @@
 import { z } from "zod";
-
-const ALLOWED_FIELDS = [
-  "eventType",
-  "reportedTimestamp",
-  "ingestedTimestamp",
-  "userId",
-  "apiKeyId",
-  "sdkCallType",
-  "debitAmount",
-  "creditAmount",
-  "model",
-  "inputTokens",
-  "outputTokens",
-  "inputDebitAmount",
-  "outputDebitAmount",
-] as const;
+import { QUERY_FIELD_NAMES } from "../interface/storage/Storage";
 
 const OPERATOR_MAP = {
   0: "EQ",
@@ -38,7 +23,7 @@ const LOGICAL_MAP = {
 } as const;
 
 const filterConditionSchema = z.object({
-  field: z.enum(ALLOWED_FIELDS),
+  field: z.enum(QUERY_FIELD_NAMES),
   operator: z
     .number()
     .int()
@@ -88,7 +73,7 @@ const aggregationSchema = z.object({
 });
 
 const groupBySchema = z.object({
-  field: z.enum(ALLOWED_FIELDS),
+  field: z.enum(QUERY_FIELD_NAMES),
 });
 
 export const queryEventsSchema = z

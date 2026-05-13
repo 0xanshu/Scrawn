@@ -8,6 +8,7 @@ import type {
   QueryFilterGroup,
   QueryResponse,
   QueryResultRow,
+  QueryFieldName,
 } from "../../../../interface/storage/Storage";
 
 interface ChFieldDef {
@@ -15,7 +16,9 @@ interface ChFieldDef {
   where?: string;
 }
 
-const CH_FIELDS: Record<string, Record<string, ChFieldDef>> = {
+type ChFieldKey = QueryFieldName | "eventId";
+
+const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
   sdk_call_events: {
     eventId:           { select: "toString(id)" },
     eventType:         { select: "'SDK_CALL'" },
@@ -25,7 +28,6 @@ const CH_FIELDS: Record<string, Record<string, ChFieldDef>> = {
     ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
     sdkCallType:       { select: "sdk_call_type", where: "sdk_call_type" },
     debitAmount:       { select: "toString(debit_amount)", where: "debit_amount" },
-    creditAmount:      { select: null },
     model:             { select: null },
     inputTokens:       { select: null },
     outputTokens:      { select: null },
@@ -41,7 +43,6 @@ const CH_FIELDS: Record<string, Record<string, ChFieldDef>> = {
     ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
     sdkCallType:       { select: null },
     debitAmount:       { select: null },
-    creditAmount:      { select: null },
     model:             { select: "model", where: "model" },
     inputTokens:       { select: "toString(input_tokens)", where: "input_tokens" },
     outputTokens:      { select: "toString(output_tokens)", where: "output_tokens" },
@@ -50,14 +51,14 @@ const CH_FIELDS: Record<string, Record<string, ChFieldDef>> = {
   },
 };
 
-const CH_PARAM_TYPE: Record<string, string> = {
+const CH_PARAM_TYPE: Record<QueryFieldName, string> = {
+  eventType: "String",
   reportedTimestamp: "DateTime64(3, 'UTC')",
   ingestedTimestamp: "DateTime64(3, 'UTC')",
   userId: "String",
   apiKeyId: "String",
   sdkCallType: "String",
   debitAmount: "Int64",
-  creditAmount: "Int64",
   model: "String",
   inputTokens: "Int64",
   outputTokens: "Int64",
@@ -261,7 +262,7 @@ async function handleAggregationQuery(
     const cols: string[] = [];
 
     if (request.groupBy) {
-      const gbCol = CH_FIELDS[t]?.[request.groupBy]?.where;
+      const gbCol = CH_FIELDS[t]?.[request.groupBy as ChFieldKey]?.where;
       if (gbCol) {
         cols.push(`${gbCol} as group_value`);
       } else if (request.groupBy === "eventType") {
@@ -272,7 +273,7 @@ async function handleAggregationQuery(
     }
 
     if (isSum && agg.field) {
-      const aggCol = CH_FIELDS[t]?.[agg.field]?.where;
+      const aggCol = CH_FIELDS[t]?.[agg.field as ChFieldKey]?.where;
       if (aggCol) {
         cols.push(`${aggCol} as agg_value`);
       } else {

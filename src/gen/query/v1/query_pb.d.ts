@@ -175,11 +175,6 @@ export class EventRow extends jspb.Message {
   getDebitAmount(): number;
   setDebitAmount(value: number): void;
 
-  hasCreditAmount(): boolean;
-  clearCreditAmount(): void;
-  getCreditAmount(): number;
-  setCreditAmount(value: number): void;
-
   hasModel(): boolean;
   clearModel(): void;
   getModel(): string;
@@ -224,7 +219,6 @@ export namespace EventRow {
     ingestedTimestamp: string,
     sdkCallType: string,
     debitAmount: number,
-    creditAmount: number,
     model: string,
     inputTokens: number,
     outputTokens: number,

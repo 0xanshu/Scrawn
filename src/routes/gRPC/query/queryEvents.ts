@@ -90,9 +90,6 @@ function buildProtoResponse(
       if (row.debitAmount != null) {
         eventRow.setDebitAmount(Number(row.debitAmount));
       }
-      if (row.creditAmount != null) {
-        eventRow.setCreditAmount(Number(row.creditAmount));
-      }
       if (row.model != null) {
         eventRow.setModel(String(row.model));
       }
