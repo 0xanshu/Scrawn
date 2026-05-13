@@ -11,9 +11,9 @@ import {
   handleAddPayment,
   handlePriceRequestSdkCall,
   handlePriceRequestAiTokenUsage,
+  handlePriceRequestPayment,
   handleQueryEvents,
 } from "./handlers";
-import { handlePriceRequestPayment } from "../postgres/handlers/priceRequestPayment";
 import type {
   SerializedEvent,
   EventKind,
