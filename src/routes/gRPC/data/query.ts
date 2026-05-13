@@ -36,14 +36,15 @@ interface FieldDef {
   cast: "text" | "integer" | "uuid" | "timestamptz" | "boolean";
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 interface TableDef {
-  table: any;
+  tableName: string;
+  table: typeof usersTable | typeof sessionsTable | typeof tagsTable | typeof expressionsTable | typeof metadataTable;
   fields: Record<string, FieldDef>;
 }
 
 const TABLE_REGISTRY: Record<string, TableDef> = {
   users: {
+    tableName: "users",
     table: usersTable,
     fields: {
       id: { col: usersTable.id, cast: "uuid" },
@@ -59,6 +60,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     },
   },
   sessions: {
+    tableName: "sessions",
     table: sessionsTable,
     fields: {
       id: { col: sessionsTable.id, cast: "uuid" },
@@ -71,6 +73,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     },
   },
   tags: {
+    tableName: "tags",
     table: tagsTable,
     fields: {
       id: { col: tagsTable.id, cast: "uuid" },
@@ -79,6 +82,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     },
   },
   expressions: {
+    tableName: "expressions",
     table: expressionsTable,
     fields: {
       id: { col: expressionsTable.id, cast: "uuid" },
@@ -87,6 +91,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     },
   },
   metadata: {
+    tableName: "metadata",
     table: metadataTable,
     fields: {
       id: { col: metadataTable.id, cast: "uuid" },
@@ -96,13 +101,23 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
   },
 };
 
-function castValue(value: string, fieldDef: FieldDef): unknown {
+function castValue(value: string, fieldDef: FieldDef, fieldName: string): boolean | number | string {
   if (fieldDef.cast === "boolean") {
+    if (value !== "true" && value !== "false") {
+      throw EventError.validationFailed(
+        `Invalid boolean value '${value}' for field '${fieldName}': must be "true" or "false"`
+      );
+    }
     return value === "true";
   }
   if (fieldDef.cast === "integer") {
     const n = Number(value);
-    return isNaN(n) ? value : n;
+    if (!Number.isFinite(n) || !Number.isInteger(n)) {
+      throw EventError.validationFailed(
+        `Invalid integer value '${value}' for field '${fieldName}': must be a finite integer`
+      );
+    }
+    return n;
   }
   return value;
 }
@@ -111,9 +126,10 @@ function applyOp(
   col: AnyPgColumn,
   op: string,
   value: string,
-  fieldDef: FieldDef
+  fieldDef: FieldDef,
+  fieldName: string
 ): SQL {
-  const casted = castValue(value, fieldDef) as string | boolean | number;
+  const casted = castValue(value, fieldDef, fieldName);
   switch (op) {
     case "EQ":
       return eq(col, casted);
@@ -142,8 +158,12 @@ function buildWhere(
 
   for (const condition of group.conditions) {
     const fieldDef = tableDef.fields[condition.field];
-    if (!fieldDef) continue;
-    const clause = applyOp(fieldDef.col, condition.operator, condition.value, fieldDef);
+    if (!fieldDef) {
+      throw EventError.validationFailed(
+        `Unknown field '${condition.field}' in table '${tableDef.tableName}'`
+      );
+    }
+    const clause = applyOp(fieldDef.col, condition.operator, condition.value, fieldDef, condition.field);
     parts.push(clause);
   }
 
@@ -157,8 +177,7 @@ function buildWhere(
 }
 
 function buildSelect(tableDef: TableDef): Record<string, AnyPgColumn> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result: Record<string, any> = {};
+  const result: Record<string, AnyPgColumn> = {};
   for (const [name, def] of Object.entries(tableDef.fields)) {
     result[name] = def.col;
   }
@@ -188,11 +207,15 @@ export async function queryData(
     const selectCols = buildSelect(tableDef);
     const columns = Object.keys(tableDef.fields);
 
-    const orderClauses = validated.orderBy
-      .filter((o) => tableDef.fields[o.field])
-      .map((o) =>
-        o.descending ? desc(tableDef.fields[o.field]!.col) : asc(tableDef.fields[o.field]!.col)
-      );
+    const orderClauses = validated.orderBy.map((o) => {
+      const fieldDef = tableDef.fields[o.field];
+      if (!fieldDef) {
+        throw EventError.validationFailed(
+          `Unknown field '${o.field}' for table '${validated.table}' in order_by`
+        );
+      }
+      return o.descending ? desc(fieldDef.col) : asc(fieldDef.col);
+    });
 
     const [countResult, rows] = await Promise.all([
       db
