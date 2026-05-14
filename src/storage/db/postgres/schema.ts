@@ -30,28 +30,33 @@ export const usersRelation = relations(usersTable, ({ many }) => ({
   sessions: many(sessionsTable),
 }));
 
-export const sessionsTable = pgTable("sessions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  sessionId: text("session_id").notNull().unique(),
-  processed: boolean("processed").default(false),
-  userId: USER_ID_CONFIG.dbType("user_id").references(() => usersTable.id),
-  billed_upto: timestamp("billed_upto", {
-    withTimezone: true,
-    mode: "string",
+export const sessionsTable = pgTable(
+  "sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: text("session_id").notNull().unique(),
+    processed: boolean("processed").default(false),
+    userId: USER_ID_CONFIG.dbType("user_id").references(() => usersTable.id),
+    apiKeyId: uuid("api_key_id").references(() => apiKeysTable.id),
+    billed_upto: timestamp("billed_upto", {
+      withTimezone: true,
+      mode: "string",
+    }).notNull(),
+    checkoutUrl: text("checkout_url").notNull(),
+    createdAt: timestamp("created_at", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .defaultNow()
+      .notNull(),
+    mode: text("mode", { enum: ["test", "production"] })
+      .notNull()
+      .default("production"),
+  },
+  (table) => ({
+    uniqueSessionId: uniqueIndex("unique_session_id").on(table.sessionId),
   })
-    .notNull(),
-  createdAt: timestamp("created_at", {
-    withTimezone: true,
-    mode: "string",
-  })
-    .defaultNow()
-    .notNull(),
-  mode: text("mode", { enum: ["test", "production"] })
-    .notNull()
-    .default("production"),
-}, (table) => ({
-  uniqueSessionId: uniqueIndex("unique_session_id").on(table.sessionId),
-}));
+);
 
 export const sessionRelations = relations(sessionsTable, ({ one }) => ({
   user: one(usersTable, {
@@ -112,9 +117,7 @@ export const eventsTable = pgTable("events", {
     .references(() => usersTable.id)
     .notNull(),
   api_keyId: uuid("api_key_id").references(() => apiKeysTable.id),
-  mode: text("mode", { enum: ["test", "production"] })
-    .notNull()
-    .default("production"),
+  mode: text("mode", { enum: ["test", "production"] }).notNull(),
 });
 
 export const eventsRelation = relations(eventsTable, ({ one }) => ({

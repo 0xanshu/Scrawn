@@ -5,7 +5,10 @@ import { DateTime } from "luxon";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 import type { PgDatabase } from "drizzle-orm/pg-core";
 
-export { userExists, ensureUserExists } from "../../../db/postgres/helpers/users";
+export {
+  userExists,
+  ensureUserExists,
+} from "../../../db/postgres/helpers/users";
 
 export type TransactionFn<T> = (
   txn: PgTransaction<any, any, any>
@@ -61,7 +64,8 @@ export type EventInsertValues = {
   reported_timestamp: string;
   ingested_timestamp: string;
   userId: string;
-  api_keyId: string | undefined;
+  api_keyId: string;
+  mode: "production" | "test";
 };
 
 export async function insertEvent(
@@ -77,6 +81,7 @@ export async function insertEvent(
         ingested_timestamp: values.ingested_timestamp,
         userId: values.userId,
         api_keyId: values.api_keyId,
+        mode: values.mode,
       })
       .returning({ id: eventsTable.id });
   } catch (e) {
