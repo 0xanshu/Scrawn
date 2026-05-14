@@ -9,6 +9,7 @@ export async function handleAddSession(
   userId: UserId,
   sessionId: string,
   billedUpto: DateTime,
+  apiKeyId: string,
   mode: "test" | "production",
   checkoutUrl?: string
 ): Promise<{ id: string }> {
@@ -30,6 +31,7 @@ export async function handleAddSession(
         userId: userId as string,
         sessionId: sessionId,
         billed_upto: billedUptoStr,
+        apiKeyId: apiKeyId,
         mode: mode,
         checkoutUrl: checkoutUrl,
       } as any)
@@ -74,7 +76,8 @@ export type SessionRow = {
   userId: string | null;
   billed_upto: string | null;
   processed: boolean | null;
-  mode: "production" | "test" | null;
+  apiKeyId: string;
+  mode: "production" | "test";
 };
 
 export async function getSessionByCheckoutId(
@@ -89,13 +92,14 @@ export async function getSessionByCheckoutId(
         userId: sessionsTable.userId,
         billed_upto: sessionsTable.billed_upto,
         processed: sessionsTable.processed,
+        apiKeyId: sessionsTable.apiKeyId,
         mode: sessionsTable.mode,
       })
       .from(sessionsTable)
       .where(eq(sessionsTable.sessionId, checkoutSessionId))
       .limit(1);
 
-    return session ?? undefined;
+    return session ? { ...session, apiKeyId: session.apiKeyId! } : undefined;
   } catch (e) {
     throw StorageError.queryFailed(
       "Failed to get session by checkout ID",

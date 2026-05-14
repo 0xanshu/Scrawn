@@ -77,6 +77,7 @@ export async function createCheckoutLink(
       validatedData.userId,
       checkoutResult.sessionId,
       beforeTimestamp,
+      auth.apiKeyId,
       mode,
       checkoutResult.checkoutUrl
     );

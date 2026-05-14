@@ -153,7 +153,7 @@ export async function handleDodoWebhook(
       const adapter =
         await StorageAdapterFactory.getEventStorageAdapter("PAYMENT");
 
-      await adapter.add(paymentEvent.serialize(), undefined, session.mode ?? undefined);
+      await adapter.add(paymentEvent.serialize(), session.apiKeyId, session.mode);
 
       builder.setSuccess(200);
       return {

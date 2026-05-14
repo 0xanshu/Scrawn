@@ -35,9 +35,5 @@ export async function storeEvent(
   const adapter = await StorageAdapterFactory.getEventStorageAdapter(
     event.type
   );
-  if (auth.mode) {
-    await adapter.add(event.serialize(), auth.apiKeyId, auth.mode);
-  } else {
-    await adapter.add(event.serialize(), auth.apiKeyId);
-  }
+  await adapter.add(event.serialize(), auth.apiKeyId, auth.mode!);
 }

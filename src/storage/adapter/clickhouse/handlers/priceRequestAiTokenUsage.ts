@@ -10,7 +10,7 @@ import { toClickHouseDateTime } from "../utils";
 export async function handlePriceRequestAiTokenUsage(
   userId: UserId,
   beforeTimestamp: DateTime,
-  mode?: "production" | "test"
+  mode: "production" | "test"
 ): Promise<number> {
   const chClient = getClickHouseDB();
   const pgDb = getPostgresDB();
@@ -45,18 +45,14 @@ export async function handlePriceRequestAiTokenUsage(
       before: beforeTs,
     };
 
-    const modeFilter = mode ? " AND mode = {mode:String}" : "";
-
     if (lastBilled) {
-      query = `SELECT sum(input_debit_amount + output_debit_amount) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND reported_timestamp > {lastBilled:DateTime64(3, 'UTC')} AND reported_timestamp < {before:DateTime64(3, 'UTC')}${modeFilter}`;
+      query = `SELECT sum(input_debit_amount + output_debit_amount) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp > {lastBilled:DateTime64(3, 'UTC')} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
       params.lastBilled = lastBilled;
     } else {
-      query = `SELECT sum(input_debit_amount + output_debit_amount) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}${modeFilter}`;
+      query = `SELECT sum(input_debit_amount + output_debit_amount) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
     }
 
-    if (mode) {
-      params.mode = mode;
-    }
+    params.mode = mode;
 
     const rs = await chClient.query({
       query,

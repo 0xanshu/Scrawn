@@ -25,7 +25,11 @@ import type { DateTime } from "luxon";
 export class PostgresAdapter implements StorageAdapter {
   connectionObject = getPostgresDB();
 
-  async add(serialized: SerializedEvent, apiKeyId?: string, mode?: "production" | "test") {
+  async add(
+    serialized: SerializedEvent,
+    apiKeyId: string,
+    mode: "production" | "test"
+  ) {
     let event_data: SqlRecord;
 
     try {
@@ -82,7 +86,7 @@ export class PostgresAdapter implements StorageAdapter {
     userID: UserId,
     event_type: EventKind,
     beforeTimestamp: DateTime,
-    mode?: "production" | "test"
+    mode: "production" | "test"
   ): Promise<number> {
     switch (event_type) {
       case "PAYMENT": {
@@ -94,7 +98,11 @@ export class PostgresAdapter implements StorageAdapter {
       }
 
       case "AI_TOKEN_USAGE": {
-        return await handlePriceRequestAiTokenUsage(userID, beforeTimestamp, mode);
+        return await handlePriceRequestAiTokenUsage(
+          userID,
+          beforeTimestamp,
+          mode
+        );
       }
 
       default: {

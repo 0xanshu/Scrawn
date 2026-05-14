@@ -7,7 +7,7 @@ import { toClickHouseDateTime } from "../utils";
 export async function handleAddSdkCall(
   event_data: SqlRecordOf<"SDK_CALL">,
   apiKeyId: string,
-  mode?: "production" | "test"
+  mode: "production" | "test"
 ): Promise<{ id: string }> {
   const client = getClickHouseDB();
 
@@ -36,7 +36,7 @@ export async function handleAddSdkCall(
           id,
           user_id: event_data.userId,
           api_key_id: apiKeyId,
-          mode: mode ?? "production",
+          mode: mode,
           reported_timestamp: reportedTimestamp,
           ingested_timestamp: toClickHouseDateTime(DateTime.utc()),
           sdk_call_type: event_data.data.sdkCallType,

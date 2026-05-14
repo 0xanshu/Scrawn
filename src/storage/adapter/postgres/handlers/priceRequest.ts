@@ -19,7 +19,7 @@ export async function handlePriceRequest(
   priceColumn: SQL,
   eventType: string,
   beforeTimestamp: DateTime,
-  mode?: "production" | "test"
+  mode: "production" | "test"
 ): Promise<number> {
   const db = getPostgresDB();
 
@@ -34,9 +34,7 @@ export async function handlePriceRequest(
 
     let result;
     try {
-      const baseCondition = mode
-        ? sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId} AND ${eventsTable.mode} = ${mode}`
-        : sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId}`;
+      const baseCondition = sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId} AND ${eventsTable.mode} = ${mode}`;
       const whereClause = beforeTimestamp
         ? and(
             baseCondition,

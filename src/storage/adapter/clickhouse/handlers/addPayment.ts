@@ -6,8 +6,8 @@ import { toClickHouseDateTime } from "../utils";
 
 export async function handleAddPayment(
   event_data: SqlRecordOf<"PAYMENT">,
-  apiKeyId?: string,
-  mode?: "production" | "test"
+  apiKeyId: string,
+  mode: "production" | "test"
 ): Promise<{ id: string }> {
   const client = getClickHouseDB();
 
@@ -39,7 +39,7 @@ export async function handleAddPayment(
         {
           id,
           user_id: event_data.userId,
-          mode: mode ?? "production",
+          mode: mode,
           reported_timestamp: reportedTimestamp,
           ingested_timestamp: toClickHouseDateTime(DateTime.utc()),
           credit_amount: creditAmount,

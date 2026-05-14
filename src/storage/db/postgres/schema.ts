@@ -37,6 +37,7 @@ export const sessionsTable = pgTable(
     sessionId: text("session_id").notNull().unique(),
     processed: boolean("processed").default(false),
     userId: USER_ID_CONFIG.dbType("user_id").references(() => usersTable.id),
+    apiKeyId: uuid("api_key_id").references(() => apiKeysTable.id),
     billed_upto: timestamp("billed_upto", {
       withTimezone: true,
       mode: "string",

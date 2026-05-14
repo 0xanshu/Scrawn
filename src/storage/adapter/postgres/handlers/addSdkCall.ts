@@ -13,7 +13,7 @@ import {
 export async function handleAddSdkCall(
   event_data: SqlRecordOf<"SDK_CALL">,
   apiKeyId: string,
-  mode?: "production" | "test"
+  mode: "production" | "test"
 ): Promise<{ id: string } | void> {
   const connectionObject = getPostgresDB();
 

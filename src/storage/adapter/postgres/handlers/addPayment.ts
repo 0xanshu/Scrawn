@@ -14,8 +14,8 @@ import {
 
 export async function handleAddPayment(
   event_data: SqlRecordOf<"PAYMENT">,
-  apiKeyId?: string,
-  mode?: "production" | "test"
+  apiKeyId: string,
+  mode: "production" | "test"
 ): Promise<{ id: string } | void> {
   const connectionObject = getPostgresDB();
 

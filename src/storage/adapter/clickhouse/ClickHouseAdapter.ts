@@ -25,7 +25,7 @@ import type { DateTime } from "luxon";
 export class ClickHouseAdapter implements StorageAdapter {
   connectionObject = getClickHouseDB();
 
-  async add(serialized: SerializedEvent, apiKeyId?: string, mode?: "production" | "test") {
+  async add(serialized: SerializedEvent, apiKeyId: string, mode: "production" | "test") {
     let event_data: SqlRecord;
 
     try {
@@ -81,7 +81,7 @@ export class ClickHouseAdapter implements StorageAdapter {
     userID: UserId,
     event_type: EventKind,
     beforeTimestamp: DateTime,
-    mode?: "production" | "test"
+    mode: "production" | "test"
   ): Promise<number> {
     switch (event_type) {
       case "SDK_CALL": {

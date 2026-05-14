@@ -6,7 +6,7 @@ import { StorageAdapterFactory } from "../../../factory/EventStorageAdapterFacto
 export async function handlePriceRequestPayment(
   userId: UserId,
   beforeTimestamp: DateTime,
-  mode?: "production" | "test"
+  mode: "production" | "test"
 ): Promise<number> {
   try {
     if (!userId) {

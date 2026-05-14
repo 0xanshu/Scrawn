@@ -7,7 +7,7 @@ import type { UserId } from "../../../../config/identifiers";
 export async function handlePriceRequestAiTokenUsage(
   userId: UserId,
   beforeTimestamp: DateTime,
-  mode?: "production" | "test"
+  mode: "production" | "test"
 ): Promise<number> {
   return handlePriceRequest(
     userId,
