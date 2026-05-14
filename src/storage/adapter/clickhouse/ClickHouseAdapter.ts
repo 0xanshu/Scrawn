@@ -1,11 +1,18 @@
-import { type StorageAdapter } from "../../../interface/storage/Storage";
+import {
+  type StorageAdapter,
+  type QueryRequest,
+  type QueryResponse,
+} from "../../../interface/storage/Storage";
 import { getClickHouseDB } from "../../db/clickhouse";
 import { StorageError } from "../../../errors/storage";
 import {
   handleAddSdkCall,
   handleAddAiTokenUsage,
+  handleAddPayment,
   handlePriceRequestSdkCall,
   handlePriceRequestAiTokenUsage,
+  handlePriceRequestPayment,
+  handleQueryEvents,
 } from "./handlers";
 import type {
   SerializedEvent,
@@ -60,8 +67,12 @@ export class ClickHouseAdapter implements StorageAdapter {
         return await handleAddAiTokenUsage([event_data], apiKeyId);
       }
 
+      case "PAYMENT": {
+        return await handleAddPayment(event_data, apiKeyId);
+      }
+
       default: {
-        throw StorageError.unknownEventType(event_data.type);
+        throw StorageError.unknownEventType((event_data as SqlRecord).type);
       }
     }
   }
@@ -80,9 +91,17 @@ export class ClickHouseAdapter implements StorageAdapter {
         return await handlePriceRequestAiTokenUsage(userID, beforeTimestamp);
       }
 
+      case "PAYMENT": {
+        return await handlePriceRequestPayment(userID, beforeTimestamp);
+      }
+
       default: {
-        throw StorageError.unknownEventType(event_type);
+        throw StorageError.unknownEventType(event_type as string);
       }
     }
+  }
+
+  async query(request: QueryRequest): Promise<QueryResponse> {
+    return await handleQueryEvents(request);
   }
 }
