@@ -1,5 +1,6 @@
-import { getPostgresDB } from "../../../db/postgres/db";
-import { sessionsTable } from "../../../db/postgres/schema";
+import { getPostgresDB } from "../db";
+import { sessionsTable } from "../schema";
+import { eq } from "drizzle-orm";
 import { StorageError } from "../../../../errors/storage";
 import type { DateTime } from "luxon";
 import type { UserId } from "../../../../config/identifiers";
@@ -7,7 +8,9 @@ import type { UserId } from "../../../../config/identifiers";
 export async function handleAddSession(
   userId: UserId,
   sessionId: string,
-  billedUpto: DateTime
+  billedUpto: DateTime,
+  mode: "test" | "production",
+  checkoutUrl?: string
 ): Promise<{ id: string }> {
   const connectionObject = getPostgresDB();
 
@@ -27,7 +30,9 @@ export async function handleAddSession(
         userId: userId as string,
         sessionId: sessionId,
         billed_upto: billedUptoStr,
-      })
+        mode: mode,
+        checkoutUrl: checkoutUrl,
+      } as any)
       .returning({ id: sessionsTable.id });
 
     if (!insertResult[0]) {
@@ -59,6 +64,27 @@ export async function handleAddSession(
 
     throw StorageError.insertFailed(
       "Failed to insert session",
+      e instanceof Error ? e : new Error(String(e))
+    );
+  }
+}
+
+export async function getCheckoutUrl(
+  sessionId: string
+): Promise<string | undefined> {
+  const db = getPostgresDB();
+
+  try {
+    const [session] = await db
+      .select({ checkoutUrl: sessionsTable.checkoutUrl })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.id, sessionId))
+      .limit(1);
+
+    return session?.checkoutUrl;
+  } catch (e) {
+    throw StorageError.queryFailed(
+      "Failed to get checkout URL",
       e instanceof Error ? e : new Error(String(e))
     );
   }

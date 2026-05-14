@@ -17,7 +17,6 @@ import type {
 import {
   getPaymentProviderConfig,
   createProviderCheckout,
-  getDodoClient,
   type CheckoutResult,
 } from "./paymentProvider.ts";
 import { StorageAdapterFactory } from "../../../factory";
@@ -26,7 +25,7 @@ import { apiKeyContextKey, type AuthContext } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import type { UserId } from "../../../config/identifiers";
 import { DateTime } from "luxon";
-import { handleAddSession } from "../../../storage/adapter/postgres/handlers";
+import { handleAddSession } from "../../../storage/db/postgres/helpers/sessions";
 import { type ContextUnaryCall } from "../../../interface/types/context.ts";
 
 export async function createCheckoutLink(
@@ -45,15 +44,13 @@ export async function createCheckoutLink(
 
     if (auth.role === "dashboard") {
       return callback?.(
-        AuthError.permissionDenied("Dashboard keys cannot create checkout links")
+        AuthError.permissionDenied(
+          "Dashboard keys cannot create checkout links"
+        )
       );
     }
 
-    if (auth.role === "test") {
-      return callback?.(
-        AuthError.permissionDenied("Test keys cannot create checkout links")
-      );
-    }
+    const mode = auth.mode!;
 
     const config = getPaymentProviderConfig();
     const validatedData = validateRequest(req);
@@ -63,7 +60,7 @@ export async function createCheckoutLink(
     const custom_price = await calculatePrice(
       validatedData.userId,
       beforeTimestamp,
-      auth.mode!
+      mode
     );
     wideEventBuilder?.setPaymentContext({ priceAmount: custom_price });
 
@@ -72,21 +69,23 @@ export async function createCheckoutLink(
       custom_price,
       validatedData.userId,
       auth.apiKeyId,
-      beforeTimestamp
+      beforeTimestamp,
+      mode
     );
 
-    const sessionResult = await (handleAddSession as unknown as (
-      userId: UserId, sessionId: string, billedUpto: DateTime, mode?: string
-    ) => Promise<{ id: string }>)(
+    const sessionResult = await handleAddSession(
       validatedData.userId,
       checkoutResult.sessionId,
       beforeTimestamp,
-      auth.mode!
+      mode,
+      checkoutResult.checkoutUrl
     );
     wideEventBuilder?.setPaymentContext({ sessionId: sessionResult.id });
 
+    const proxyUrl = `${process.env.APP_URL}/checkout/${sessionResult.id}`;
+
     const response = new CreateCheckoutLinkResponse();
-    response.setCheckoutlink(checkoutResult.checkoutUrl);
+    response.setCheckoutlink(proxyUrl);
     callback?.(null, response);
   } catch (error) {
     callback?.(error as Error);
@@ -118,9 +117,12 @@ async function calculatePrice(
     throw PaymentError.storageAdapterFailed("Storage adapter not available");
   }
 
-  const price = await (storageAdapter as unknown as {
-    price: (userId: UserId, eventType: string, beforeTs: DateTime, mode?: string) => Promise<number>;
-  }).price(userId, "PAYMENT", beforeTimestamp, mode);
+  const price = await storageAdapter.price(
+    userId,
+    "PAYMENT",
+    beforeTimestamp,
+    mode
+  );
 
   if (typeof price !== "number" || isNaN(price) || price < 0) {
     throw PaymentError.priceCalculationFailed(
@@ -137,7 +139,8 @@ async function createCheckoutSession(
   customPrice: number,
   userId: string,
   apiKeyId: string,
-  beforeTimestamp: DateTime
+  beforeTimestamp: DateTime,
+  mode: "test" | "production"
 ): Promise<CheckoutResult> {
   const params: CheckoutParams = {
     customPrice,
@@ -145,7 +148,7 @@ async function createCheckoutSession(
     apiKeyId,
   };
 
-  const checkoutResult = await createProviderCheckout(config, params);
+  const checkoutResult = await createProviderCheckout(config, params, mode);
 
   if (
     !checkoutResult.checkoutUrl ||

@@ -1,22 +1,40 @@
 import DodoPayments from "dodopayments";
 import { PaymentError } from "../../../errors/payment";
 
-let client: DodoPayments | null = null;
+let liveClient: DodoPayments | null = null;
+let testClient: DodoPayments | null = null;
 
-export function getDodoClient(): DodoPayments {
-  if (!client) {
-    const apiKey = process.env.DODO_PAYMENTS_API_KEY;
+export function getDodoClient(mode?: "test" | "production"): DodoPayments {
+  if (!mode) {
+    mode = process.env.NODE_ENV === "production" ? "production" : "test";
+  }
+  if (mode === "production") {
+    if (!liveClient) {
+      const apiKey = process.env.DODO_PAYMENTS_LIVE_API_KEY;
+      if (!apiKey) {
+        throw PaymentError.missingApiKey();
+      }
+      liveClient = new DodoPayments({
+        bearerToken: apiKey,
+        environment: "live_mode",
+        webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SIGNING_SECRET,
+      });
+    }
+    return liveClient;
+  }
+
+  if (!testClient) {
+    const apiKey = process.env.DODO_PAYMENTS_TEST_API_KEY;
     if (!apiKey) {
       throw PaymentError.missingApiKey();
     }
-    client = new DodoPayments({
+    testClient = new DodoPayments({
       bearerToken: apiKey,
-      environment:
-        process.env.NODE_ENV === "production" ? "live_mode" : "test_mode",
+      environment: "test_mode",
       webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SIGNING_SECRET,
     });
   }
-  return client;
+  return testClient;
 }
 
 export interface PaymentProviderConfig {
@@ -48,9 +66,10 @@ export function getPaymentProviderConfig(): PaymentProviderConfig {
 
 export async function createProviderCheckout(
   config: PaymentProviderConfig,
-  params: CheckoutParams
+  params: CheckoutParams,
+  mode: "test" | "production"
 ): Promise<CheckoutResult> {
-  const client = getDodoClient();
+  const client = getDodoClient(mode);
 
   const session = await client.checkoutSessions.create({
     product_cart: [
