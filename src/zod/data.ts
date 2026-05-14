@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { Operator, LogicalOperator } from "../gen/data/v1/data_pb";
 
 const DATA_TABLE_NAMES = [
   "users",
@@ -9,20 +10,18 @@ const DATA_TABLE_NAMES = [
 ] as const;
 
 const OPERATOR_MAP = {
-  0: "EQ",
-  1: "EQ",
-  2: "GT",
-  3: "GTE",
-  4: "LT",
-  5: "LTE",
-  6: "NEQ",
-  7: "CONTAINS",
+  [Operator.EQ]: "EQ",
+  [Operator.GT]: "GT",
+  [Operator.GTE]: "GTE",
+  [Operator.LT]: "LT",
+  [Operator.LTE]: "LTE",
+  [Operator.NEQ]: "NEQ",
+  [Operator.CONTAINS]: "CONTAINS",
 } as const;
 
 const LOGICAL_MAP = {
-  0: "AND",
-  1: "AND",
-  2: "OR",
+  [LogicalOperator.AND]: "AND",
+  [LogicalOperator.OR]: "OR",
 } as const;
 
 const filterConditionSchema = z.object({

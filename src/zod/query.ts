@@ -1,25 +1,24 @@
 import { z } from "zod";
 import { QUERY_FIELD_NAMES } from "../interface/storage/Storage";
+import { Operator, AggregationType, LogicalOperator } from "../gen/query/v1/query_pb";
 
 const OPERATOR_MAP = {
-  0: "EQ",
-  1: "EQ",
-  2: "GT",
-  3: "GTE",
-  4: "LT",
-  5: "LTE",
-  6: "NEQ",
+  [Operator.EQ]: "EQ",
+  [Operator.GT]: "GT",
+  [Operator.GTE]: "GTE",
+  [Operator.LT]: "LT",
+  [Operator.LTE]: "LTE",
+  [Operator.NEQ]: "NEQ",
 } as const;
 
 const AGGREGATION_TYPE_MAP = {
-  1: "SUM",
-  2: "COUNT",
+  [AggregationType.SUM]: "SUM",
+  [AggregationType.COUNT]: "COUNT",
 } as const;
 
 const LOGICAL_MAP = {
-  0: "AND",
-  1: "AND",
-  2: "OR",
+  [LogicalOperator.AND]: "AND",
+  [LogicalOperator.OR]: "OR",
 } as const;
 
 const filterConditionSchema = z.object({
