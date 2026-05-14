@@ -1,5 +1,6 @@
 import type { EventKind } from "../interface/event/Event.ts";
 import { ClickHouseAdapter } from "../storage/adapter/clickhouse/ClickHouseAdapter.ts";
+import { PostgresAdapter } from "../storage/adapter/postgres/postgres.js";
 
 export class StorageAdapterFactory {
   public static async getEventStorageAdapter(RequestType: EventKind) {
@@ -7,7 +8,7 @@ export class StorageAdapterFactory {
       case "SDK_CALL":
       case "AI_TOKEN_USAGE":
       case "PAYMENT": {
-        return new ClickHouseAdapter();
+        return new PostgresAdapter();
       }
       default: {
         throw new Error(`Unknown event type: ${RequestType}`);

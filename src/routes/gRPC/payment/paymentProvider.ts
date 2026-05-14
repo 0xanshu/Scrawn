@@ -55,7 +55,7 @@ export interface CheckoutResult {
 
 export function getPaymentProviderConfig(): PaymentProviderConfig {
   const productId = process.env.DODO_PAYMENTS_PRODUCT_ID;
-  const returnUrl = `${process.env.APP_URL}/checkout/success`;
+  const returnUrl = `${process.env.REDIRECT_URL}`;
 
   if (!productId) {
     throw PaymentError.missingProductId();

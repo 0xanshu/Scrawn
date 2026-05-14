@@ -1,4 +1,5 @@
 import { EventError } from "../errors/event";
+import { AuthError } from "../errors/auth";
 import type { Event, SDKCallEventData, AITokenUsageEventData } from "../interface/event/Event";
 import { SDKCall } from "../events/SDKCall";
 import { AITokenUsage } from "../events/AITokenUsage";
@@ -32,8 +33,12 @@ export async function storeEvent(
   event: Event,
   auth: AuthContext
 ): Promise<void> {
+  if (!auth.mode) {
+    throw AuthError.permissionDenied("Auth mode not set on API key");
+  }
+
   const adapter = await StorageAdapterFactory.getEventStorageAdapter(
     event.type
   );
-  await adapter.add(event.serialize(), auth.apiKeyId, auth.mode!);
+  await adapter.add(event.serialize(), auth.apiKeyId, auth.mode);
 }

@@ -50,7 +50,13 @@ export async function createCheckoutLink(
       );
     }
 
-    const mode = auth.mode!;
+    if (!auth.mode) {
+      return callback?.(
+        AuthError.permissionDenied("Auth mode not set on API key")
+      );
+    }
+
+    const mode = auth.mode;
 
     const config = getPaymentProviderConfig();
     const validatedData = validateRequest(req);
