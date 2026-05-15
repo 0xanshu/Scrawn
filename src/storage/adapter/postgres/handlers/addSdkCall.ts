@@ -1,12 +1,11 @@
 import { getPostgresDB } from "../../../db/postgres/db";
-import { eventsTable, sdkCallEventsTable } from "../../../db/postgres/schema";
+import { basicUsageEventsTable } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import { type SqlRecordOf } from "../../../../interface/event/Event";
 import { DateTime } from "luxon";
 import { ensureUserExists } from "../../../db/postgres/helpers/users";
 import {
   validateAndPrepareTimestamp,
-  insertEvent,
   executeInTransaction,
 } from "./addEventUtils";
 
@@ -31,34 +30,35 @@ export async function handleAddSdkCall(
     async (txn) => {
       await ensureUserExists(event_data.userId);
 
-      const reported_timestamp = await validateAndPrepareTimestamp(
+      const reportedTimestamp = await validateAndPrepareTimestamp(
         event_data.reported_timestamp
       );
 
-      const eventID = await insertEvent(txn, {
-        reported_timestamp,
-        ingested_timestamp: DateTime.utc().toString(),
-        userId: event_data.userId,
-        api_keyId: apiKeyId,
-        mode,
-      });
-
       try {
-        const sdkData = event_data;
+        const [result] = await txn
+          .insert(basicUsageEventsTable)
+          .values({
+            reportedTimestamp,
+            ingestedTimestamp: DateTime.utc().toString(),
+            userId: event_data.userId,
+            apiKeyId: apiKeyId,
+            mode,
+            type: event_data.data.sdkCallType,
+            debitAmount: event_data.data.debitAmount,
+          })
+          .returning({ id: basicUsageEventsTable.id });
 
-        await txn.insert(sdkCallEventsTable).values({
-          id: eventID.id,
-          type: sdkData.data.sdkCallType,
-          debitAmount: sdkData.data.debitAmount,
-        });
+        if (!result) {
+          throw StorageError.emptyResult("SDK call insert returned no ID");
+        }
+
+        return { id: result.id };
       } catch (e) {
         throw StorageError.insertFailed(
-          `Failed to insert SDK call event for event ID ${eventID.id}`,
+          "Failed to insert SDK call event",
           e instanceof Error ? e : new Error(String(e))
         );
       }
-
-      return { id: eventID.id };
     }
   );
 }

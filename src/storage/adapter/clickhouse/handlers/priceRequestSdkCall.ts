@@ -44,10 +44,10 @@ export async function handlePriceRequestSdkCall(
     };
 
     if (lastBilled) {
-      query = `SELECT sum(debit_amount) as total FROM sdk_call_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp > {lastBilled:DateTime64(3, 'UTC')} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
+      query = `SELECT sum(debit_amount) as total FROM basic_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp > {lastBilled:DateTime64(3, 'UTC')} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
       params.lastBilled = lastBilled;
     } else {
-      query = `SELECT sum(debit_amount) as total FROM sdk_call_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
+      query = `SELECT sum(debit_amount) as total FROM basic_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
     }
 
     params.mode = mode;

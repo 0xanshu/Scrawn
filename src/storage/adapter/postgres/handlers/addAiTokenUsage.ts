@@ -1,6 +1,5 @@
 import { getPostgresDB } from "../../../db/postgres/db";
 import {
-  eventsTable,
   aiTokenUsageEventsTable,
 } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
@@ -12,10 +11,13 @@ import {
   validateAndPrepareTimestamp,
   executeInTransaction,
 } from "./addEventUtils";
+import { metricsSchema } from "../../../../zod/metrics";
+import type { Metrics } from "../../../../zod/metrics";
 
 type AggregatedEvent = {
   userId: UserId;
   model: string;
+  provider: string;
   inputTokens: number;
   outputTokens: number;
   inputDebitAmount: number;
@@ -35,7 +37,6 @@ export async function handleAddAiTokenUsage(
   }
 
   for (const event_data of events) {
-    // Validate input tokens is not negative
     const inputTokens = event_data.data.inputTokens;
     if (typeof inputTokens === "number" && inputTokens < 0) {
       throw StorageError.insertFailed(
@@ -44,7 +45,6 @@ export async function handleAddAiTokenUsage(
       );
     }
 
-    // Validate output tokens is not negative
     const outputTokens = event_data.data.outputTokens;
     if (typeof outputTokens === "number" && outputTokens < 0) {
       throw StorageError.insertFailed(
@@ -53,7 +53,6 @@ export async function handleAddAiTokenUsage(
       );
     }
 
-    // Validate input debit amount is not negative
     const inputDebitAmount = event_data.data.inputDebitAmount;
     if (typeof inputDebitAmount === "number" && inputDebitAmount < 0) {
       throw StorageError.insertFailed(
@@ -62,7 +61,6 @@ export async function handleAddAiTokenUsage(
       );
     }
 
-    // Validate output debit amount is not negative
     const outputDebitAmount = event_data.data.outputDebitAmount;
     if (typeof outputDebitAmount === "number" && outputDebitAmount < 0) {
       throw StorageError.insertFailed(
@@ -72,7 +70,6 @@ export async function handleAddAiTokenUsage(
     }
   }
 
-  // Aggregate events by userId and model
   const aggregationMap = new Map<string, AggregatedEvent>();
 
   for (const event_data of events) {
@@ -84,20 +81,18 @@ export async function handleAddAiTokenUsage(
     const existing = aggregationMap.get(key);
 
     if (existing) {
-      // Aggregate with existing entry
       existing.inputTokens += event_data.data.inputTokens;
       existing.outputTokens += event_data.data.outputTokens;
       existing.inputDebitAmount += event_data.data.inputDebitAmount;
       existing.outputDebitAmount += event_data.data.outputDebitAmount;
-      // Use the latest timestamp
       if (reported_timestamp > existing.reported_timestamp) {
         existing.reported_timestamp = reported_timestamp;
       }
     } else {
-      // Create new aggregated entry
       aggregationMap.set(key, {
         userId: event_data.userId,
         model: event_data.data.model,
+        provider: "unknown",
         inputTokens: event_data.data.inputTokens,
         outputTokens: event_data.data.outputTokens,
         inputDebitAmount: event_data.data.inputDebitAmount,
@@ -121,74 +116,48 @@ export async function handleAddAiTokenUsage(
         await ensureUserExists(userId);
       }
 
-      const eventValues = aggregatedEvents.map((aggEvent) => ({
-        reported_timestamp: aggEvent.reported_timestamp,
-        ingested_timestamp: DateTime.utc().toString(),
+      const aiTokenUsageValues = aggregatedEvents.map((aggEvent) => ({
+        reportedTimestamp: aggEvent.reported_timestamp,
+        ingestedTimestamp: DateTime.utc().toString(),
         userId: aggEvent.userId,
-        api_keyId: apiKeyId,
+        apiKeyId: apiKeyId,
         mode: mode,
+        model: aggEvent.model,
+        provider: aggEvent.provider,
+        metrics: metricsSchema.parse({
+          tokens: {
+            input: aggEvent.inputTokens,
+            input_cache: 0,
+            output: aggEvent.outputTokens,
+          },
+          debit_amount: {
+            input: aggEvent.inputDebitAmount,
+            input_cache: 0,
+            output: aggEvent.outputDebitAmount,
+          },
+        } satisfies Metrics),
       }));
 
-      let eventIDs;
       try {
-        eventIDs = await txn
-          .insert(eventsTable)
-          .values(eventValues)
-          .returning({ id: eventsTable.id });
-      } catch (e) {
-        throw StorageError.eventInsertFailed(
-          `Failed to batch insert ${aggregatedEvents.length} aggregated event(s)`,
-          e instanceof Error ? e : new Error(String(e))
-        );
-      }
+        const inserted = await txn
+          .insert(aiTokenUsageEventsTable)
+          .values(aiTokenUsageValues)
+          .returning({ id: aiTokenUsageEventsTable.id });
 
-      if (!eventIDs || eventIDs.length === 0) {
-        throw StorageError.emptyResult("Event insert returned no IDs");
-      }
-
-      if (eventIDs.length !== aggregatedEvents.length) {
-        throw StorageError.insertFailed(
-          `Expected ${aggregatedEvents.length} event IDs but got ${eventIDs.length}`,
-          new Error("Event ID count mismatch")
-        );
-      }
-
-      const aiTokenUsageValues = aggregatedEvents.map((aggEvent, index) => {
-        const eventId = eventIDs[index];
-        if (!eventId) {
+        if (!inserted[0] || !inserted[0].id) {
           throw StorageError.insertFailed(
-            `Missing event ID at index ${index}`,
-            new Error("Event ID is undefined")
+            "Missing or invalid ID for the first inserted event",
+            new Error(`Invalid first event ID: ${JSON.stringify(inserted[0])}`)
           );
         }
-        return {
-          id: eventId.id,
-          model: aggEvent.model,
-          inputTokens: aggEvent.inputTokens,
-          outputTokens: aggEvent.outputTokens,
-          inputDebitAmount: aggEvent.inputDebitAmount,
-          outputDebitAmount: aggEvent.outputDebitAmount,
-        };
-      });
 
-      try {
-        await txn.insert(aiTokenUsageEventsTable).values(aiTokenUsageValues);
+        return { id: inserted[0].id };
       } catch (e) {
         throw StorageError.insertFailed(
-          `Failed to batch insert AI token usage events`,
+          "Failed to batch insert AI token usage events",
           e instanceof Error ? e : new Error(String(e))
         );
       }
-
-      const firstEvent = eventIDs[0];
-      if (!firstEvent || !firstEvent.id) {
-        throw StorageError.insertFailed(
-          "Missing or invalid ID for the first inserted event",
-          new Error(`Invalid first event ID: ${JSON.stringify(firstEvent)}`)
-        );
-      }
-
-      return { id: firstEvent.id };
     }
   );
 }

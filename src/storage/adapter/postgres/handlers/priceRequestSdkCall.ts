@@ -1,4 +1,4 @@
-import { sdkCallEventsTable } from "../../../db/postgres/schema";
+import { basicUsageEventsTable } from "../../../db/postgres/schema";
 import { handlePriceRequest } from "./priceRequest";
 import { sql } from "drizzle-orm";
 import type { DateTime } from "luxon";
@@ -11,8 +11,8 @@ export async function handlePriceRequestSdkCall(
 ): Promise<number> {
   return handlePriceRequest(
     userId,
-    sdkCallEventsTable,
-    sql`${sdkCallEventsTable.debitAmount}`,
+    basicUsageEventsTable,
+    sql`${basicUsageEventsTable.debitAmount}`,
     "REQUEST_SDK_CALL",
     beforeTimestamp,
     mode

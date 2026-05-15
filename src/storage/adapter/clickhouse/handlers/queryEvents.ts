@@ -19,14 +19,14 @@ interface ChFieldDef {
 type ChFieldKey = QueryFieldName | "eventId";
 
 const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
-  sdk_call_events: {
+  basic_usage_events: {
     eventId:           { select: "toString(id)" },
     eventType:         { select: "'SDK_CALL'" },
     userId:            { select: "user_id", where: "user_id" },
     apiKeyId:          { select: "api_key_id", where: "api_key_id" },
     reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
     ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
-    sdkCallType:       { select: "sdk_call_type", where: "sdk_call_type" },
+    sdkCallType:       { select: "type", where: "type" },
     debitAmount:       { select: "toString(debit_amount)", where: "debit_amount" },
     model:             { select: null },
     inputTokens:       { select: null },
@@ -45,17 +45,17 @@ const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
     sdkCallType:       { select: null },
     debitAmount:       { select: null },
     model:             { select: "model", where: "model" },
-    inputTokens:       { select: "toString(input_tokens)", where: "input_tokens" },
-    outputTokens:      { select: "toString(output_tokens)", where: "output_tokens" },
-    inputDebitAmount:  { select: "toString(input_debit_amount)", where: "input_debit_amount" },
-    outputDebitAmount: { select: "toString(output_debit_amount)", where: "output_debit_amount" },
+    inputTokens:       { select: "JSONExtractString(metrics, 'tokens', 'input')", where: "JSONExtractString(metrics, 'tokens', 'input')" },
+    outputTokens:      { select: "JSONExtractString(metrics, 'tokens', 'output')", where: "JSONExtractString(metrics, 'tokens', 'output')" },
+    inputDebitAmount:  { select: "JSONExtractString(metrics, 'debit_amount', 'input')", where: "JSONExtractString(metrics, 'debit_amount', 'input')" },
+    outputDebitAmount: { select: "JSONExtractString(metrics, 'debit_amount', 'output')", where: "JSONExtractString(metrics, 'debit_amount', 'output')" },
     creditAmount:      { select: null },
   },
   payment_events: {
     eventId:           { select: "toString(id)" },
     eventType:         { select: "'PAYMENT'" },
     userId:            { select: "user_id", where: "user_id" },
-    apiKeyId:          { select: null },
+    apiKeyId:          { select: "api_key_id", where: "api_key_id" },
     reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
     ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
     sdkCallType:       { select: null },
@@ -98,13 +98,13 @@ function getTablesForRequest(where: QueryFilterGroup): string[] {
   const eventTypes = collectEventTypes(where);
   if (eventTypes.length > 0) {
     const tables: string[] = [];
-    if (eventTypes.includes("SDK_CALL")) tables.push("sdk_call_events");
+    if (eventTypes.includes("SDK_CALL")) tables.push("basic_usage_events");
     if (eventTypes.includes("AI_TOKEN_USAGE"))
       tables.push("ai_token_usage_events");
     if (eventTypes.includes("PAYMENT")) tables.push("payment_events");
     return tables;
   }
-    return ["sdk_call_events", "ai_token_usage_events", "payment_events"];
+    return ["basic_usage_events", "ai_token_usage_events", "payment_events"];
 }
 
 function collectEventTypes(group: QueryFilterGroup): string[] {
@@ -287,7 +287,7 @@ async function handleAggregationQuery(
         cols.push(`${gbCol} as group_value`);
       } else if (request.groupBy === "eventType") {
         cols.push(
-          `'${t === "sdk_call_events" ? "SDK_CALL" : t === "ai_token_usage_events" ? "AI_TOKEN_USAGE" : "PAYMENT"}' as group_value`
+          `'${t === "basic_usage_events" ? "SDK_CALL" : t === "ai_token_usage_events" ? "AI_TOKEN_USAGE" : "PAYMENT"}' as group_value`
         );
       }
     }

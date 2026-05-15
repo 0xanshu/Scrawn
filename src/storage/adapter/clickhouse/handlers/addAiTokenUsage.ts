@@ -8,6 +8,7 @@ import { toClickHouseDateTime } from "../utils";
 type AggregatedEvent = {
   userId: UserId;
   model: string;
+  provider: string;
   inputTokens: number;
   outputTokens: number;
   inputDebitAmount: number;
@@ -85,6 +86,7 @@ export async function handleAddAiTokenUsage(
       aggregationMap.set(key, {
         userId: event_data.userId,
         model: event_data.data.model,
+        provider: "unknown",
         inputTokens: event_data.data.inputTokens,
         outputTokens: event_data.data.outputTokens,
         inputDebitAmount: event_data.data.inputDebitAmount,
@@ -98,19 +100,32 @@ export async function handleAddAiTokenUsage(
   const firstId = crypto.randomUUID();
   const now = toClickHouseDateTime(DateTime.utc());
 
-  const values = aggregatedEvents.map((aggEvent, index) => ({
-    id: index === 0 ? firstId : crypto.randomUUID(),
-    user_id: aggEvent.userId,
-    api_key_id: apiKeyId,
-    mode: mode,
-    reported_timestamp: aggEvent.reported_timestamp,
-    ingested_timestamp: now,
-    model: aggEvent.model,
-    input_tokens: aggEvent.inputTokens,
-    output_tokens: aggEvent.outputTokens,
-    input_debit_amount: aggEvent.inputDebitAmount,
-    output_debit_amount: aggEvent.outputDebitAmount,
-  }));
+  const values = aggregatedEvents.map((aggEvent, index) => {
+    const metrics = JSON.stringify({
+      tokens: {
+        input: aggEvent.inputTokens,
+        input_cache: 0,
+        output: aggEvent.outputTokens,
+      },
+      debit_amount: {
+        input: aggEvent.inputDebitAmount,
+        input_cache: 0,
+        output: aggEvent.outputDebitAmount,
+      },
+    });
+
+    return {
+      id: index === 0 ? firstId : crypto.randomUUID(),
+      user_id: aggEvent.userId,
+      api_key_id: apiKeyId,
+      mode: mode,
+      reported_timestamp: aggEvent.reported_timestamp,
+      ingested_timestamp: now,
+      model: aggEvent.model,
+      provider: aggEvent.provider,
+      metrics,
+    };
+  });
 
   try {
     await client.insert({

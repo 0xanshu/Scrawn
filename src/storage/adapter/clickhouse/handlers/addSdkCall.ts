@@ -30,7 +30,7 @@ export async function handleAddSdkCall(
 
   try {
     await client.insert({
-      table: "sdk_call_events",
+      table: "basic_usage_events",
       values: [
         {
           id,
@@ -39,7 +39,7 @@ export async function handleAddSdkCall(
           mode: mode,
           reported_timestamp: reportedTimestamp,
           ingested_timestamp: toClickHouseDateTime(DateTime.utc()),
-          sdk_call_type: event_data.data.sdkCallType,
+          type: event_data.data.sdkCallType,
           debit_amount: debitAmount,
         },
       ],
