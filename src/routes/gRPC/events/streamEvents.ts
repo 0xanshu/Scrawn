@@ -38,13 +38,9 @@ export async function streamEvents(
 
     for await (const req of call) {
       try {
-        console.log(req.toObject());
-
         const eventSkeleton = await streamEventSchema.parseAsync(
           req.toObject()
         );
-
-        console.log(eventSkeleton);
 
         wideEventBuilder?.setUser(eventSkeleton.userid);
         wideEventBuilder?.setEventContext({ eventType: "AI_TOKEN_USAGE" });

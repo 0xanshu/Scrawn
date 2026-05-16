@@ -57,6 +57,25 @@ const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
     creditAmount:         { select: "toString(credit_amount)", where: "credit_amount" },
     provider:             { select: null },
   },
+  ai_token_usage_events: {
+    eventId:           { select: "toString(id)" },
+    eventType:         { select: "'AI_TOKEN_USAGE'" },
+    userId:            { select: "user_id", where: "user_id" },
+    apiKeyId:          { select: "api_key_id", where: "api_key_id" },
+    reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
+    ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
+    sdkCallType:       { select: null },
+    debitAmount:       { select: "toString(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output'))" },
+    model:             { select: "model", where: "model" },
+    inputTokens:       { select: "toString(JSONExtractInt(metrics, 'tokens', 'input'))" },
+    outputTokens:      { select: "toString(JSONExtractInt(metrics, 'tokens', 'output'))" },
+    inputDebitAmount:  { select: "toString(JSONExtractInt(metrics, 'debit_amount', 'input'))" },
+    outputDebitAmount: { select: "toString(JSONExtractInt(metrics, 'debit_amount', 'output'))" },
+    inputCacheTokens:  { select: "toString(JSONExtractInt(metrics, 'tokens', 'input_cache'))" },
+    inputCacheDebitAmount: { select: "toString(JSONExtractInt(metrics, 'debit_amount', 'input_cache'))" },
+    creditAmount:      { select: null },
+    provider:          { select: "provider", where: "provider" },
+  },
 };
 
 const CH_PARAM_TYPE: Record<QueryFieldName, string> = {

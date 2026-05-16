@@ -46,9 +46,13 @@ export async function handlePriceRequestAiTokenUsage(
     };
 
     if (lastBilled) {
-      query = `SELECT sum(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp > {lastBilled:DateTime64(3, 'UTC')} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
       const lastBilledDt = DateTime.fromSQL(lastBilled, { zone: 'utc' });
-      params.lastBilled = lastBilledDt.isValid ? toClickHouseDateTime(lastBilledDt) : lastBilled;
+      if (lastBilledDt.isValid) {
+        query = `SELECT sum(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp > {lastBilled:DateTime64(3, 'UTC')} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
+        params.lastBilled = toClickHouseDateTime(lastBilledDt);
+      } else {
+        query = `SELECT sum(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
+      }
     } else {
       query = `SELECT sum(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
     }
