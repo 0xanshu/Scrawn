@@ -4,6 +4,7 @@ import type { UserId } from "../../config/identifiers";
 export type SDKCallEventData = {
   sdkCallType: "RAW" | "MIDDLEWARE_CALL";
   debitAmount: number;
+  metadata?: Record<string, unknown>;
 };
 
 export type AITokenUsageEventData = {
@@ -15,6 +16,7 @@ export type AITokenUsageEventData = {
   inputDebitAmount: number;
   inputCacheDebitAmount: number;
   outputDebitAmount: number;
+  metadata?: Record<string, unknown>;
 };
 
 export type PaymentEventData = {

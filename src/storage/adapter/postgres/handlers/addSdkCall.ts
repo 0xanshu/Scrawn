@@ -45,6 +45,7 @@ export async function handleAddSdkCall(
             mode,
             type: event_data.data.sdkCallType,
             debitAmount: event_data.data.debitAmount,
+            metadata: event_data.data.metadata ?? null,
           })
           .returning({ id: basicUsageEventsTable.id });
 

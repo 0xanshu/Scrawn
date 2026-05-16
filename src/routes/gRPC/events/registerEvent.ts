@@ -33,6 +33,7 @@ export async function registerEvent(
       );
     }
 
+    console.log(req.toObject());
     const eventSkeleton = await registerEventSchema.parseAsync(req.toObject());
 
     wideEventBuilder?.setUser(eventSkeleton.userid);

@@ -8,7 +8,7 @@ export class StorageAdapterFactory {
       case "SDK_CALL":
       case "AI_TOKEN_USAGE":
       case "PAYMENT": {
-        return new ClickHouseAdapter();
+        return new PostgresAdapter();
       }
       default: {
         throw new Error(`Unknown event type: ${RequestType}`);

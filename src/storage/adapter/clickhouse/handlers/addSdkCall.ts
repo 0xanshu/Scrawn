@@ -41,6 +41,7 @@ export async function handleAddSdkCall(
           ingested_timestamp: toClickHouseDateTime(DateTime.utc()),
           type: event_data.data.sdkCallType,
           debit_amount: debitAmount,
+          metadata: event_data.data.metadata ?? null,
         },
       ],
       format: "JSONEachRow",

@@ -37,6 +37,7 @@ const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
     inputCacheDebitAmount: { select: null },
     creditAmount:         { select: null },
     provider:             { select: null },
+    metadata:             { select: null },
   },
   payment_events: {
     eventId:           { select: "toString(id)" },
@@ -56,6 +57,7 @@ const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
     inputCacheDebitAmount: { select: null },
     creditAmount:         { select: "toString(credit_amount)", where: "credit_amount" },
     provider:             { select: null },
+    metadata:             { select: null },
   },
   ai_token_usage_events: {
     eventId:           { select: "toString(id)" },
@@ -75,6 +77,7 @@ const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
     inputCacheDebitAmount: { select: "toString(JSONExtractInt(metrics, 'debit_amount', 'input_cache'))" },
     creditAmount:      { select: null },
     provider:          { select: "provider", where: "provider" },
+    metadata:          { select: "metadata", where: "metadata" },
   },
 };
 
@@ -95,6 +98,7 @@ const CH_PARAM_TYPE: Record<QueryFieldName, string> = {
   inputCacheDebitAmount: "Int64",
   creditAmount: "Int64",
   provider: "String",
+  metadata: "String",
 };
 
 const OPERATOR_SQL: Record<string, string> = {

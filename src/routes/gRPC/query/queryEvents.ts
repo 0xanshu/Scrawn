@@ -106,6 +106,10 @@ function buildProtoResponse(
         eventRow.setOutputDebitAmount(Number(row.outputDebitAmount));
       }
 
+      if (row.metadata != null) {
+        eventRow.setMetadata(JSON.stringify(row.metadata));
+      }
+
       response.addRows(eventRow);
     }
   }

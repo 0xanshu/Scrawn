@@ -25,6 +25,7 @@ type AggregatedEvent = {
   inputCacheDebitAmount: number;
   outputDebitAmount: number;
   reported_timestamp: string;
+  metadata?: Record<string, unknown>;
 };
 
 export async function handleAddAiTokenUsage(
@@ -120,6 +121,7 @@ export async function handleAddAiTokenUsage(
         inputCacheDebitAmount: event_data.data.inputCacheDebitAmount,
         outputDebitAmount: event_data.data.outputDebitAmount,
         reported_timestamp,
+        metadata: event_data.data.metadata,
       });
     }
   }
@@ -146,18 +148,19 @@ export async function handleAddAiTokenUsage(
         mode: mode,
         model: aggEvent.model,
         provider: aggEvent.provider,
-        metrics: metricsSchema.parse({
-          tokens: {
-            input: aggEvent.inputTokens,
-            input_cache: aggEvent.inputCacheTokens,
-            output: aggEvent.outputTokens,
-          },
-          debit_amount: {
-            input: aggEvent.inputDebitAmount,
-            input_cache: aggEvent.inputCacheDebitAmount,
-            output: aggEvent.outputDebitAmount,
-          },
-        } satisfies Metrics),
+          metrics: metricsSchema.parse({
+            tokens: {
+              input: aggEvent.inputTokens,
+              input_cache: aggEvent.inputCacheTokens,
+              output: aggEvent.outputTokens,
+            },
+            debit_amount: {
+              input: aggEvent.inputDebitAmount,
+              input_cache: aggEvent.inputCacheDebitAmount,
+              output: aggEvent.outputDebitAmount,
+            },
+          } satisfies Metrics),
+          metadata: aggEvent.metadata ?? null,
       }));
 
       try {

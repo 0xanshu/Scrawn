@@ -62,6 +62,11 @@ export class SDKCall extends jspb.Message {
   getExpr(): string;
   setExpr(value: string): void;
 
+  hasMetadata(): boolean;
+  clearMetadata(): void;
+  getMetadata(): string;
+  setMetadata(value: string): void;
+
   getDebitCase(): SDKCall.DebitCase;
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): SDKCall.AsObject;
@@ -79,6 +84,7 @@ export namespace SDKCall {
     amount: number,
     tag: string,
     expr: string,
+    metadata: string,
   }
 
   export enum DebitCase {
@@ -219,6 +225,11 @@ export class AITokenUsage extends jspb.Message {
   getInputcacheexpr(): string;
   setInputcacheexpr(value: string): void;
 
+  hasMetadata(): boolean;
+  clearMetadata(): void;
+  getMetadata(): string;
+  setMetadata(value: string): void;
+
   getInputdebitCase(): AITokenUsage.InputdebitCase;
   getOutputdebitCase(): AITokenUsage.OutputdebitCase;
   getInputcachedebitCase(): AITokenUsage.InputcachedebitCase;
@@ -248,6 +259,7 @@ export namespace AITokenUsage {
     inputcacheamount: number,
     inputcachetag: string,
     inputcacheexpr: string,
+    metadata: string,
   }
 
   export enum InputdebitCase {

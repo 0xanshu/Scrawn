@@ -27,6 +27,7 @@ const SDKCallDataSchema: z.ZodType<SDKCallEventData> = z
     amount: z.number(),
     tag: z.string(),
     expr: z.string(),
+    metadata: z.string().optional(),
   })
   .transform(async (v): Promise<SDKCallEventData> => {
     let debitAmount: number;
@@ -37,7 +38,7 @@ const SDKCallDataSchema: z.ZodType<SDKCallEventData> = z
     } else {
       debitAmount = v.amount;
     }
-    return { sdkCallType: v.sdkcalltype, debitAmount };
+    return { sdkCallType: v.sdkcalltype, debitAmount, metadata: v.metadata ? JSON.parse(v.metadata) as Record<string, unknown> : undefined };
   });
 
 const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
@@ -56,6 +57,7 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
     outputamount: z.number(),
     outputtag: z.string(),
     outputexpr: z.string(),
+    metadata: z.string().optional(),
   })
   .transform(async (v): Promise<AITokenUsageEventData> => {
     const tokenContext = {
@@ -109,6 +111,7 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
       inputDebitAmount,
       inputCacheDebitAmount,
       outputDebitAmount,
+      metadata: v.metadata ? JSON.parse(v.metadata) as Record<string, unknown> : undefined,
     };
   });
 

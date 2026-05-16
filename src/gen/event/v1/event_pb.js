@@ -489,7 +489,8 @@ proto.event.v1.SDKCall.toObject = function(includeInstance, msg) {
     sdkcalltype: jspb.Message.getFieldWithDefault(msg, 1, 0),
     amount: jspb.Message.getFieldWithDefault(msg, 2, 0),
     tag: jspb.Message.getFieldWithDefault(msg, 3, ""),
-    expr: jspb.Message.getFieldWithDefault(msg, 4, "")
+    expr: jspb.Message.getFieldWithDefault(msg, 4, ""),
+    metadata: jspb.Message.getFieldWithDefault(msg, 5, "")
   };
 
   if (includeInstance) {
@@ -541,6 +542,10 @@ proto.event.v1.SDKCall.deserializeBinaryFromReader = function(msg, reader) {
     case 4:
       var value = /** @type {string} */ (reader.readString());
       msg.setExpr(value);
+      break;
+    case 5:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setMetadata(value);
       break;
     default:
       reader.skipField();
@@ -596,6 +601,13 @@ proto.event.v1.SDKCall.serializeBinaryToWriter = function(message, writer) {
   if (f != null) {
     writer.writeString(
       4,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 5));
+  if (f != null) {
+    writer.writeString(
+      5,
       f
     );
   }
@@ -725,6 +737,42 @@ proto.event.v1.SDKCall.prototype.clearExpr = function() {
  */
 proto.event.v1.SDKCall.prototype.hasExpr = function() {
   return jspb.Message.getField(this, 4) != null;
+};
+
+
+/**
+ * optional string metadata = 5;
+ * @return {string}
+ */
+proto.event.v1.SDKCall.prototype.getMetadata = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 5, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.event.v1.SDKCall} returns this
+ */
+proto.event.v1.SDKCall.prototype.setMetadata = function(value) {
+  return jspb.Message.setField(this, 5, value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.event.v1.SDKCall} returns this
+ */
+proto.event.v1.SDKCall.prototype.clearMetadata = function() {
+  return jspb.Message.setField(this, 5, undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.event.v1.SDKCall.prototype.hasMetadata = function() {
+  return jspb.Message.getField(this, 5) != null;
 };
 
 
@@ -1282,7 +1330,8 @@ proto.event.v1.AITokenUsage.toObject = function(includeInstance, msg) {
     inputcachetokens: jspb.Message.getFieldWithDefault(msg, 11, 0),
     inputcacheamount: jspb.Message.getFieldWithDefault(msg, 12, 0),
     inputcachetag: jspb.Message.getFieldWithDefault(msg, 13, ""),
-    inputcacheexpr: jspb.Message.getFieldWithDefault(msg, 14, "")
+    inputcacheexpr: jspb.Message.getFieldWithDefault(msg, 14, ""),
+    metadata: jspb.Message.getFieldWithDefault(msg, 15, "")
   };
 
   if (includeInstance) {
@@ -1374,6 +1423,10 @@ proto.event.v1.AITokenUsage.deserializeBinaryFromReader = function(msg, reader) 
     case 14:
       var value = /** @type {string} */ (reader.readString());
       msg.setInputcacheexpr(value);
+      break;
+    case 15:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setMetadata(value);
       break;
     default:
       reader.skipField();
@@ -1499,6 +1552,13 @@ proto.event.v1.AITokenUsage.serializeBinaryToWriter = function(message, writer) 
   if (f != null) {
     writer.writeString(
       14,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 15));
+  if (f != null) {
+    writer.writeString(
+      15,
       f
     );
   }
@@ -1934,6 +1994,42 @@ proto.event.v1.AITokenUsage.prototype.clearInputcacheexpr = function() {
  */
 proto.event.v1.AITokenUsage.prototype.hasInputcacheexpr = function() {
   return jspb.Message.getField(this, 14) != null;
+};
+
+
+/**
+ * optional string metadata = 15;
+ * @return {string}
+ */
+proto.event.v1.AITokenUsage.prototype.getMetadata = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 15, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.setMetadata = function(value) {
+  return jspb.Message.setField(this, 15, value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.clearMetadata = function() {
+  return jspb.Message.setField(this, 15, undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.event.v1.AITokenUsage.prototype.hasMetadata = function() {
+  return jspb.Message.getField(this, 15) != null;
 };
 
 

@@ -130,6 +130,7 @@ export const basicUsageEventsTable = pgTable("basic_usage_events", {
   mode: text("mode", { enum: ["test", "production"] }).notNull(),
   type: text("type", { enum: ["RAW", "MIDDLEWARE_CALL"] }).notNull(),
   debitAmount: bigint("debit_amount", { mode: "number" }).notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 });
 
 export const basicUsageEventsRelation = relations(
@@ -204,6 +205,7 @@ export const aiTokenUsageEventsTable = pgTable("ai_token_usage_events", {
   model: text("model").notNull(),
   provider: text("provider").notNull(),
   metrics: jsonb("metrics").$type<Metrics>().notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>(),
 });
 
 export const aiTokenUsageEventsRelation = relations(

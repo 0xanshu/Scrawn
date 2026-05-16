@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS basic_usage_events (
   reported_timestamp DateTime64(3, 'UTC'),
   ingested_timestamp DateTime64(3, 'UTC') DEFAULT now64(3, 'UTC'),
   type String,
-  debit_amount Int64
+  debit_amount Int64,
+  metadata JSON
 ) ENGINE = MergeTree()
 ORDER BY (user_id, reported_timestamp)
 `;
@@ -26,7 +27,8 @@ CREATE TABLE IF NOT EXISTS ai_token_usage_events (
   ingested_timestamp DateTime64(3, 'UTC') DEFAULT now64(3, 'UTC'),
   model String,
   provider String,
-  metrics String
+  metrics String,
+  metadata JSON
 ) ENGINE = MergeTree()
 ORDER BY (user_id, reported_timestamp)
 `;
