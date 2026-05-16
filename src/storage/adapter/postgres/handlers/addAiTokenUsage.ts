@@ -140,14 +140,15 @@ export async function handleAddAiTokenUsage(
         await ensureUserExists(userId);
       }
 
-      const aiTokenUsageValues = aggregatedEvents.map((aggEvent) => ({
-        reportedTimestamp: aggEvent.reported_timestamp,
-        ingestedTimestamp: DateTime.utc().toString(),
-        userId: aggEvent.userId,
-        apiKeyId: apiKeyId,
-        mode: mode,
-        model: aggEvent.model,
-        provider: aggEvent.provider,
+      try {
+        const aiTokenUsageValues = aggregatedEvents.map((aggEvent) => ({
+          reportedTimestamp: aggEvent.reported_timestamp,
+          ingestedTimestamp: DateTime.utc().toString(),
+          userId: aggEvent.userId,
+          apiKeyId: apiKeyId,
+          mode: mode,
+          model: aggEvent.model,
+          provider: aggEvent.provider,
           metrics: metricsSchema.parse({
             tokens: {
               input: aggEvent.inputTokens,
@@ -161,9 +162,8 @@ export async function handleAddAiTokenUsage(
             },
           } satisfies Metrics),
           metadata: aggEvent.metadata ?? null,
-      }));
+        }));
 
-      try {
         const inserted = await txn
           .insert(aiTokenUsageEventsTable)
           .values(aiTokenUsageValues)
@@ -178,6 +178,17 @@ export async function handleAddAiTokenUsage(
 
         return { id: inserted[0].id };
       } catch (e) {
+        if (
+          e &&
+          typeof e === "object" &&
+          "name" in e &&
+          (e as Error).name === "ZodError"
+        ) {
+          throw StorageError.insertFailed(
+            "Invalid metrics for AI token usage event",
+            e instanceof Error ? e : new Error(String(e))
+          );
+        }
         throw StorageError.insertFailed(
           "Failed to batch insert AI token usage events",
           e instanceof Error ? e : new Error(String(e))
