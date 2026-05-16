@@ -23,7 +23,10 @@ export async function streamEvents(
 
   try {
     if (!auth) {
-      return callback?.(AuthError.invalidAPIKey("API key context not found"), null);
+      return callback?.(
+        AuthError.invalidAPIKey("API key context not found"),
+        null
+      );
     }
 
     if (auth.role === "dashboard") {
@@ -35,9 +38,13 @@ export async function streamEvents(
 
     for await (const req of call) {
       try {
+        console.log(req.toObject());
+
         const eventSkeleton = await streamEventSchema.parseAsync(
           req.toObject()
         );
+
+        console.log(eventSkeleton);
 
         wideEventBuilder?.setUser(eventSkeleton.userid);
         wideEventBuilder?.setEventContext({ eventType: "AI_TOKEN_USAGE" });

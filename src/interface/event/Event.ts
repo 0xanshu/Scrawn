@@ -8,9 +8,12 @@ export type SDKCallEventData = {
 
 export type AITokenUsageEventData = {
   model: string;
+  provider: string;
   inputTokens: number;
+  inputCacheTokens: number;
   outputTokens: number;
   inputDebitAmount: number;
+  inputCacheDebitAmount: number;
   outputDebitAmount: number;
 };
 

@@ -17,7 +17,10 @@ export const QUERY_FIELD_NAMES = [
   "outputTokens",
   "inputDebitAmount",
   "outputDebitAmount",
+  "inputCacheTokens",
+  "inputCacheDebitAmount",
   "creditAmount",
+  "provider",
 ] as const;
 
 export type QueryFieldName = (typeof QUERY_FIELD_NAMES)[number];

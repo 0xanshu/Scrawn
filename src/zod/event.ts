@@ -43,11 +43,16 @@ const SDKCallDataSchema: z.ZodType<SDKCallEventData> = z
 const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
   .object({
     model: z.string().min(1),
+    provider: z.string().optional().default("unknown"),
     inputtokens: z.number().int().min(0),
+    inputcachetokens: z.number().int().min(0),
     outputtokens: z.number().int().min(0),
     inputamount: z.number(),
     inputtag: z.string(),
     inputexpr: z.string(),
+    inputcacheamount: z.number(),
+    inputcachetag: z.string(),
+    inputcacheexpr: z.string(),
     outputamount: z.number(),
     outputtag: z.string(),
     outputexpr: z.string(),
@@ -55,6 +60,7 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
   .transform(async (v): Promise<AITokenUsageEventData> => {
     const tokenContext = {
       inputTokens: v.inputtokens,
+      inputCacheTokens: v.inputcachetokens,
       outputTokens: v.outputtokens,
     };
 
@@ -68,6 +74,18 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
       inputDebitAmount = await parseAndEvaluateExpr(v.inputexpr, tokenContext);
     } else {
       inputDebitAmount = v.inputamount;
+    }
+
+    let inputCacheDebitAmount: number;
+    if (v.inputcachetag) {
+      inputCacheDebitAmount = await fetchTagAmount(
+        v.inputcachetag,
+        `Input cache tag not found: ${v.inputcachetag}`
+      );
+    } else if (v.inputcacheexpr) {
+      inputCacheDebitAmount = await parseAndEvaluateExpr(v.inputcacheexpr, tokenContext);
+    } else {
+      inputCacheDebitAmount = v.inputcacheamount;
     }
 
     let outputDebitAmount: number;
@@ -84,9 +102,12 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
 
     return {
       model: v.model,
+      provider: v.provider,
       inputTokens: v.inputtokens,
+      inputCacheTokens: v.inputcachetokens,
       outputTokens: v.outputtokens,
       inputDebitAmount,
+      inputCacheDebitAmount,
       outputDebitAmount,
     };
   });

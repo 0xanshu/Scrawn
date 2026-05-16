@@ -196,8 +196,32 @@ export class AITokenUsage extends jspb.Message {
   getOutputexpr(): string;
   setOutputexpr(value: string): void;
 
+  hasProvider(): boolean;
+  clearProvider(): void;
+  getProvider(): string;
+  setProvider(value: string): void;
+
+  getInputcachetokens(): number;
+  setInputcachetokens(value: number): void;
+
+  hasInputcacheamount(): boolean;
+  clearInputcacheamount(): void;
+  getInputcacheamount(): number;
+  setInputcacheamount(value: number): void;
+
+  hasInputcachetag(): boolean;
+  clearInputcachetag(): void;
+  getInputcachetag(): string;
+  setInputcachetag(value: string): void;
+
+  hasInputcacheexpr(): boolean;
+  clearInputcacheexpr(): void;
+  getInputcacheexpr(): string;
+  setInputcacheexpr(value: string): void;
+
   getInputdebitCase(): AITokenUsage.InputdebitCase;
   getOutputdebitCase(): AITokenUsage.OutputdebitCase;
+  getInputcachedebitCase(): AITokenUsage.InputcachedebitCase;
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): AITokenUsage.AsObject;
   static toObject(includeInstance: boolean, msg: AITokenUsage): AITokenUsage.AsObject;
@@ -219,6 +243,11 @@ export namespace AITokenUsage {
     outputamount: number,
     outputtag: string,
     outputexpr: string,
+    provider: string,
+    inputcachetokens: number,
+    inputcacheamount: number,
+    inputcachetag: string,
+    inputcacheexpr: string,
   }
 
   export enum InputdebitCase {
@@ -233,6 +262,13 @@ export namespace AITokenUsage {
     OUTPUTAMOUNT = 6,
     OUTPUTTAG = 7,
     OUTPUTEXPR = 9,
+  }
+
+  export enum InputcachedebitCase {
+    INPUTCACHEDEBIT_NOT_SET = 0,
+    INPUTCACHEAMOUNT = 12,
+    INPUTCACHETAG = 13,
+    INPUTCACHEEXPR = 14,
   }
 }
 

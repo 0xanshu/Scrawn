@@ -19,8 +19,10 @@ type AggregatedEvent = {
   model: string;
   provider: string;
   inputTokens: number;
+  inputCacheTokens: number;
   outputTokens: number;
   inputDebitAmount: number;
+  inputCacheDebitAmount: number;
   outputDebitAmount: number;
   reported_timestamp: string;
 };
@@ -68,6 +70,22 @@ export async function handleAddAiTokenUsage(
         new Error(`outputDebitAmount ${outputDebitAmount} is negative`)
       );
     }
+
+    const inputCacheTokens = event_data.data.inputCacheTokens;
+    if (typeof inputCacheTokens === "number" && inputCacheTokens < 0) {
+      throw StorageError.insertFailed(
+        `Negative input cache tokens not allowed for AI token usage for user ${event_data.userId}`,
+        new Error(`inputCacheTokens ${inputCacheTokens} is negative`)
+      );
+    }
+
+    const inputCacheDebitAmount = event_data.data.inputCacheDebitAmount;
+    if (typeof inputCacheDebitAmount === "number" && inputCacheDebitAmount < 0) {
+      throw StorageError.insertFailed(
+        `Negative input cache debit amount not allowed for AI token usage for user ${event_data.userId}`,
+        new Error(`inputCacheDebitAmount ${inputCacheDebitAmount} is negative`)
+      );
+    }
   }
 
   const aggregationMap = new Map<string, AggregatedEvent>();
@@ -82,8 +100,10 @@ export async function handleAddAiTokenUsage(
 
     if (existing) {
       existing.inputTokens += event_data.data.inputTokens;
+      existing.inputCacheTokens += event_data.data.inputCacheTokens;
       existing.outputTokens += event_data.data.outputTokens;
       existing.inputDebitAmount += event_data.data.inputDebitAmount;
+      existing.inputCacheDebitAmount += event_data.data.inputCacheDebitAmount;
       existing.outputDebitAmount += event_data.data.outputDebitAmount;
       if (reported_timestamp > existing.reported_timestamp) {
         existing.reported_timestamp = reported_timestamp;
@@ -92,10 +112,12 @@ export async function handleAddAiTokenUsage(
       aggregationMap.set(key, {
         userId: event_data.userId,
         model: event_data.data.model,
-        provider: "unknown",
+        provider: event_data.data.provider,
         inputTokens: event_data.data.inputTokens,
+        inputCacheTokens: event_data.data.inputCacheTokens,
         outputTokens: event_data.data.outputTokens,
         inputDebitAmount: event_data.data.inputDebitAmount,
+        inputCacheDebitAmount: event_data.data.inputCacheDebitAmount,
         outputDebitAmount: event_data.data.outputDebitAmount,
         reported_timestamp,
       });
@@ -127,12 +149,12 @@ export async function handleAddAiTokenUsage(
         metrics: metricsSchema.parse({
           tokens: {
             input: aggEvent.inputTokens,
-            input_cache: 0,
+            input_cache: aggEvent.inputCacheTokens,
             output: aggEvent.outputTokens,
           },
           debit_amount: {
             input: aggEvent.inputDebitAmount,
-            input_cache: 0,
+            input_cache: aggEvent.inputCacheDebitAmount,
             output: aggEvent.outputDebitAmount,
           },
         } satisfies Metrics),

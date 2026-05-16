@@ -12,7 +12,6 @@ import {
   handlePriceRequestSdkCall,
   handleAddAiTokenUsage,
   handlePriceRequestAiTokenUsage,
-  handleQueryEvents,
 } from "./handlers";
 import type {
   SerializedEvent,
@@ -112,6 +111,7 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   async query(request: QueryRequest): Promise<QueryResponse> {
-    return await handleQueryEvents(request);
+    return "smth" as any;
+    // return await handleQueryEvents(request);
   }
 }
