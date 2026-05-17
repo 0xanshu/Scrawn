@@ -8,6 +8,8 @@ export async function calculatePaymentPrice(
   beforeTimestamp: DateTime,
   mode: "production" | "test"
 ): Promise<number> {
+  const beforeTimestampUtc = beforeTimestamp.toUTC();
+
   if (!userId) {
     throw StorageError.invalidData("Missing userId in PAYMENT price request");
   }
@@ -17,7 +19,7 @@ export async function calculatePaymentPrice(
   const sdkPrice = await sdkAdapter.price(
     userId,
     "BASIC_USAGE",
-    beforeTimestamp,
+    beforeTimestampUtc,
     mode
   );
 
@@ -33,7 +35,7 @@ export async function calculatePaymentPrice(
   const aiPrice = await aiAdapter.price(
     userId,
     "AI_TOKEN_USAGE",
-    beforeTimestamp,
+    beforeTimestampUtc,
     mode
   );
 
