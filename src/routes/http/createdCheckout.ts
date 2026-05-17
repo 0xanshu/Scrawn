@@ -58,28 +58,6 @@ function unwrapWebhookPayload(
   }
 }
 
-interface ResolvedSession {
-  userId: string;
-  billedUpto: string;
-  apiKeyId: string;
-  mode: string;
-}
-
-async function resolvePaymentSession(
-  checkoutSessionId: string
-): Promise<ResolvedSession | null> {
-  const session = await getSessionByCheckoutId(checkoutSessionId);
-  if (!session || session.processed || !session.userId || !session.billed_upto) {
-    return null;
-  }
-  return {
-    userId: session.userId,
-    billedUpto: session.billed_upto,
-    apiKeyId: session.apiKeyId,
-    mode: session.mode,
-  };
-}
-
 async function storePaymentEvent(
   userId: string,
   creditAmount: number,

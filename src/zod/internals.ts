@@ -16,7 +16,7 @@ export function createFilterGroupSchema<C extends z.ZodTypeAny>(
         logical: z
           .number()
           .int()
-          .min(0)
+          .min(1)
           .max(2)
           .transform((v) => (logicalMap[v] ?? "AND") as "AND" | "OR"),
         conditionsList: z.array(conditionSchema).default([]),
