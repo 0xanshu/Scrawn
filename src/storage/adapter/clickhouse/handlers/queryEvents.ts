@@ -199,7 +199,7 @@ function buildWhereFromGroup(
       condition.field === "reportedTimestamp" ||
       condition.field === "ingestedTimestamp"
     ) {
-      const dt = DateTime.fromISO(condition.value);
+      const dt = DateTime.fromISO(condition.value, { zone: "utc" });
       if (dt.isValid) {
         value = toClickHouseDateTime(dt);
       }
