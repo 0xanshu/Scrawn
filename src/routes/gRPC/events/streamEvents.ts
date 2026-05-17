@@ -23,7 +23,10 @@ export async function streamEvents(
 
   try {
     if (!auth) {
-      return callback?.(AuthError.invalidAPIKey("API key context not found"), null);
+      return callback?.(
+        AuthError.invalidAPIKey("API key context not found"),
+        null
+      );
     }
 
     if (auth.role === "dashboard") {

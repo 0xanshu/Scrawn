@@ -2,7 +2,7 @@ import { getClickHouseDB } from "../../../db/clickhouse";
 import { getPostgresDB } from "../../../db/postgres/db";
 import { usersTable } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
-import type { DateTime } from "luxon";
+import { DateTime } from "luxon";
 import type { UserId } from "../../../../config/identifiers";
 import { eq } from "drizzle-orm";
 import { toClickHouseDateTime } from "../utils";
@@ -46,10 +46,15 @@ export async function handlePriceRequestAiTokenUsage(
     };
 
     if (lastBilled) {
-      query = `SELECT sum(input_debit_amount + output_debit_amount) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp > {lastBilled:DateTime64(3, 'UTC')} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
-      params.lastBilled = lastBilled;
+      const lastBilledDt = DateTime.fromSQL(lastBilled, { zone: 'utc' });
+      if (lastBilledDt.isValid) {
+        query = `SELECT sum(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp > {lastBilled:DateTime64(3, 'UTC')} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
+        params.lastBilled = toClickHouseDateTime(lastBilledDt);
+      } else {
+        query = `SELECT sum(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
+      }
     } else {
-      query = `SELECT sum(input_debit_amount + output_debit_amount) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
+      query = `SELECT sum(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')) as total FROM ai_token_usage_events WHERE user_id = {userId:String} AND mode = {mode:String} AND reported_timestamp < {before:DateTime64(3, 'UTC')}`;
     }
 
     params.mode = mode;

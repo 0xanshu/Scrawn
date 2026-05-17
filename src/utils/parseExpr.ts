@@ -197,10 +197,8 @@ async function resolveExprRefsInExpression(
 
     resolving.add(refName);
 
-    // Recursively resolve any expr() refs within the stored expression
     const expanded = await resolveExprRefsInExpression(storedExpr, resolving);
 
-    // Replace this expr(NAME) with the expanded stored expression
     const refPattern = new RegExp(`expr\\(${refName}\\)`, "g");
     resolved = resolved.replace(refPattern, `(${expanded})`);
 

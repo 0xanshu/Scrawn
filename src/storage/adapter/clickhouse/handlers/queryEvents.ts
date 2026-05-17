@@ -2,9 +2,14 @@ import { getClickHouseDB } from "../../../db/clickhouse";
 import { StorageError } from "../../../../errors/storage";
 import { DateTime } from "luxon";
 import { toClickHouseDateTime } from "../utils";
+import {
+  getTablesForRequest,
+  OPERATOR_SQL,
+  TABLE_TO_EVENT_TYPE,
+  type EventTableName,
+} from "../../common/queryEventsBase";
 import type {
   QueryRequest,
-  QueryFilter,
   QueryFilterGroup,
   QueryResponse,
   QueryResultRow,
@@ -13,154 +18,167 @@ import type {
 
 interface ChFieldDef {
   select: string | null;
-  where?: string;
+  where: string | null;
+  aggExpr?: string;
 }
 
 type ChFieldKey = QueryFieldName | "eventId";
 
-const CH_FIELDS: Record<string, Record<ChFieldKey, ChFieldDef>> = {
-  sdk_call_events: {
-    eventId:           { select: "toString(id)" },
-    eventType:         { select: "'SDK_CALL'" },
-    userId:            { select: "user_id", where: "user_id" },
-    apiKeyId:          { select: "api_key_id", where: "api_key_id" },
-    reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
-    ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
-    sdkCallType:       { select: "sdk_call_type", where: "sdk_call_type" },
-    debitAmount:       { select: "toString(debit_amount)", where: "debit_amount" },
-    model:             { select: null },
-    inputTokens:       { select: null },
-    outputTokens:      { select: null },
-    inputDebitAmount:  { select: null },
-    outputDebitAmount: { select: null },
-    creditAmount:      { select: null },
+const CH_FIELDS: Record<EventTableName, Record<ChFieldKey, ChFieldDef>> = {
+  basic_usage_events: {
+    eventId: { select: "toString(id)", where: "id" },
+    eventType: { select: "'BASIC_USAGE'", where: null },
+    userId: { select: "user_id", where: "user_id" },
+    apiKeyId: { select: "api_key_id", where: "api_key_id" },
+    reportedTimestamp: {
+      select: "toString(reported_timestamp)",
+      where: "reported_timestamp",
+    },
+    ingestedTimestamp: {
+      select: "toString(ingested_timestamp)",
+      where: "ingested_timestamp",
+    },
+    basicUsageType: { select: "type", where: "type" },
+    debitAmount: { select: "toString(debit_amount)", where: "debit_amount" },
+    model: { select: null, where: null },
+    inputTokens: { select: null, where: null },
+    outputTokens: { select: null, where: null },
+    inputDebitAmount: { select: null, where: null },
+    outputDebitAmount: { select: null, where: null },
+    inputCacheTokens: { select: null, where: null },
+    inputCacheDebitAmount: { select: null, where: null },
+    creditAmount: { select: null, where: null },
+    provider: { select: null, where: null },
+    metadata: { select: null, where: null },
   },
   ai_token_usage_events: {
-    eventId:           { select: "toString(id)" },
-    eventType:         { select: "'AI_TOKEN_USAGE'" },
-    userId:            { select: "user_id", where: "user_id" },
-    apiKeyId:          { select: "api_key_id", where: "api_key_id" },
-    reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
-    ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
-    sdkCallType:       { select: null },
-    debitAmount:       { select: null },
-    model:             { select: "model", where: "model" },
-    inputTokens:       { select: "toString(input_tokens)", where: "input_tokens" },
-    outputTokens:      { select: "toString(output_tokens)", where: "output_tokens" },
-    inputDebitAmount:  { select: "toString(input_debit_amount)", where: "input_debit_amount" },
-    outputDebitAmount: { select: "toString(output_debit_amount)", where: "output_debit_amount" },
-    creditAmount:      { select: null },
+    eventId: { select: "toString(id)", where: "id" },
+    eventType: { select: "'AI_TOKEN_USAGE'", where: null },
+    userId: { select: "user_id", where: "user_id" },
+    apiKeyId: { select: "api_key_id", where: "api_key_id" },
+    reportedTimestamp: {
+      select: "toString(reported_timestamp)",
+      where: "reported_timestamp",
+    },
+    ingestedTimestamp: {
+      select: "toString(ingested_timestamp)",
+      where: "ingested_timestamp",
+    },
+    basicUsageType: { select: null, where: null },
+    debitAmount: {
+      select:
+        "toString(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output'))",
+      where: null,
+      aggExpr:
+        "JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')",
+    },
+    model: { select: "model", where: "model" },
+    inputTokens: {
+      select: "toString(JSONExtractInt(metrics, 'tokens', 'input'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'tokens', 'input')",
+    },
+    outputTokens: {
+      select: "toString(JSONExtractInt(metrics, 'tokens', 'output'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'tokens', 'output')",
+    },
+    inputDebitAmount: {
+      select: "toString(JSONExtractInt(metrics, 'debit_amount', 'input'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'debit_amount', 'input')",
+    },
+    outputDebitAmount: {
+      select: "toString(JSONExtractInt(metrics, 'debit_amount', 'output'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'debit_amount', 'output')",
+    },
+    inputCacheTokens: {
+      select: "toString(JSONExtractInt(metrics, 'tokens', 'input_cache'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'tokens', 'input_cache')",
+    },
+    inputCacheDebitAmount: {
+      select:
+        "toString(JSONExtractInt(metrics, 'debit_amount', 'input_cache'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'debit_amount', 'input_cache')",
+    },
+    creditAmount: { select: null, where: null },
+    provider: { select: "provider", where: "provider" },
+    metadata:          { select: "toString(metadata)",                      where: null },
   },
   payment_events: {
-    eventId:           { select: "toString(id)" },
-    eventType:         { select: "'PAYMENT'" },
-    userId:            { select: "user_id", where: "user_id" },
-    apiKeyId:          { select: null },
-    reportedTimestamp: { select: "toString(reported_timestamp)", where: "reported_timestamp" },
-    ingestedTimestamp: { select: "toString(ingested_timestamp)", where: "ingested_timestamp" },
-    sdkCallType:       { select: null },
-    debitAmount:       { select: null },
-    model:             { select: null },
-    inputTokens:       { select: null },
-    outputTokens:      { select: null },
-    inputDebitAmount:  { select: null },
-    outputDebitAmount: { select: null },
-    creditAmount:      { select: "toString(credit_amount)", where: "credit_amount" },
+    eventId: { select: "toString(id)", where: "id" },
+    eventType: { select: "'PAYMENT'", where: null },
+    userId: { select: "user_id", where: "user_id" },
+    apiKeyId: { select: "api_key_id", where: "api_key_id" },
+    reportedTimestamp: {
+      select: "toString(reported_timestamp)",
+      where: "reported_timestamp",
+    },
+    ingestedTimestamp: {
+      select: "toString(ingested_timestamp)",
+      where: "ingested_timestamp",
+    },
+    basicUsageType: { select: null, where: null },
+    debitAmount: { select: null, where: null },
+    model: { select: null, where: null },
+    inputTokens: { select: null, where: null },
+    outputTokens: { select: null, where: null },
+    inputDebitAmount: { select: null, where: null },
+    outputDebitAmount: { select: null, where: null },
+    inputCacheTokens: { select: null, where: null },
+    inputCacheDebitAmount: { select: null, where: null },
+    creditAmount: { select: "toString(credit_amount)", where: "credit_amount" },
+    provider: { select: null, where: null },
+    metadata: { select: null, where: null },
   },
 };
 
-const CH_PARAM_TYPE: Record<QueryFieldName, string> = {
+const CH_PARAM_TYPE: Record<string, string> = {
+  eventId: "String",
   eventType: "String",
   reportedTimestamp: "DateTime64(3, 'UTC')",
   ingestedTimestamp: "DateTime64(3, 'UTC')",
   userId: "String",
   apiKeyId: "String",
-  sdkCallType: "String",
+  basicUsageType: "String",
   debitAmount: "Int64",
   model: "String",
   inputTokens: "Int64",
   outputTokens: "Int64",
   inputDebitAmount: "Int64",
   outputDebitAmount: "Int64",
+  inputCacheTokens: "Int64",
+  inputCacheDebitAmount: "Int64",
   creditAmount: "Int64",
+  provider: "String",
+  metadata: "String",
 };
 
-const OPERATOR_SQL: Record<string, string> = {
-  EQ: "=",
-  GT: ">",
-  GTE: ">=",
-  LT: "<",
-  LTE: "<=",
-  NEQ: "!=",
-};
+const OUTPUT_FIELDS: ChFieldKey[] = Object.keys(
+  CH_FIELDS.basic_usage_events
+) as ChFieldKey[];
 
-function getTablesForRequest(where: QueryFilterGroup): string[] {
-  const eventTypes = collectEventTypes(where);
-  if (eventTypes.length > 0) {
-    const tables: string[] = [];
-    if (eventTypes.includes("SDK_CALL")) tables.push("sdk_call_events");
-    if (eventTypes.includes("AI_TOKEN_USAGE"))
-      tables.push("ai_token_usage_events");
-    if (eventTypes.includes("PAYMENT")) tables.push("payment_events");
-    return tables;
-  }
-    return ["sdk_call_events", "ai_token_usage_events", "payment_events"];
-}
-
-function collectEventTypes(group: QueryFilterGroup): string[] {
-  const types: string[] = [];
-  const et = group.conditions.find((c) => c.field === "eventType");
-  if (et) types.push(et.value);
-  for (const sub of group.groups) {
-    types.push(...collectEventTypes(sub));
-  }
-  return types;
-}
-
-function buildSelectColumns(table: string, outputAliases: boolean): string {
+function buildSelectColumns(table: EventTableName): string {
   const defs = CH_FIELDS[table];
   if (!defs) return "*";
   const parts: string[] = [];
-  for (const [alias, def] of Object.entries(defs)) {
-    if (def.select === null) {
-      parts.push(`NULL as ${alias}`);
-    } else if (outputAliases) {
+  for (const alias of OUTPUT_FIELDS) {
+    const def = defs[alias];
+    if (def?.select) {
       parts.push(`${def.select} as ${alias}`);
     } else {
-      parts.push(def.select);
+      parts.push(`NULL as ${alias}`);
     }
   }
   return parts.join(", ");
 }
 
-function buildGroupCondition(
-  condition: QueryFilter,
-  table: string,
-  params: Record<string, unknown>,
-  paramIndex: { value: number }
-): string | null {
-  const col = CH_FIELDS[table]?.[condition.field]?.where;
-  if (!col) return null;
-  const op = OPERATOR_SQL[condition.operator];
-  if (!op) return null;
-  const paramName = `p_${paramIndex.value++}`;
-  const paramType = CH_PARAM_TYPE[condition.field] ?? "String";
-
-  let value: string | number = condition.value;
-  if (condition.field === "reportedTimestamp" || condition.field === "ingestedTimestamp") {
-    const dt = DateTime.fromISO(condition.value);
-    if (dt.isValid) {
-      value = toClickHouseDateTime(dt);
-    }
-  }
-  params[paramName] = value;
-
-  return `${col} ${op} {${paramName}:${paramType}}`;
-}
-
 function buildWhereFromGroup(
   group: QueryFilterGroup,
-  table: string,
+  table: EventTableName,
   params: Record<string, unknown>,
   paramIndex: { value: number }
 ): string {
@@ -168,22 +186,31 @@ function buildWhereFromGroup(
 
   for (const condition of group.conditions) {
     if (condition.field === "eventType") continue;
-    const clause = buildGroupCondition(
-      condition,
-      table,
-      params,
-      paramIndex
-    );
-    if (clause) parts.push(clause);
+    const col = CH_FIELDS[table]?.[condition.field as ChFieldKey]?.where;
+    if (!col) continue;
+    const op = OPERATOR_SQL[condition.operator];
+    if (!op) continue;
+
+    const paramName = `p_${paramIndex.value++}`;
+    const paramType = CH_PARAM_TYPE[condition.field] ?? "String";
+
+    let value: string | number = condition.value;
+    if (
+      condition.field === "reportedTimestamp" ||
+      condition.field === "ingestedTimestamp"
+    ) {
+      const dt = DateTime.fromISO(condition.value, { zone: "utc" });
+      if (dt.isValid) {
+        value = toClickHouseDateTime(dt);
+      }
+    }
+
+    params[paramName] = value;
+    parts.push(`${col} ${op} {${paramName}:${paramType}}`);
   }
 
   for (const subGroup of group.groups) {
-    const subClause = buildWhereFromGroup(
-      subGroup,
-      table,
-      params,
-      paramIndex
-    );
+    const subClause = buildWhereFromGroup(subGroup, table, params, paramIndex);
     if (subClause) parts.push(`(${subClause})`);
   }
 
@@ -195,19 +222,16 @@ function buildWhereFromGroup(
 export async function handleQueryEvents(
   request: QueryRequest
 ): Promise<QueryResponse> {
-  const client = getClickHouseDB();
   const tables = getTablesForRequest(request.where);
-  const isAgg = !!request.aggregation;
-
   if (tables.length === 0) {
     return { rows: [], total: 0 };
   }
 
   try {
-    if (isAgg) {
-      return await handleAggregationQuery(client, request, tables);
+    if (request.aggregation) {
+      return await handleAggregationQuery(request, tables);
     }
-    return await handleListQuery(client, request, tables);
+    return await handleListQuery(request, tables);
   } catch (e) {
     if (
       e &&
@@ -225,10 +249,10 @@ export async function handleQueryEvents(
 }
 
 async function handleListQuery(
-  client: ReturnType<typeof getClickHouseDB>,
   request: QueryRequest,
-  tables: string[]
+  tables: EventTableName[]
 ): Promise<QueryResponse> {
+  const client = getClickHouseDB();
   const paramIndex = { value: 0 };
   const params: Record<string, unknown> = {};
 
@@ -239,21 +263,28 @@ async function handleListQuery(
       params,
       paramIndex
     );
-    let q = `SELECT ${buildSelectColumns(t, true)} FROM ${t}`;
+    let q = `SELECT ${buildSelectColumns(t)} FROM ${t}`;
     if (whereClause) q += ` WHERE ${whereClause}`;
     return q;
   });
 
-  const unionQuery = queries.join(" UNION ALL ");
-  const orderLimitOffset = buildOrderLimitOffset(
-    request,
-    params,
-    paramIndex
-  );
-  const finalQuery = `${unionQuery} ${orderLimitOffset}`;
+  let unionQuery = queries.join(" UNION ALL ");
+  unionQuery += " ORDER BY reportedTimestamp DESC";
+
+  if (request.limit) {
+    const limitParam = `p_${paramIndex.value++}`;
+    unionQuery += ` LIMIT {${limitParam}:Int32}`;
+    params[limitParam] = request.limit;
+  }
+
+  if (request.offset) {
+    const offsetParam = `p_${paramIndex.value++}`;
+    unionQuery += ` OFFSET {${offsetParam}:Int32}`;
+    params[offsetParam] = request.offset;
+  }
 
   const rs = await client.query({
-    query: finalQuery,
+    query: unionQuery,
     query_params: params,
     format: "JSONEachRow",
   });
@@ -263,16 +294,16 @@ async function handleListQuery(
     data as unknown as Record<string, string>[]
   ).map(normalizeRow);
 
-  const total = await getTotalCount(client, request, tables);
+  const total = await getTotalCount(request, tables);
 
   return { rows, total };
 }
 
 async function handleAggregationQuery(
-  client: ReturnType<typeof getClickHouseDB>,
   request: QueryRequest,
-  tables: string[]
+  tables: EventTableName[]
 ): Promise<QueryResponse> {
+  const client = getClickHouseDB();
   const agg = request.aggregation!;
   const isSum = agg.type === "SUM";
   const paramIndex = { value: 0 };
@@ -286,21 +317,23 @@ async function handleAggregationQuery(
       if (gbCol) {
         cols.push(`${gbCol} as group_value`);
       } else if (request.groupBy === "eventType") {
-        cols.push(
-          `'${t === "sdk_call_events" ? "SDK_CALL" : t === "ai_token_usage_events" ? "AI_TOKEN_USAGE" : "PAYMENT"}' as group_value`
-        );
+        cols.push(`'${TABLE_TO_EVENT_TYPE[t]}' as group_value`);
+      } else {
+        cols.push("NULL as group_value");
       }
     }
 
     if (isSum && agg.field) {
-      const aggCol = CH_FIELDS[t]?.[agg.field as ChFieldKey]?.where;
-      if (aggCol) {
-        cols.push(`${aggCol} as agg_value`);
+      const def = CH_FIELDS[t]?.[agg.field as ChFieldKey];
+      if (def?.aggExpr) {
+        cols.push(`toInt64(${def.aggExpr}) as agg_value`);
+      } else if (def?.where) {
+        cols.push(`toInt64(${def.where}) as agg_value`);
       } else {
-        cols.push("0 as agg_value");
+        cols.push("toInt64(0) as agg_value");
       }
     } else {
-      cols.push("1 as agg_value");
+      cols.push("toInt64(1) as agg_value");
     }
 
     const whereClause = buildWhereFromGroup(
@@ -320,8 +353,8 @@ async function handleAggregationQuery(
   const groupByClause = request.groupBy ? "GROUP BY group_value" : "";
   if (isSum) {
     outerSelect = request.groupBy
-      ? "SELECT group_value, toString(sum(toInt64(agg_value))) as agg_value"
-      : "SELECT toString(sum(toInt64(agg_value))) as agg_value";
+      ? "SELECT group_value, toString(sum(agg_value)) as agg_value"
+      : "SELECT toString(sum(agg_value)) as agg_value";
   } else {
     outerSelect = request.groupBy
       ? "SELECT group_value, toString(count()) as agg_value"
@@ -335,10 +368,7 @@ async function handleAggregationQuery(
     query_params: params,
     format: "JSONEachRow",
   });
-  const data = await rs.json<{
-    group_value?: string;
-    agg_value: string;
-  }>();
+  const data = await rs.json<{ group_value?: string; agg_value: string }>();
 
   const rows: QueryResultRow[] = (
     data as unknown as Record<string, string>[]
@@ -351,10 +381,10 @@ async function handleAggregationQuery(
 }
 
 async function getTotalCount(
-  client: ReturnType<typeof getClickHouseDB>,
   request: QueryRequest,
-  tables: string[]
+  tables: EventTableName[]
 ): Promise<number> {
+  const client = getClickHouseDB();
   const paramIndex = { value: 0 };
   const params: Record<string, unknown> = {};
 
@@ -370,9 +400,7 @@ async function getTotalCount(
     return q;
   });
 
-  const query = `SELECT sum(cnt) as total FROM (${subQueries.join(
-    " UNION ALL "
-  )})`;
+  const query = `SELECT sum(cnt) as total FROM (${subQueries.join(" UNION ALL ")})`;
 
   const rs = await client.query({
     query,
@@ -384,29 +412,6 @@ async function getTotalCount(
   if (!data || data.length === 0 || !data[0]?.total) return 0;
   const parsed = parseInt(data[0].total);
   return isNaN(parsed) ? 0 : parsed;
-}
-
-function buildOrderLimitOffset(
-  request: QueryRequest,
-  params: Record<string, unknown>,
-  paramIndex: { value: number }
-): string {
-  const parts: string[] = [];
-  parts.push("ORDER BY reportedTimestamp DESC");
-
-  if (request.limit) {
-    const limitParam = `p_${paramIndex.value++}`;
-    parts.push(`LIMIT {${limitParam}:Int32}`);
-    params[limitParam] = request.limit;
-  }
-
-  if (request.offset) {
-    const offsetParam = `p_${paramIndex.value++}`;
-    parts.push(`OFFSET {${offsetParam}:Int32}`);
-    params[offsetParam] = request.offset;
-  }
-
-  return parts.join(" ");
 }
 
 function normalizeRow(row: Record<string, string>): QueryResultRow {

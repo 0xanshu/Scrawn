@@ -1,19 +1,19 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import * as Sentry from "@sentry/bun";
-import { createWideEventBuilder, generateRequestId } from "../../context/requestContext.ts";
+import {
+  createWideEventBuilder,
+  generateRequestId,
+} from "../../context/requestContext.ts";
 import { logger } from "../../errors/logger.ts";
 import { handleDodoWebhook } from "./createdCheckout.ts";
 
 export async function registerWebhookRoutes(
-  server: ReturnType<typeof import("fastify")["fastify"]>
+  server: ReturnType<(typeof import("fastify"))["fastify"]>
 ): Promise<void> {
   server.post(
     "/webhooks/payment/createdCheckout",
     { config: { rawBody: true } },
-    async (
-      request: FastifyRequest,
-      reply: FastifyReply
-    ) => {
+    async (request: FastifyRequest, reply: FastifyReply) => {
       const builder = createWideEventBuilder(
         generateRequestId(),
         request.method,
@@ -57,7 +57,13 @@ export async function registerWebhookRoutes(
           return { error: "Missing raw webhook payload" };
         }
 
-        const result = await handleDodoWebhook(rawBody, signature, timestamp, webhookId, builder);
+        const result = await handleDodoWebhook(
+          rawBody,
+          signature,
+          timestamp,
+          webhookId,
+          builder
+        );
 
         reply.code(result.statusCode);
         return result.body;

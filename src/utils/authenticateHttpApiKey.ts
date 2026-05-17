@@ -53,7 +53,7 @@ export async function authenticateHttpApiKey(
     throw AuthError.revokedAPIKey();
   }
 
-  if (DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt)) {
+  if (DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })) {
     throw AuthError.expiredAPIKey();
   }
 

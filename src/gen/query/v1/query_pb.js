@@ -1282,7 +1282,11 @@ proto.query.v1.EventRow.toObject = function(includeInstance, msg) {
     inputTokens: jspb.Message.getFieldWithDefault(msg, 10, 0),
     outputTokens: jspb.Message.getFieldWithDefault(msg, 11, 0),
     inputDebitAmount: jspb.Message.getFieldWithDefault(msg, 12, 0),
-    outputDebitAmount: jspb.Message.getFieldWithDefault(msg, 13, 0)
+    outputDebitAmount: jspb.Message.getFieldWithDefault(msg, 13, 0),
+    provider: jspb.Message.getFieldWithDefault(msg, 14, ""),
+    inputCacheTokens: jspb.Message.getFieldWithDefault(msg, 15, 0),
+    inputCacheDebitAmount: jspb.Message.getFieldWithDefault(msg, 16, 0),
+    metadata: jspb.Message.getFieldWithDefault(msg, 17, "")
   };
 
   if (includeInstance) {
@@ -1366,6 +1370,22 @@ proto.query.v1.EventRow.deserializeBinaryFromReader = function(msg, reader) {
     case 13:
       var value = /** @type {number} */ (reader.readInt64());
       msg.setOutputDebitAmount(value);
+      break;
+    case 14:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setProvider(value);
+      break;
+    case 15:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setInputCacheTokens(value);
+      break;
+    case 16:
+      var value = /** @type {number} */ (reader.readInt64());
+      msg.setInputCacheDebitAmount(value);
+      break;
+    case 17:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setMetadata(value);
       break;
     default:
       reader.skipField();
@@ -1477,6 +1497,34 @@ proto.query.v1.EventRow.serializeBinaryToWriter = function(message, writer) {
   if (f != null) {
     writer.writeInt64(
       13,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 14));
+  if (f != null) {
+    writer.writeString(
+      14,
+      f
+    );
+  }
+  f = message.getInputCacheTokens();
+  if (f !== 0) {
+    writer.writeInt32(
+      15,
+      f
+    );
+  }
+  f = message.getInputCacheDebitAmount();
+  if (f !== 0) {
+    writer.writeInt64(
+      16,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 17));
+  if (f != null) {
+    writer.writeString(
+      17,
       f
     );
   }
@@ -1822,6 +1870,114 @@ proto.query.v1.EventRow.prototype.clearOutputDebitAmount = function() {
  */
 proto.query.v1.EventRow.prototype.hasOutputDebitAmount = function() {
   return jspb.Message.getField(this, 13) != null;
+};
+
+
+/**
+ * optional string provider = 14;
+ * @return {string}
+ */
+proto.query.v1.EventRow.prototype.getProvider = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 14, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.query.v1.EventRow} returns this
+ */
+proto.query.v1.EventRow.prototype.setProvider = function(value) {
+  return jspb.Message.setField(this, 14, value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.query.v1.EventRow} returns this
+ */
+proto.query.v1.EventRow.prototype.clearProvider = function() {
+  return jspb.Message.setField(this, 14, undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.query.v1.EventRow.prototype.hasProvider = function() {
+  return jspb.Message.getField(this, 14) != null;
+};
+
+
+/**
+ * optional int32 input_cache_tokens = 15;
+ * @return {number}
+ */
+proto.query.v1.EventRow.prototype.getInputCacheTokens = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 15, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.query.v1.EventRow} returns this
+ */
+proto.query.v1.EventRow.prototype.setInputCacheTokens = function(value) {
+  return jspb.Message.setProto3IntField(this, 15, value);
+};
+
+
+/**
+ * optional int64 input_cache_debit_amount = 16;
+ * @return {number}
+ */
+proto.query.v1.EventRow.prototype.getInputCacheDebitAmount = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 16, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.query.v1.EventRow} returns this
+ */
+proto.query.v1.EventRow.prototype.setInputCacheDebitAmount = function(value) {
+  return jspb.Message.setProto3IntField(this, 16, value);
+};
+
+
+/**
+ * optional string metadata = 17;
+ * @return {string}
+ */
+proto.query.v1.EventRow.prototype.getMetadata = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 17, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.query.v1.EventRow} returns this
+ */
+proto.query.v1.EventRow.prototype.setMetadata = function(value) {
+  return jspb.Message.setField(this, 17, value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.query.v1.EventRow} returns this
+ */
+proto.query.v1.EventRow.prototype.clearMetadata = function() {
+  return jspb.Message.setField(this, 17, undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.query.v1.EventRow.prototype.hasMetadata = function() {
+  return jspb.Message.getField(this, 17) != null;
 };
 
 
@@ -2289,7 +2445,8 @@ proto.query.v1.SdkCallField = {
   SDK_CALL_REPORTED_TIMESTAMP: 5,
   SDK_CALL_INGESTED_TIMESTAMP: 6,
   SDK_CALL_SDK_CALL_TYPE: 7,
-  SDK_CALL_DEBIT_AMOUNT: 8
+  SDK_CALL_DEBIT_AMOUNT: 8,
+  SDK_CALL_METADATA: 9
 };
 
 /**
@@ -2307,7 +2464,8 @@ proto.query.v1.AiTokenField = {
   AI_TOKEN_INPUT_TOKENS: 8,
   AI_TOKEN_OUTPUT_TOKENS: 9,
   AI_TOKEN_INPUT_DEBIT_AMOUNT: 10,
-  AI_TOKEN_OUTPUT_DEBIT_AMOUNT: 11
+  AI_TOKEN_OUTPUT_DEBIT_AMOUNT: 11,
+  AI_TOKEN_METADATA: 12
 };
 
 /**

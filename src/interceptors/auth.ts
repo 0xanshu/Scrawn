@@ -145,7 +145,7 @@ export function authInterceptor<Req, Res>(
           return callback?.(AuthError.revokedAPIKey());
         }
 
-        if (DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt)) {
+        if (DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })) {
           return callback?.(AuthError.expiredAPIKey());
         }
 

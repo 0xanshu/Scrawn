@@ -39,6 +39,7 @@ export async function handleAddPayment(
         {
           id,
           user_id: event_data.userId,
+          api_key_id: apiKeyId,
           mode: mode,
           reported_timestamp: reportedTimestamp,
           ingested_timestamp: toClickHouseDateTime(DateTime.utc()),

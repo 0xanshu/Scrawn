@@ -1,252 +1,237 @@
+import { sql, type SQL } from "drizzle-orm";
 import { getPostgresDB } from "../../../db/postgres/db";
-import {
-  eventsTable,
-  sdkCallEventsTable,
-  aiTokenUsageEventsTable,
-  paymentEventsTable,
-} from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import {
-  eq,
-  gt,
-  gte,
-  lt,
-  lte,
-  ne,
-  and,
-  or,
-  sql,
-  count,
-  sum,
-} from "drizzle-orm";
-import type { SQL } from "drizzle-orm";
+  getTablesForRequest,
+  OPERATOR_SQL,
+  TABLE_TO_EVENT_TYPE,
+  type EventTableName,
+} from "../../common/queryEventsBase";
 import type {
   QueryRequest,
-  QueryFilter,
   QueryFilterGroup,
   QueryResponse,
   QueryResultRow,
 } from "../../../../interface/storage/Storage";
-import { type AnyPgColumn } from "drizzle-orm/pg-core";
 
-type EventTypeName = "SDK_CALL" | "AI_TOKEN_USAGE" | "PAYMENT";
-
-interface PgFieldDef {
-  column: AnyPgColumn | null;
-  cast: "text" | "integer" | "uuid" | "timestamptz";
+interface PGFieldDef {
+  select: string | null;
+  whereCol: string | null;
+  whereCast: string;
+  aggExpr?: string;
 }
 
-const PG_FIELDS: Record<EventTypeName, Record<string, PgFieldDef>> = {
-  SDK_CALL: {
-    eventId: { column: eventsTable.id, cast: "uuid" },
-    eventType: { column: null, cast: "text" },
-    userId: { column: eventsTable.userId, cast: "uuid" },
-    apiKeyId: { column: eventsTable.api_keyId, cast: "uuid" },
+type PGFieldRegistry = Record<EventTableName, Record<string, PGFieldDef>>;
+
+const PG_FIELDS: PGFieldRegistry = {
+  basic_usage_events: {
+    eventId: { select: "id::text", whereCol: "id", whereCast: "::uuid" },
+    eventType: { select: "'BASIC_USAGE'", whereCol: null, whereCast: "" },
+    userId: { select: "user_id::text", whereCol: "user_id", whereCast: "" },
+    apiKeyId: {
+      select: "api_key_id::text",
+      whereCol: "api_key_id",
+      whereCast: "",
+    },
     reportedTimestamp: {
-      column: eventsTable.reported_timestamp,
-      cast: "timestamptz",
+      select: "reported_timestamp::text",
+      whereCol: "reported_timestamp",
+      whereCast: "::timestamptz",
     },
     ingestedTimestamp: {
-      column: eventsTable.ingested_timestamp,
-      cast: "timestamptz",
+      select: "ingested_timestamp::text",
+      whereCol: "ingested_timestamp",
+      whereCast: "::timestamptz",
     },
-    sdkCallType: { column: sdkCallEventsTable.type, cast: "text" },
-    debitAmount: { column: sdkCallEventsTable.debitAmount, cast: "integer" },
-    model: { column: null, cast: "text" },
-    inputTokens: { column: null, cast: "integer" },
-    outputTokens: { column: null, cast: "integer" },
-    inputDebitAmount: { column: null, cast: "integer" },
-    outputDebitAmount: { column: null, cast: "integer" },
-    creditAmount: { column: null, cast: "integer" },
+    basicUsageType: { select: "type", whereCol: "type", whereCast: "" },
+    debitAmount: {
+      select: "debit_amount::text",
+      whereCol: "debit_amount",
+      whereCast: "::bigint",
+    },
+    model: { select: null, whereCol: null, whereCast: "" },
+    inputTokens: { select: null, whereCol: null, whereCast: "" },
+    outputTokens: { select: null, whereCol: null, whereCast: "" },
+    inputDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    outputDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    inputCacheTokens: { select: null, whereCol: null, whereCast: "" },
+    inputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    creditAmount: { select: null, whereCol: null, whereCast: "" },
+    provider: { select: null, whereCol: null, whereCast: "" },
+    metadata: { select: "metadata::text", whereCol: null, whereCast: "" },
   },
-  AI_TOKEN_USAGE: {
-    eventId: { column: eventsTable.id, cast: "uuid" },
-    eventType: { column: null, cast: "text" },
-    userId: { column: eventsTable.userId, cast: "uuid" },
-    apiKeyId: { column: eventsTable.api_keyId, cast: "uuid" },
+  ai_token_usage_events: {
+    eventId: { select: "id::text", whereCol: "id", whereCast: "::uuid" },
+    eventType: { select: "'AI_TOKEN_USAGE'", whereCol: null, whereCast: "" },
+    userId: { select: "user_id::text", whereCol: "user_id", whereCast: "" },
+    apiKeyId: {
+      select: "api_key_id::text",
+      whereCol: "api_key_id",
+      whereCast: "",
+    },
     reportedTimestamp: {
-      column: eventsTable.reported_timestamp,
-      cast: "timestamptz",
+      select: "reported_timestamp::text",
+      whereCol: "reported_timestamp",
+      whereCast: "::timestamptz",
     },
     ingestedTimestamp: {
-      column: eventsTable.ingested_timestamp,
-      cast: "timestamptz",
+      select: "ingested_timestamp::text",
+      whereCol: "ingested_timestamp",
+      whereCast: "::timestamptz",
     },
-    sdkCallType: { column: null, cast: "text" },
-    debitAmount: { column: null, cast: "integer" },
-    model: { column: aiTokenUsageEventsTable.model, cast: "text" },
+    basicUsageType: { select: null, whereCol: null, whereCast: "" },
+    debitAmount: {
+      select:
+        "(COALESCE((metrics->'debit_amount'->>'input')::integer,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output')::integer,0))::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr:
+        "(COALESCE((metrics->'debit_amount'->>'input')::bigint,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output')::bigint,0))",
+    },
+    model: { select: "model", whereCol: "model", whereCast: "" },
     inputTokens: {
-      column: aiTokenUsageEventsTable.inputTokens,
-      cast: "integer",
+      select: "(metrics->'tokens'->>'input')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'tokens'->>'input')::bigint",
     },
     outputTokens: {
-      column: aiTokenUsageEventsTable.outputTokens,
-      cast: "integer",
+      select: "(metrics->'tokens'->>'output')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'tokens'->>'output')::bigint",
     },
     inputDebitAmount: {
-      column: aiTokenUsageEventsTable.inputDebitAmount,
-      cast: "integer",
+      select: "(metrics->'debit_amount'->>'input')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'debit_amount'->>'input')::bigint",
     },
     outputDebitAmount: {
-      column: aiTokenUsageEventsTable.outputDebitAmount,
-      cast: "integer",
+      select: "(metrics->'debit_amount'->>'output')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'debit_amount'->>'output')::bigint",
     },
-    creditAmount: { column: null, cast: "integer" },
+    inputCacheTokens: {
+      select: "(metrics->'tokens'->>'input_cache')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'tokens'->>'input_cache')::bigint",
+    },
+    inputCacheDebitAmount: {
+      select: "(metrics->'debit_amount'->>'input_cache')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'debit_amount'->>'input_cache')::bigint",
+    },
+    creditAmount: { select: null, whereCol: null, whereCast: "" },
+    provider: { select: "provider", whereCol: "provider", whereCast: "" },
+    metadata: { select: "metadata::text", whereCol: null, whereCast: "" },
   },
-  PAYMENT: {
-    eventId: { column: eventsTable.id, cast: "uuid" },
-    eventType: { column: null, cast: "text" },
-    userId: { column: eventsTable.userId, cast: "uuid" },
-    apiKeyId: { column: eventsTable.api_keyId, cast: "uuid" },
+  payment_events: {
+    eventId: { select: "id::text", whereCol: "id", whereCast: "::uuid" },
+    eventType: { select: "'PAYMENT'", whereCol: null, whereCast: "" },
+    userId: { select: "user_id::text", whereCol: "user_id", whereCast: "" },
+    apiKeyId: {
+      select: "api_key_id::text",
+      whereCol: "api_key_id",
+      whereCast: "",
+    },
     reportedTimestamp: {
-      column: eventsTable.reported_timestamp,
-      cast: "timestamptz",
+      select: "reported_timestamp::text",
+      whereCol: "reported_timestamp",
+      whereCast: "::timestamptz",
     },
     ingestedTimestamp: {
-      column: eventsTable.ingested_timestamp,
-      cast: "timestamptz",
+      select: "ingested_timestamp::text",
+      whereCol: "ingested_timestamp",
+      whereCast: "::timestamptz",
     },
-    sdkCallType: { column: null, cast: "text" },
-    debitAmount: { column: null, cast: "integer" },
-    model: { column: null, cast: "text" },
-    inputTokens: { column: null, cast: "integer" },
-    outputTokens: { column: null, cast: "integer" },
-    inputDebitAmount: { column: null, cast: "integer" },
-    outputDebitAmount: { column: null, cast: "integer" },
-    creditAmount: { column: paymentEventsTable.creditAmount, cast: "integer" },
+    basicUsageType: { select: null, whereCol: null, whereCast: "" },
+    debitAmount: { select: null, whereCol: null, whereCast: "" },
+    model: { select: null, whereCol: null, whereCast: "" },
+    inputTokens: { select: null, whereCol: null, whereCast: "" },
+    outputTokens: { select: null, whereCol: null, whereCast: "" },
+    inputDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    outputDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    inputCacheTokens: { select: null, whereCol: null, whereCast: "" },
+    inputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    creditAmount: {
+      select: "credit_amount::text",
+      whereCol: "credit_amount",
+      whereCast: "::bigint",
+    },
+    provider: { select: null, whereCol: null, whereCast: "" },
+    metadata: { select: null, whereCol: null, whereCast: "" },
   },
 };
 
-function applyOp(col: AnyPgColumn, filter: QueryFilter): SQL {
-  switch (filter.operator) {
-    case "EQ":
-      return eq(col, filter.value);
-    case "GT":
-      return gt(col, filter.value);
-    case "GTE":
-      return gte(col, filter.value);
-    case "LT":
-      return lt(col, filter.value);
-    case "LTE":
-      return lte(col, filter.value);
-    case "NEQ":
-      return ne(col, filter.value);
-    default:
-      return eq(col, filter.value);
-  }
-}
+const OUTPUT_FIELDS = Object.keys(PG_FIELDS.basic_usage_events);
 
-function buildConditions(
-  eventType: EventTypeName,
-  group: QueryFilterGroup
-): SQL | undefined {
-  const fields = PG_FIELDS[eventType];
-  const resolveColumn = (filter: QueryFilter): SQL | null => {
-    if (filter.field === "eventType") return null;
-    const def = fields[filter.field];
-    if (!def?.column) return null;
-    return applyOp(def.column, filter);
-  };
-  return buildConditionsFromGroup(group, resolveColumn);
-}
-
-function buildConditionsFromGroup(
+function buildConditionParts(
   group: QueryFilterGroup,
-  resolveColumn: (filter: QueryFilter) => SQL | null
-): SQL | undefined {
+  table: EventTableName
+): SQL[] {
   const parts: SQL[] = [];
 
-  for (const condition of group.conditions) {
-    if (condition.field === "eventType") continue;
-    const clause = resolveColumn(condition);
-    if (clause) parts.push(clause);
-  }
-
-  for (const subGroup of group.groups) {
-    const subWhere = buildConditionsFromGroup(subGroup, resolveColumn);
-    if (subWhere) parts.push(subWhere);
-  }
-
-  if (parts.length === 0) return undefined;
-  return group.logical === "OR" ? or(...parts) : and(...parts);
-}
-
-function getEventTypes(where: QueryFilterGroup): EventTypeName[] {
-  const collect = (group: QueryFilterGroup): string[] => {
-    const types: string[] = [];
-    const et = group.conditions.find((c) => c.field === "eventType");
-    if (et) types.push(et.value);
-    for (const sub of group.groups) {
-      types.push(...collect(sub));
-    }
-    return types;
-  };
-
-  const types = collect(where);
-  if (types.length > 0) {
-    return types.filter(
-      (t): t is EventTypeName =>
-        t === "SDK_CALL" || t === "AI_TOKEN_USAGE" || t === "PAYMENT"
+  for (const cond of group.conditions) {
+    if (cond.field === "eventType") continue;
+    const def = PG_FIELDS[table]?.[cond.field];
+    if (!def?.whereCol) continue;
+    const op = OPERATOR_SQL[cond.operator];
+    if (!op) continue;
+    parts.push(
+      sql`${sql.raw(def.whereCol)} ${sql.raw(op)} ${cond.value}${sql.raw(def.whereCast)}`
     );
   }
-  return ["SDK_CALL", "AI_TOKEN_USAGE", "PAYMENT"];
-}
 
-function buildSelect(eventType: EventTypeName) {
-  const fields = PG_FIELDS[eventType];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const result: Record<string, any> = {};
-
-  for (const [field, def] of Object.entries(fields)) {
-    if (field === "eventType") {
-      result[field] = sql<string>`${sql.raw(`'${eventType}'`)}`.as("eventType");
-    } else if (def.column) {
-      result[field] = def.column;
-    } else {
-      const nullSql =
-        def.cast === "integer" ? sql<number>`NULL::integer` : sql<string>`NULL`;
-      result[field] = (nullSql as ReturnType<typeof sql>).as(field);
+  for (const sub of group.groups) {
+    const subParts = buildConditionParts(sub, table);
+    if (subParts.length > 0) {
+      parts.push(sql`(${sql.join(subParts, sql` ${sql.raw(sub.logical)} `)})`);
     }
   }
 
-  return result;
+  return parts;
 }
 
-function getSubtypeTable(
-  eventType: EventTypeName
-): typeof sdkCallEventsTable | typeof aiTokenUsageEventsTable | typeof paymentEventsTable {
-  if (eventType === "SDK_CALL") return sdkCallEventsTable;
-  if (eventType === "PAYMENT") return paymentEventsTable;
-  return aiTokenUsageEventsTable;
-}
-
-function getSelect(eventType: EventTypeName) {
-  return buildSelect(eventType);
-}
-
-function getConditions(
-  eventType: EventTypeName,
-  where: QueryFilterGroup
+function buildWhereClause(
+  group: QueryFilterGroup,
+  table: EventTableName
 ): SQL | undefined {
-  return buildConditions(eventType, where);
+  const parts = buildConditionParts(group, table);
+  if (parts.length === 0) return undefined;
+  return sql.join(parts, sql` ${sql.raw(group.logical)} `);
+}
+
+function buildSelectColumns(table: EventTableName): SQL {
+  const cols: SQL[] = [];
+  for (const alias of OUTPUT_FIELDS) {
+    const def = PG_FIELDS[table]?.[alias];
+    const expr = def?.select;
+    if (expr) {
+      cols.push(sql`${sql.raw(expr)} as ${sql.raw(`"${alias}"`)}`);
+    } else {
+      cols.push(sql`NULL as ${sql.raw(`"${alias}"`)}`);
+    }
+  }
+  return sql.join(cols, sql`, `);
 }
 
 export async function handleQueryEvents(
   request: QueryRequest
 ): Promise<QueryResponse> {
-  const db = getPostgresDB();
-  const eventTypes = getEventTypes(request.where);
-  const isAgg = !!request.aggregation;
-
-  if (eventTypes.length === 0) {
+  const tables = getTablesForRequest(request.where);
+  if (tables.length === 0) {
     return { rows: [], total: 0 };
   }
 
   try {
-    if (isAgg) {
-      return await handleAggregationQuery(db, request, eventTypes);
+    if (request.aggregation) {
+      return await handleAggregationQuery(request, tables);
     }
-    return await handleListQuery(db, request, eventTypes);
+    return await handleListQuery(request, tables);
   } catch (e) {
     if (
       e &&
@@ -263,130 +248,150 @@ export async function handleQueryEvents(
   }
 }
 
-async function queryListForType(
-  db: ReturnType<typeof getPostgresDB>,
+async function handleListQuery(
   request: QueryRequest,
-  eventType: EventTypeName
-): Promise<{ rows: QueryResultRow[]; total: number }> {
-  const subtypeTable = getSubtypeTable(eventType);
-  const selectCols = getSelect(eventType);
-  const whereClause = getConditions(eventType, request.where);
+  tables: EventTableName[]
+): Promise<QueryResponse> {
+  const db = getPostgresDB();
 
-  // Count
-  const [countResult, rows] = await Promise.all([
-    db
-      .select({ cnt: count() })
-      .from(eventsTable)
-      .innerJoin(subtypeTable, eq(eventsTable.id, subtypeTable.id))
-      .where(whereClause)
-      .execute(),
-    db
-      .select(selectCols)
-      .from(eventsTable)
-      .innerJoin(subtypeTable, eq(eventsTable.id, subtypeTable.id))
-      .where(whereClause)
-      .orderBy(sql`${eventsTable.reported_timestamp} DESC`)
-      .execute(),
-  ]);
+  const selectExpr = tables.map((t) => buildSelectColumns(t));
+  const whereExpr = tables.map((t) => buildWhereClause(request.where, t));
 
-  const total = Number(countResult[0]?.cnt ?? 0);
+  const subqueries = tables.map((t, i) => {
+    const base = sql`SELECT ${selectExpr[i]} FROM ${sql.raw(t)}`;
+    return whereExpr[i] ? sql`${base} WHERE ${whereExpr[i]}` : base;
+  });
+
+  const unionQuery = sql.join(subqueries, sql` UNION ALL `);
+
+  const finalQuery = sql`
+    ${unionQuery}
+    ORDER BY "reportedTimestamp" DESC
+    LIMIT ${request.limit ?? 100}
+    OFFSET ${request.offset ?? 0}
+  `;
+
+  const result = await db.execute(finalQuery);
+  const data = result as unknown as Record<string, unknown>[];
+  const rows: QueryResultRow[] = data.map(normalizeRow);
+
+  const total = await getTotalCount(request, tables);
 
   return { rows, total };
 }
 
-async function handleListQuery(
-  db: ReturnType<typeof getPostgresDB>,
-  request: QueryRequest,
-  eventTypes: EventTypeName[]
-): Promise<QueryResponse> {
-  const allRows: QueryResultRow[] = [];
-  let totalCount = 0;
-
-  for (const eventType of eventTypes) {
-    const result = await queryListForType(db, request, eventType);
-    allRows.push(...result.rows);
-    totalCount += result.total;
-  }
-
-  allRows.sort((a, b) => {
-    const aTs = String(a.reportedTimestamp ?? "");
-    const bTs = String(b.reportedTimestamp ?? "");
-    return bTs.localeCompare(aTs);
-  });
-
-  const offset = request.offset ?? 0;
-  const limit = request.limit ?? 100;
-  const paginated = limit > 0 ? allRows.slice(offset, offset + limit) : allRows;
-
-  return { rows: paginated, total: totalCount };
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function resolveAggCol(
-  eventType: EventTypeName,
-  isSum: boolean,
-  field?: string
-): any {
-  if (!isSum || !field) return count().mapWith(Number);
-  const col = PG_FIELDS[eventType]?.[field]?.column;
-  if (!col) return count().mapWith(Number);
-  return sum(col).mapWith(Number);
-}
-
 async function handleAggregationQuery(
-  db: ReturnType<typeof getPostgresDB>,
   request: QueryRequest,
-  eventTypes: EventTypeName[]
+  tables: EventTableName[]
 ): Promise<QueryResponse> {
+  const db = getPostgresDB();
   const agg = request.aggregation!;
   const isSum = agg.type === "SUM";
-  const rows: QueryResultRow[] = [];
 
-  for (const eventType of eventTypes) {
-    const subtypeTable = getSubtypeTable(eventType);
-    const whereClause = getConditions(eventType, request.where);
+  const subqueries = tables.map((t) => {
+    const cols: SQL[] = [];
 
-    if (request.groupBy && request.groupBy !== "eventType") {
-      const gbCol = PG_FIELDS[eventType]?.[request.groupBy]?.column;
-      if (!gbCol) continue;
+    if (request.groupBy) {
+      const gbField = PG_FIELDS[t]?.[request.groupBy];
+      if (gbField?.whereCol) {
+        cols.push(
+          sql`${sql.raw(gbField.whereCol)} as ${sql.raw(`"group_value"`)}`
+        );
+      } else if (request.groupBy === "eventType") {
+        cols.push(
+          sql`${sql.raw(`'${TABLE_TO_EVENT_TYPE[t]}'`)} as ${sql.raw(`"group_value"`)}`
+        );
+      } else {
+        cols.push(sql`NULL as ${sql.raw(`"group_value"`)}`);
+      }
+    }
 
-      const aggCol = resolveAggCol(eventType, isSum, agg.field);
-
-      const result = await db
-        .select({
-          group_value: gbCol,
-          agg_value: aggCol,
-        })
-        .from(eventsTable)
-        .innerJoin(subtypeTable, eq(eventsTable.id, subtypeTable.id))
-        .where(whereClause)
-        .groupBy(gbCol)
-        .execute();
-
-      for (const r of result) {
-        rows.push({
-          group_value: String(r.group_value ?? ""),
-          agg_value: String(r.agg_value ?? "0"),
-        });
+    if (isSum && agg.field) {
+      const def = PG_FIELDS[t]?.[agg.field];
+      if (def?.aggExpr) {
+        cols.push(sql`${sql.raw(def.aggExpr)} as ${sql.raw(`"agg_value"`)}`);
+      } else if (def?.whereCol) {
+        cols.push(sql`${sql.raw(def.whereCol)}::bigint as ${sql.raw(`"agg_value"`)}`);
+      } else {
+        cols.push(sql`0::bigint as ${sql.raw(`"agg_value"`)}`);
       }
     } else {
-      const aggCol = resolveAggCol(eventType, isSum, agg.field);
+      cols.push(sql`1::bigint as ${sql.raw(`"agg_value"`)}`);
+    }
 
-      const result = await db
-        .select({ agg_value: aggCol })
-        .from(eventsTable)
-        .innerJoin(subtypeTable, eq(eventsTable.id, subtypeTable.id))
-        .where(whereClause)
-        .execute();
+    const whereClause = buildWhereClause(request.where, t);
+    const base = sql`SELECT ${sql.join(cols, sql`, `)} FROM ${sql.raw(t)}`;
+    return whereClause ? sql`${base} WHERE ${whereClause}` : base;
+  });
 
-      const row: QueryResultRow = {};
-      if (request.groupBy === "eventType") {
-        row.group_value = eventType;
-      }
-      row.agg_value = String(result[0]?.agg_value ?? "0");
-      rows.push(row);
+  const unionQuery = sql.join(subqueries, sql` UNION ALL `);
+
+  let outerQuery: SQL;
+  if (request.groupBy) {
+    if (isSum) {
+      outerQuery = sql`
+        SELECT "group_value", SUM("agg_value")::text as "agg_value"
+        FROM (${unionQuery}) sub
+        GROUP BY "group_value"
+      `;
+    } else {
+      outerQuery = sql`
+        SELECT "group_value", COUNT(*)::text as "agg_value"
+        FROM (${unionQuery}) sub
+        GROUP BY "group_value"
+      `;
+    }
+  } else {
+    if (isSum) {
+      outerQuery = sql`
+        SELECT SUM("agg_value")::text as "agg_value"
+        FROM (${unionQuery}) sub
+      `;
+    } else {
+      outerQuery = sql`
+        SELECT COUNT(*)::text as "agg_value"
+        FROM (${unionQuery}) sub
+      `;
     }
   }
 
+  const result = await db.execute(outerQuery);
+  const data = result as unknown as Record<string, unknown>[];
+  const rows: QueryResultRow[] = data.map((r) => ({
+    group_value: r.group_value ?? null,
+    agg_value: r.agg_value ?? "0",
+  }));
+
   return { rows, total: rows.length };
+}
+
+async function getTotalCount(
+  request: QueryRequest,
+  tables: EventTableName[]
+): Promise<number> {
+  const db = getPostgresDB();
+
+  const subqueries = tables.map((t) => {
+    const whereClause = buildWhereClause(request.where, t);
+    const base = sql`SELECT count(*)::int as cnt FROM ${sql.raw(t)}`;
+    return whereClause ? sql`${base} WHERE ${whereClause}` : base;
+  });
+
+  const countQuery = sql`
+    SELECT coalesce(sum(cnt), 0)::int as total
+    FROM (${sql.join(subqueries, sql` UNION ALL `)}) sub
+  `;
+
+  const result = await db.execute(countQuery);
+  const data = result as unknown as Record<string, unknown>[];
+  const total = Number(data[0]?.total ?? 0);
+  return total;
+}
+
+function normalizeRow(row: Record<string, unknown>): QueryResultRow {
+  const result: QueryResultRow = {};
+  for (const [key, value] of Object.entries(row)) {
+    result[key] = value ?? null;
+  }
+  return result;
 }

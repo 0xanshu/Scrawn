@@ -22,6 +22,7 @@ var global = (function() {
 }.call(null));
 
 goog.exportSymbol('proto.event.v1.AITokenUsage', null, global);
+goog.exportSymbol('proto.event.v1.AITokenUsage.InputcachedebitCase', null, global);
 goog.exportSymbol('proto.event.v1.AITokenUsage.InputdebitCase', null, global);
 goog.exportSymbol('proto.event.v1.AITokenUsage.OutputdebitCase', null, global);
 goog.exportSymbol('proto.event.v1.EventType', null, global);
@@ -486,9 +487,10 @@ proto.event.v1.SDKCall.prototype.toObject = function(opt_includeInstance) {
 proto.event.v1.SDKCall.toObject = function(includeInstance, msg) {
   var f, obj = {
     sdkcalltype: jspb.Message.getFieldWithDefault(msg, 1, 0),
-    amount: jspb.Message.getFloatingPointFieldWithDefault(msg, 2, 0.0),
+    amount: jspb.Message.getFieldWithDefault(msg, 2, 0),
     tag: jspb.Message.getFieldWithDefault(msg, 3, ""),
-    expr: jspb.Message.getFieldWithDefault(msg, 4, "")
+    expr: jspb.Message.getFieldWithDefault(msg, 4, ""),
+    metadata: jspb.Message.getFieldWithDefault(msg, 5, "")
   };
 
   if (includeInstance) {
@@ -530,7 +532,7 @@ proto.event.v1.SDKCall.deserializeBinaryFromReader = function(msg, reader) {
       msg.setSdkcalltype(value);
       break;
     case 2:
-      var value = /** @type {number} */ (reader.readFloat());
+      var value = /** @type {number} */ (reader.readInt32());
       msg.setAmount(value);
       break;
     case 3:
@@ -540,6 +542,10 @@ proto.event.v1.SDKCall.deserializeBinaryFromReader = function(msg, reader) {
     case 4:
       var value = /** @type {string} */ (reader.readString());
       msg.setExpr(value);
+      break;
+    case 5:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setMetadata(value);
       break;
     default:
       reader.skipField();
@@ -579,7 +585,7 @@ proto.event.v1.SDKCall.serializeBinaryToWriter = function(message, writer) {
   }
   f = /** @type {number} */ (jspb.Message.getField(message, 2));
   if (f != null) {
-    writer.writeFloat(
+    writer.writeInt32(
       2,
       f
     );
@@ -595,6 +601,13 @@ proto.event.v1.SDKCall.serializeBinaryToWriter = function(message, writer) {
   if (f != null) {
     writer.writeString(
       4,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 5));
+  if (f != null) {
+    writer.writeString(
+      5,
       f
     );
   }
@@ -620,11 +633,11 @@ proto.event.v1.SDKCall.prototype.setSdkcalltype = function(value) {
 
 
 /**
- * optional float amount = 2;
+ * optional int32 amount = 2;
  * @return {number}
  */
 proto.event.v1.SDKCall.prototype.getAmount = function() {
-  return /** @type {number} */ (jspb.Message.getFloatingPointFieldWithDefault(this, 2, 0.0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 2, 0));
 };
 
 
@@ -724,6 +737,42 @@ proto.event.v1.SDKCall.prototype.clearExpr = function() {
  */
 proto.event.v1.SDKCall.prototype.hasExpr = function() {
   return jspb.Message.getField(this, 4) != null;
+};
+
+
+/**
+ * optional string metadata = 5;
+ * @return {string}
+ */
+proto.event.v1.SDKCall.prototype.getMetadata = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 5, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.event.v1.SDKCall} returns this
+ */
+proto.event.v1.SDKCall.prototype.setMetadata = function(value) {
+  return jspb.Message.setField(this, 5, value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.event.v1.SDKCall} returns this
+ */
+proto.event.v1.SDKCall.prototype.clearMetadata = function() {
+  return jspb.Message.setField(this, 5, undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.event.v1.SDKCall.prototype.hasMetadata = function() {
+  return jspb.Message.getField(this, 5) != null;
 };
 
 
@@ -1184,7 +1233,7 @@ proto.event.v1.StreamEventRequest.prototype.hasAitokenusage = function() {
  * @private {!Array<!Array<number>>}
  * @const
  */
-proto.event.v1.AITokenUsage.oneofGroups_ = [[4,5,8],[6,7,9]];
+proto.event.v1.AITokenUsage.oneofGroups_ = [[4,5,8],[6,7,9],[12,13,14]];
 
 /**
  * @enum {number}
@@ -1218,6 +1267,23 @@ proto.event.v1.AITokenUsage.OutputdebitCase = {
  */
 proto.event.v1.AITokenUsage.prototype.getOutputdebitCase = function() {
   return /** @type {proto.event.v1.AITokenUsage.OutputdebitCase} */(jspb.Message.computeOneofCase(this, proto.event.v1.AITokenUsage.oneofGroups_[1]));
+};
+
+/**
+ * @enum {number}
+ */
+proto.event.v1.AITokenUsage.InputcachedebitCase = {
+  INPUTCACHEDEBIT_NOT_SET: 0,
+  INPUTCACHEAMOUNT: 12,
+  INPUTCACHETAG: 13,
+  INPUTCACHEEXPR: 14
+};
+
+/**
+ * @return {proto.event.v1.AITokenUsage.InputcachedebitCase}
+ */
+proto.event.v1.AITokenUsage.prototype.getInputcachedebitCase = function() {
+  return /** @type {proto.event.v1.AITokenUsage.InputcachedebitCase} */(jspb.Message.computeOneofCase(this, proto.event.v1.AITokenUsage.oneofGroups_[2]));
 };
 
 
@@ -1254,12 +1320,18 @@ proto.event.v1.AITokenUsage.toObject = function(includeInstance, msg) {
     model: jspb.Message.getFieldWithDefault(msg, 1, ""),
     inputtokens: jspb.Message.getFieldWithDefault(msg, 2, 0),
     outputtokens: jspb.Message.getFieldWithDefault(msg, 3, 0),
-    inputamount: jspb.Message.getFloatingPointFieldWithDefault(msg, 4, 0.0),
+    inputamount: jspb.Message.getFieldWithDefault(msg, 4, 0),
     inputtag: jspb.Message.getFieldWithDefault(msg, 5, ""),
     inputexpr: jspb.Message.getFieldWithDefault(msg, 8, ""),
-    outputamount: jspb.Message.getFloatingPointFieldWithDefault(msg, 6, 0.0),
+    outputamount: jspb.Message.getFieldWithDefault(msg, 6, 0),
     outputtag: jspb.Message.getFieldWithDefault(msg, 7, ""),
-    outputexpr: jspb.Message.getFieldWithDefault(msg, 9, "")
+    outputexpr: jspb.Message.getFieldWithDefault(msg, 9, ""),
+    provider: jspb.Message.getFieldWithDefault(msg, 10, ""),
+    inputcachetokens: jspb.Message.getFieldWithDefault(msg, 11, 0),
+    inputcacheamount: jspb.Message.getFieldWithDefault(msg, 12, 0),
+    inputcachetag: jspb.Message.getFieldWithDefault(msg, 13, ""),
+    inputcacheexpr: jspb.Message.getFieldWithDefault(msg, 14, ""),
+    metadata: jspb.Message.getFieldWithDefault(msg, 15, "")
   };
 
   if (includeInstance) {
@@ -1309,7 +1381,7 @@ proto.event.v1.AITokenUsage.deserializeBinaryFromReader = function(msg, reader) 
       msg.setOutputtokens(value);
       break;
     case 4:
-      var value = /** @type {number} */ (reader.readFloat());
+      var value = /** @type {number} */ (reader.readInt32());
       msg.setInputamount(value);
       break;
     case 5:
@@ -1321,7 +1393,7 @@ proto.event.v1.AITokenUsage.deserializeBinaryFromReader = function(msg, reader) 
       msg.setInputexpr(value);
       break;
     case 6:
-      var value = /** @type {number} */ (reader.readFloat());
+      var value = /** @type {number} */ (reader.readInt32());
       msg.setOutputamount(value);
       break;
     case 7:
@@ -1331,6 +1403,30 @@ proto.event.v1.AITokenUsage.deserializeBinaryFromReader = function(msg, reader) 
     case 9:
       var value = /** @type {string} */ (reader.readString());
       msg.setOutputexpr(value);
+      break;
+    case 10:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setProvider(value);
+      break;
+    case 11:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setInputcachetokens(value);
+      break;
+    case 12:
+      var value = /** @type {number} */ (reader.readInt32());
+      msg.setInputcacheamount(value);
+      break;
+    case 13:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setInputcachetag(value);
+      break;
+    case 14:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setInputcacheexpr(value);
+      break;
+    case 15:
+      var value = /** @type {string} */ (reader.readString());
+      msg.setMetadata(value);
       break;
     default:
       reader.skipField();
@@ -1384,7 +1480,7 @@ proto.event.v1.AITokenUsage.serializeBinaryToWriter = function(message, writer) 
   }
   f = /** @type {number} */ (jspb.Message.getField(message, 4));
   if (f != null) {
-    writer.writeFloat(
+    writer.writeInt32(
       4,
       f
     );
@@ -1405,7 +1501,7 @@ proto.event.v1.AITokenUsage.serializeBinaryToWriter = function(message, writer) 
   }
   f = /** @type {number} */ (jspb.Message.getField(message, 6));
   if (f != null) {
-    writer.writeFloat(
+    writer.writeInt32(
       6,
       f
     );
@@ -1421,6 +1517,48 @@ proto.event.v1.AITokenUsage.serializeBinaryToWriter = function(message, writer) 
   if (f != null) {
     writer.writeString(
       9,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 10));
+  if (f != null) {
+    writer.writeString(
+      10,
+      f
+    );
+  }
+  f = message.getInputcachetokens();
+  if (f !== 0) {
+    writer.writeInt32(
+      11,
+      f
+    );
+  }
+  f = /** @type {number} */ (jspb.Message.getField(message, 12));
+  if (f != null) {
+    writer.writeInt32(
+      12,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 13));
+  if (f != null) {
+    writer.writeString(
+      13,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 14));
+  if (f != null) {
+    writer.writeString(
+      14,
+      f
+    );
+  }
+  f = /** @type {string} */ (jspb.Message.getField(message, 15));
+  if (f != null) {
+    writer.writeString(
+      15,
       f
     );
   }
@@ -1482,11 +1620,11 @@ proto.event.v1.AITokenUsage.prototype.setOutputtokens = function(value) {
 
 
 /**
- * optional float inputAmount = 4;
+ * optional int32 inputAmount = 4;
  * @return {number}
  */
 proto.event.v1.AITokenUsage.prototype.getInputamount = function() {
-  return /** @type {number} */ (jspb.Message.getFloatingPointFieldWithDefault(this, 4, 0.0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 4, 0));
 };
 
 
@@ -1590,11 +1728,11 @@ proto.event.v1.AITokenUsage.prototype.hasInputexpr = function() {
 
 
 /**
- * optional float outputAmount = 6;
+ * optional int32 outputAmount = 6;
  * @return {number}
  */
 proto.event.v1.AITokenUsage.prototype.getOutputamount = function() {
-  return /** @type {number} */ (jspb.Message.getFloatingPointFieldWithDefault(this, 6, 0.0));
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 6, 0));
 };
 
 
@@ -1694,6 +1832,204 @@ proto.event.v1.AITokenUsage.prototype.clearOutputexpr = function() {
  */
 proto.event.v1.AITokenUsage.prototype.hasOutputexpr = function() {
   return jspb.Message.getField(this, 9) != null;
+};
+
+
+/**
+ * optional string provider = 10;
+ * @return {string}
+ */
+proto.event.v1.AITokenUsage.prototype.getProvider = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 10, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.setProvider = function(value) {
+  return jspb.Message.setField(this, 10, value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.clearProvider = function() {
+  return jspb.Message.setField(this, 10, undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.event.v1.AITokenUsage.prototype.hasProvider = function() {
+  return jspb.Message.getField(this, 10) != null;
+};
+
+
+/**
+ * optional int32 inputCacheTokens = 11;
+ * @return {number}
+ */
+proto.event.v1.AITokenUsage.prototype.getInputcachetokens = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 11, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.setInputcachetokens = function(value) {
+  return jspb.Message.setProto3IntField(this, 11, value);
+};
+
+
+/**
+ * optional int32 inputCacheAmount = 12;
+ * @return {number}
+ */
+proto.event.v1.AITokenUsage.prototype.getInputcacheamount = function() {
+  return /** @type {number} */ (jspb.Message.getFieldWithDefault(this, 12, 0));
+};
+
+
+/**
+ * @param {number} value
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.setInputcacheamount = function(value) {
+  return jspb.Message.setOneofField(this, 12, proto.event.v1.AITokenUsage.oneofGroups_[2], value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.clearInputcacheamount = function() {
+  return jspb.Message.setOneofField(this, 12, proto.event.v1.AITokenUsage.oneofGroups_[2], undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.event.v1.AITokenUsage.prototype.hasInputcacheamount = function() {
+  return jspb.Message.getField(this, 12) != null;
+};
+
+
+/**
+ * optional string inputCacheTag = 13;
+ * @return {string}
+ */
+proto.event.v1.AITokenUsage.prototype.getInputcachetag = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 13, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.setInputcachetag = function(value) {
+  return jspb.Message.setOneofField(this, 13, proto.event.v1.AITokenUsage.oneofGroups_[2], value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.clearInputcachetag = function() {
+  return jspb.Message.setOneofField(this, 13, proto.event.v1.AITokenUsage.oneofGroups_[2], undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.event.v1.AITokenUsage.prototype.hasInputcachetag = function() {
+  return jspb.Message.getField(this, 13) != null;
+};
+
+
+/**
+ * optional string inputCacheExpr = 14;
+ * @return {string}
+ */
+proto.event.v1.AITokenUsage.prototype.getInputcacheexpr = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 14, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.setInputcacheexpr = function(value) {
+  return jspb.Message.setOneofField(this, 14, proto.event.v1.AITokenUsage.oneofGroups_[2], value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.clearInputcacheexpr = function() {
+  return jspb.Message.setOneofField(this, 14, proto.event.v1.AITokenUsage.oneofGroups_[2], undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.event.v1.AITokenUsage.prototype.hasInputcacheexpr = function() {
+  return jspb.Message.getField(this, 14) != null;
+};
+
+
+/**
+ * optional string metadata = 15;
+ * @return {string}
+ */
+proto.event.v1.AITokenUsage.prototype.getMetadata = function() {
+  return /** @type {string} */ (jspb.Message.getFieldWithDefault(this, 15, ""));
+};
+
+
+/**
+ * @param {string} value
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.setMetadata = function(value) {
+  return jspb.Message.setField(this, 15, value);
+};
+
+
+/**
+ * Clears the field making it undefined.
+ * @return {!proto.event.v1.AITokenUsage} returns this
+ */
+proto.event.v1.AITokenUsage.prototype.clearMetadata = function() {
+  return jspb.Message.setField(this, 15, undefined);
+};
+
+
+/**
+ * Returns whether this field is set.
+ * @return {boolean}
+ */
+proto.event.v1.AITokenUsage.prototype.hasMetadata = function() {
+  return jspb.Message.getField(this, 15) != null;
 };
 
 

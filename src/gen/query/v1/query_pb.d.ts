@@ -200,6 +200,22 @@ export class EventRow extends jspb.Message {
   getOutputDebitAmount(): number;
   setOutputDebitAmount(value: number): void;
 
+  hasProvider(): boolean;
+  clearProvider(): void;
+  getProvider(): string;
+  setProvider(value: string): void;
+
+  getInputCacheTokens(): number;
+  setInputCacheTokens(value: number): void;
+
+  getInputCacheDebitAmount(): number;
+  setInputCacheDebitAmount(value: number): void;
+
+  hasMetadata(): boolean;
+  clearMetadata(): void;
+  getMetadata(): string;
+  setMetadata(value: string): void;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): EventRow.AsObject;
   static toObject(includeInstance: boolean, msg: EventRow): EventRow.AsObject;
@@ -224,6 +240,10 @@ export namespace EventRow {
     outputTokens: number,
     inputDebitAmount: number,
     outputDebitAmount: number,
+    provider: string,
+    inputCacheTokens: number,
+    inputCacheDebitAmount: number,
+    metadata: string,
   }
 }
 
@@ -323,6 +343,7 @@ export interface SdkCallFieldMap {
   SDK_CALL_INGESTED_TIMESTAMP: 6;
   SDK_CALL_SDK_CALL_TYPE: 7;
   SDK_CALL_DEBIT_AMOUNT: 8;
+  SDK_CALL_METADATA: 9;
 }
 
 export const SdkCallField: SdkCallFieldMap;
@@ -340,6 +361,7 @@ export interface AiTokenFieldMap {
   AI_TOKEN_OUTPUT_TOKENS: 9;
   AI_TOKEN_INPUT_DEBIT_AMOUNT: 10;
   AI_TOKEN_OUTPUT_DEBIT_AMOUNT: 11;
+  AI_TOKEN_METADATA: 12;
 }
 
 export const AiTokenField: AiTokenFieldMap;

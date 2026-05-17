@@ -58,7 +58,7 @@ export class PostgresAdapter implements StorageAdapter {
     }
 
     switch (event_data.type) {
-      case "SDK_CALL": {
+      case "BASIC_USAGE": {
         if (!apiKeyId) {
           throw StorageError.missingApiKeyId();
         }
@@ -93,7 +93,7 @@ export class PostgresAdapter implements StorageAdapter {
         return await handlePriceRequestPayment(userID, beforeTimestamp, mode);
       }
 
-      case "SDK_CALL": {
+      case "BASIC_USAGE": {
         return await handlePriceRequestSdkCall(userID, beforeTimestamp, mode);
       }
 

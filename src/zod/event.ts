@@ -4,7 +4,7 @@ import { USER_ID_CONFIG } from "../config/identifiers";
 import { fetchTagAmount } from "../utils/fetchTagAmount";
 import { parseAndEvaluateExpr } from "../utils/parseExpr";
 import type {
-  SDKCallEventData,
+  BasicUsageEventData,
   AITokenUsageEventData,
 } from "../interface/event/Event";
 
@@ -17,7 +17,7 @@ const BaseEvent = z.object({
     .transform((ts) => DateTime.fromSeconds(ts, { zone: 'utc' })),
 });
 
-const SDKCallDataSchema: z.ZodType<SDKCallEventData> = z
+const BasicUsageDataSchema: z.ZodType<BasicUsageEventData> = z
   .object({
     sdkcalltype: z.union([
       z.literal(0).transform(() => "RAW" as const),
@@ -27,8 +27,9 @@ const SDKCallDataSchema: z.ZodType<SDKCallEventData> = z
     amount: z.number(),
     tag: z.string(),
     expr: z.string(),
+    metadata: z.string().optional(),
   })
-  .transform(async (v): Promise<SDKCallEventData> => {
+  .transform(async (v): Promise<BasicUsageEventData> => {
     let debitAmount: number;
     if (v.tag) {
       debitAmount = await fetchTagAmount(v.tag, `Tag not found: ${v.tag}`);
@@ -37,24 +38,31 @@ const SDKCallDataSchema: z.ZodType<SDKCallEventData> = z
     } else {
       debitAmount = v.amount;
     }
-    return { sdkCallType: v.sdkcalltype, debitAmount };
+    return { basicUsageType: v.sdkcalltype, debitAmount, metadata: v.metadata ? JSON.parse(v.metadata) as Record<string, unknown> : undefined };
   });
 
 const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
   .object({
     model: z.string().min(1),
+    provider: z.string().optional().default("unknown"),
     inputtokens: z.number().int().min(0),
+    inputcachetokens: z.number().int().min(0),
     outputtokens: z.number().int().min(0),
     inputamount: z.number(),
     inputtag: z.string(),
     inputexpr: z.string(),
+    inputcacheamount: z.number(),
+    inputcachetag: z.string(),
+    inputcacheexpr: z.string(),
     outputamount: z.number(),
     outputtag: z.string(),
     outputexpr: z.string(),
+    metadata: z.string().optional(),
   })
   .transform(async (v): Promise<AITokenUsageEventData> => {
     const tokenContext = {
       inputTokens: v.inputtokens,
+      inputCacheTokens: v.inputcachetokens,
       outputTokens: v.outputtokens,
     };
 
@@ -68,6 +76,18 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
       inputDebitAmount = await parseAndEvaluateExpr(v.inputexpr, tokenContext);
     } else {
       inputDebitAmount = v.inputamount;
+    }
+
+    let inputCacheDebitAmount: number;
+    if (v.inputcachetag) {
+      inputCacheDebitAmount = await fetchTagAmount(
+        v.inputcachetag,
+        `Input cache tag not found: ${v.inputcachetag}`
+      );
+    } else if (v.inputcacheexpr) {
+      inputCacheDebitAmount = await parseAndEvaluateExpr(v.inputcacheexpr, tokenContext);
+    } else {
+      inputCacheDebitAmount = v.inputcacheamount;
     }
 
     let outputDebitAmount: number;
@@ -84,21 +104,25 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
 
     return {
       model: v.model,
+      provider: v.provider,
       inputTokens: v.inputtokens,
+      inputCacheTokens: v.inputcachetokens,
       outputTokens: v.outputtokens,
       inputDebitAmount,
+      inputCacheDebitAmount,
       outputDebitAmount,
+      metadata: v.metadata ? JSON.parse(v.metadata) as Record<string, unknown> : undefined,
     };
   });
 
-const RegisterEventSDKCall = BaseEvent.extend({
-  type: z.literal(1).transform(() => "SDK_CALL" as const),
-  sdkcall: SDKCallDataSchema,
+const RegisterEventBasicUsage = BaseEvent.extend({
+  type: z.literal(1).transform(() => "BASIC_USAGE" as const),
+  sdkcall: BasicUsageDataSchema,
 });
 
-const StreamEventSDKCall = BaseEvent.extend({
-  type: z.literal(1).transform(() => "SDK_CALL" as const),
-  sdkcall: SDKCallDataSchema,
+const StreamEventBasicUsage = BaseEvent.extend({
+  type: z.literal(1).transform(() => "BASIC_USAGE" as const),
+  sdkcall: BasicUsageDataSchema,
 });
 
 const StreamEventAITokenUsage = BaseEvent.extend({
@@ -106,11 +130,11 @@ const StreamEventAITokenUsage = BaseEvent.extend({
   aitokenusage: AITokenUsageDataSchema,
 });
 
-export const registerEventSchema = RegisterEventSDKCall;
+export const registerEventSchema = RegisterEventBasicUsage;
 export type RegisterEventSchemaType = z.output<typeof registerEventSchema>;
 
 export const streamEventSchema = z.union([
-  StreamEventSDKCall,
+  StreamEventBasicUsage,
   StreamEventAITokenUsage,
 ]);
 export type StreamEventSchemaType = z.output<typeof streamEventSchema>;

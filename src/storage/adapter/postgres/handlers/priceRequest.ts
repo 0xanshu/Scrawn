@@ -1,8 +1,8 @@
 import { getPostgresDB } from "../../../db/postgres/db";
-import { eventsTable, usersTable } from "../../../db/postgres/schema";
 import {
-  sdkCallEventsTable,
+  basicUsageEventsTable,
   aiTokenUsageEventsTable,
+  usersTable,
 } from "../../../db/postgres/schema";
 import { StorageError } from "../../../../errors/storage";
 import { eq, sum, sql, and, type SQL } from "drizzle-orm";
@@ -10,7 +10,7 @@ import type { DateTime } from "luxon";
 import type { UserId } from "../../../../config/identifiers";
 
 type PriceEventTable =
-  | typeof sdkCallEventsTable
+  | typeof basicUsageEventsTable
   | typeof aiTokenUsageEventsTable;
 
 export async function handlePriceRequest(
@@ -34,11 +34,11 @@ export async function handlePriceRequest(
 
     let result;
     try {
-      const baseCondition = sql`${eventsTable.reported_timestamp} > ${usersTable.last_billed_timestamp} AND ${eventsTable.userId} = ${userId} AND ${eventsTable.mode} = ${mode}`;
+      const baseCondition = sql`${priceTable.reportedTimestamp} > ${usersTable.last_billed_timestamp} AND ${priceTable.userId} = ${userId} AND ${priceTable.mode} = ${mode}`;
       const whereClause = beforeTimestamp
         ? and(
             baseCondition,
-            sql`${eventsTable.reported_timestamp} < ${beforeTimestamp.toISO()}`
+            sql`${priceTable.reportedTimestamp} < ${beforeTimestamp.toISO()}`
           )
         : baseCondition;
 
@@ -47,10 +47,9 @@ export async function handlePriceRequest(
           price: sum(priceColumn),
         })
         .from(priceTable)
-        .innerJoin(eventsTable, eq(priceTable.id, eventsTable.id))
-        .innerJoin(usersTable, eq(eventsTable.userId, usersTable.id))
+        .innerJoin(usersTable, eq(priceTable.userId, usersTable.id))
         .where(whereClause)
-        .groupBy(eventsTable.userId);
+        .groupBy(priceTable.userId);
     } catch (e) {
       throw StorageError.queryFailed(
         `Failed to query ${eventType} events for user ${userId}`,

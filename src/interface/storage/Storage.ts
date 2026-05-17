@@ -10,14 +10,18 @@ export const QUERY_FIELD_NAMES = [
   "ingestedTimestamp",
   "userId",
   "apiKeyId",
-  "sdkCallType",
+  "basicUsageType",
   "debitAmount",
   "model",
   "inputTokens",
   "outputTokens",
   "inputDebitAmount",
   "outputDebitAmount",
+  "inputCacheTokens",
+  "inputCacheDebitAmount",
   "creditAmount",
+  "provider",
+  "metadata",
 ] as const;
 
 export type QueryFieldName = (typeof QUERY_FIELD_NAMES)[number];
