@@ -12,7 +12,7 @@ function extractHeaderValue(
 ): string | undefined {
   return typeof header === "string"
     ? header
-    : Array.isArray(header)
+    : Array.isArray(header) && header.length === 1
       ? header[0]
       : undefined;
 }

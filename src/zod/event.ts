@@ -9,6 +9,14 @@ import type {
   AITokenUsageEventData,
 } from "../interface/event/Event";
 
+function parseMetadata(val: string): Record<string, unknown> {
+  try {
+    return JSON.parse(val) as Record<string, unknown>;
+  } catch {
+    throw new Error("Invalid JSON in metadata");
+  }
+}
+
 const BaseEvent = z.object({
   type: z.number(),
   userid: USER_ID_CONFIG.validator,
@@ -42,9 +50,7 @@ const BasicUsageDataSchema: z.ZodType<BasicUsageEventData> = z
     return {
       basicUsageType: v.basicusagetype,
       debitAmount,
-      metadata: v.metadata
-        ? (JSON.parse(v.metadata) as Record<string, unknown>)
-        : undefined,
+      metadata: v.metadata ? parseMetadata(v.metadata) : undefined,
     };
   });
 
@@ -124,9 +130,7 @@ const AITokenUsageDataSchema: z.ZodType<AITokenUsageEventData> = z
       inputDebitAmount,
       inputCacheDebitAmount,
       outputDebitAmount,
-      metadata: v.metadata
-        ? (JSON.parse(v.metadata) as Record<string, unknown>)
-        : undefined,
+      metadata: v.metadata ? parseMetadata(v.metadata) : undefined,
     };
   });
 

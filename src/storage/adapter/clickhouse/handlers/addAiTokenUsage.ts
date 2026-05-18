@@ -21,7 +21,11 @@ type AggregatedEvent = {
   metadata?: Record<string, unknown>;
 };
 
-function validateNonNegative(value: unknown, label: string, userId: UserId): void {
+function validateNonNegative(
+  value: unknown,
+  label: string,
+  userId: UserId
+): void {
   if (typeof value === "number" && value < 0) {
     throw StorageError.insertFailed(
       `Negative ${label} not allowed for AI token usage for user ${userId}`,
@@ -37,7 +41,11 @@ function validateAiTokenEvent(event_data: SqlRecordOf<"AI_TOKEN_USAGE">): void {
   validateNonNegative(data.inputDebitAmount, "inputDebitAmount", userId);
   validateNonNegative(data.outputDebitAmount, "outputDebitAmount", userId);
   validateNonNegative(data.inputCacheTokens, "inputCacheTokens", userId);
-  validateNonNegative(data.inputCacheDebitAmount, "inputCacheDebitAmount", userId);
+  validateNonNegative(
+    data.inputCacheDebitAmount,
+    "inputCacheDebitAmount",
+    userId
+  );
 }
 
 function aggregateAiTokenEvents(
@@ -47,9 +55,13 @@ function aggregateAiTokenEvents(
 
   for (const event_data of events) {
     if (!event_data.reported_timestamp.isValid) {
-      throw StorageError.invalidTimestamp("reported_timestamp is not a valid DateTime");
+      throw StorageError.invalidTimestamp(
+        "reported_timestamp is not a valid DateTime"
+      );
     }
-    const reportedTimestamp = toClickHouseDateTime(event_data.reported_timestamp);
+    const reportedTimestamp = toClickHouseDateTime(
+      event_data.reported_timestamp
+    );
     const key = `${event_data.userId}:${event_data.data.model}`;
     const existing = aggregationMap.get(key);
 
@@ -132,12 +144,12 @@ export async function handleAddAiTokenUsage(
     validateAiTokenEvent(event_data);
   }
 
-  const aggregatedEvents = aggregateAiTokenEvents(events);
+  const firstEvent = events[0];
+  if (firstEvent) {
+    await ensureUserExists(firstEvent.userId).catch(() => {});
+  }
 
-  const uniqueUserIds = Array.from(
-    new Set(aggregatedEvents.map((event) => event.userId))
-  );
-  const ensurePromises = uniqueUserIds.map((uid) => ensureUserExists(uid));
+  const aggregatedEvents = aggregateAiTokenEvents(events);
 
   const firstId = crypto.randomUUID();
   const now = toClickHouseDateTime(DateTime.utc());
@@ -152,15 +164,6 @@ export async function handleAddAiTokenUsage(
   } catch (e) {
     throw StorageError.insertFailed(
       "Failed to insert AI token usage events",
-      e instanceof Error ? e : new Error(String(e))
-    );
-  }
-
-  try {
-    await Promise.all(ensurePromises);
-  } catch (e) {
-    throw StorageError.insertFailed(
-      "Failed to ensure users exist for AI token usage events",
       e instanceof Error ? e : new Error(String(e))
     );
   }

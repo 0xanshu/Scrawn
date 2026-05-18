@@ -129,18 +129,15 @@ export async function handleAddAiTokenUsage(
   }
 
   const aggregatedEvents = await aggregateAiTokenEvents(events);
+  const firstEvent = events[0];
 
   return await executeInTransaction(
     connectionObject,
     `storing ${events.length} AI_TOKEN_USAGE event(s)`,
     async (txn) => {
-      const uniqueUserIds = Array.from(
-        new Set(aggregatedEvents.map((event) => event.userId))
-      );
-
-      const ensurePromises = uniqueUserIds.map((userId) =>
-        ensureUserExists(userId, txn)
-      );
+      if (firstEvent) {
+        await ensureUserExists(firstEvent.userId, txn);
+      }
 
       try {
         const aiTokenUsageValues = buildAiTokenInsertValues(aggregatedEvents, auth);
@@ -154,15 +151,6 @@ export async function handleAddAiTokenUsage(
           throw StorageError.insertFailed(
             "Missing or invalid ID for the first inserted event",
             new Error(`Invalid first event ID: ${JSON.stringify(inserted[0])}`)
-          );
-        }
-
-        try {
-          await Promise.all(ensurePromises);
-        } catch (e) {
-          throw StorageError.insertFailed(
-            "Failed to ensure users exist for AI token usage events",
-            e instanceof Error ? e : new Error(String(e))
           );
         }
 

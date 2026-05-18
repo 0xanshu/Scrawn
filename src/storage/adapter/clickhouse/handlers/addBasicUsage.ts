@@ -27,7 +27,7 @@ export async function handleAddBasicUsage(
   }
   const reportedTimestamp = toClickHouseDateTime(event_data.reported_timestamp);
 
-  const ensurePromise = ensureUserExists(event_data.userId);
+  await ensureUserExists(event_data.userId);
 
   const id = crypto.randomUUID();
 
@@ -52,15 +52,6 @@ export async function handleAddBasicUsage(
   } catch (e) {
     throw StorageError.insertFailed(
       `Failed to insert basic usage event for user ${event_data.userId}`,
-      e instanceof Error ? e : new Error(String(e))
-    );
-  }
-
-  try {
-    await ensurePromise;
-  } catch (e) {
-    throw StorageError.insertFailed(
-      "Failed to ensure user exists for basic usage event",
       e instanceof Error ? e : new Error(String(e))
     );
   }
