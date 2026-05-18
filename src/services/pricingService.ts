@@ -25,13 +25,10 @@ export async function calculatePaymentPrice(
     getPostgresDB(),
     "calculating payment price",
     async (txn) => {
-      const sdkPrice = await sdkAdapter.price(
-        userId,
-        "BASIC_USAGE",
-        beforeTimestampUtc,
-        mode,
-        txn
-      );
+      const [sdkPrice, aiPrice] = await Promise.all([
+        sdkAdapter.price(userId, "BASIC_USAGE", beforeTimestampUtc, mode, txn),
+        aiAdapter.price(userId, "AI_TOKEN_USAGE", beforeTimestampUtc, mode, txn),
+      ]);
 
       if (typeof sdkPrice !== "number" || isNaN(sdkPrice)) {
         throw StorageError.priceCalculationFailed(
@@ -39,14 +36,6 @@ export async function calculatePaymentPrice(
           new Error(`Invalid SDK price value returned: ${sdkPrice}`)
         );
       }
-
-      const aiPrice = await aiAdapter.price(
-        userId,
-        "AI_TOKEN_USAGE",
-        beforeTimestampUtc,
-        mode,
-        txn
-      );
 
       if (typeof aiPrice !== "number" || isNaN(aiPrice)) {
         throw StorageError.priceCalculationFailed(
