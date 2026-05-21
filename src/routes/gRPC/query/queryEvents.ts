@@ -6,6 +6,7 @@ import {
   AggregationRow,
 } from "../../../gen/query/v1/query";
 import { queryEventsSchema } from "../../../zod/query";
+import { AuthError } from "../../../errors/auth";
 import { EventError } from "../../../errors/event";
 import { formatZodError } from "../../../utils/formatZodError";
 import { StorageAdapterFactory } from "../../../factory";
@@ -14,7 +15,7 @@ import type {
   QueryResponse,
 } from "../../../interface/storage/Storage";
 import type { WideEventBuilder } from "../../../context/requestContext";
-import { apiKeyContextKey } from "../../../context/auth";
+import { apiKeyContextKey, type AuthContext } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import type { ContextUnaryCall } from "../../../interface/types/context.js";
 
@@ -33,9 +34,14 @@ export async function queryEvents(
       queryConditions: countConditions(queryRequest.where),
     });
 
+    const auth = call[apiKeyContextKey];
+    if (!auth) {
+      return callback?.(AuthError.invalidAPIKey("API key context not found"));
+    }
+
     const adapter =
       await StorageAdapterFactory.getEventStorageAdapter("BASIC_USAGE");
-    const result = await adapter.query(queryRequest);
+    const result = await adapter.query(queryRequest, auth);
 
     const response = buildProtoResponse(result, queryRequest);
     callback?.(null, response);
