@@ -2,7 +2,7 @@ import type { sendUnaryData } from "@grpc/grpc-js";
 import {
   CreateCheckoutLinkRequest,
   CreateCheckoutLinkResponse,
-} from "../../../gen/payment/v1/payment_pb.js";
+} from "../../../gen/payment/v1/payment";
 import {
   createCheckoutLinkSchema,
   type CreateCheckoutLinkSchemaType,
@@ -20,13 +20,15 @@ import {
   type CheckoutResult,
 } from "./paymentProvider.ts";
 import { calculatePaymentPrice } from "../../../services/pricingService";
-import type { WideEventBuilder } from "../../../context/requestContext";
-import { apiKeyContextKey, type AuthContext } from "../../../context/auth";
+import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import type { UserId } from "../../../config/identifiers";
+import { executeInTransaction } from "../../../storage/adapter/postgres/handlers/addEventUtils";
 import { DateTime } from "luxon";
 import { handleAddSession } from "../../../storage/db/postgres/helpers/sessions";
 import { type ContextUnaryCall } from "../../../interface/types/context.ts";
+import { getPostgresDB } from "../../../storage/db/postgres/db";
+import { checkIfExisting } from "../../../storage/db/postgres/helpers/sessions";
 
 export async function createCheckoutLink(
   call: ContextUnaryCall<CreateCheckoutLinkRequest, CreateCheckoutLinkResponse>,
@@ -62,7 +64,10 @@ export async function createCheckoutLink(
     const validatedData = validateRequest(req);
     wideEventBuilder?.setUser(validatedData.userId);
 
+    const db = getPostgresDB();
+
     const beforeTimestamp = DateTime.utc();
+
     const custom_price = await calculatePrice(
       validatedData.userId,
       beforeTimestamp,
@@ -79,21 +84,30 @@ export async function createCheckoutLink(
       mode
     );
 
-    const sessionResult = await handleAddSession(
-      validatedData.userId,
-      checkoutResult.sessionId,
-      beforeTimestamp,
-      auth.apiKeyId,
-      mode,
-      checkoutResult.checkoutUrl
-    );
-    wideEventBuilder?.setPaymentContext({ sessionId: sessionResult.id });
+    const checkoutLink = await executeInTransaction(db, "create checkout link", async (txn) => {
+      const existingId = await checkIfExisting(txn, validatedData.userId, mode)
 
-    const proxyUrl = `${process.env.APP_URL}/checkout/${sessionResult.id}`;
+      if (existingId) {
+        const proxyUrl = `${process.env.APP_URL}/checkout/${existingId}`;
+        return proxyUrl;
+      }
 
-    const response = new CreateCheckoutLinkResponse();
-    response.setCheckoutlink(proxyUrl);
-    callback?.(null, response);
+      const sessionResult = await handleAddSession(
+        validatedData.userId,
+        checkoutResult.sessionId,
+        beforeTimestamp,
+        auth.apiKeyId,
+        mode,
+        checkoutResult.checkoutUrl,
+        txn
+      );
+      wideEventBuilder?.setPaymentContext({ sessionId: sessionResult.id });
+
+      const proxyUrl = `${process.env.APP_URL}/checkout/${sessionResult.id}`;
+      return proxyUrl;
+    });
+
+    callback?.(null, CreateCheckoutLinkResponse.create({ checkoutLink }));
   } catch (error) {
     callback?.(error as Error);
   }
@@ -104,7 +118,7 @@ function validateRequest(
 ): CreateCheckoutLinkSchemaType {
   try {
     const json = {
-      userId: req.getUserid(),
+      userId: req.userId,
     };
     return createCheckoutLinkSchema.parse(json);
   } catch (error) {
