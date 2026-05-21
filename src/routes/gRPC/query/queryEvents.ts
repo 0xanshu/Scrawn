@@ -14,7 +14,7 @@ import type {
   QueryResponse,
 } from "../../../interface/storage/Storage";
 import type { WideEventBuilder } from "../../../context/requestContext";
-import { apiKeyContextKey } from "../../../context/auth";
+import { apiKeyContextKey, type AuthContext } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
 import type { ContextUnaryCall } from "../../../interface/types/context.js";
 
@@ -33,9 +33,10 @@ export async function queryEvents(
       queryConditions: countConditions(queryRequest.where),
     });
 
+    const auth = call[apiKeyContextKey] as AuthContext | undefined;
     const adapter =
       await StorageAdapterFactory.getEventStorageAdapter("BASIC_USAGE");
-    const result = await adapter.query(queryRequest);
+    const result = await adapter.query(queryRequest, auth!);
 
     const response = buildProtoResponse(result, queryRequest);
     callback?.(null, response);
