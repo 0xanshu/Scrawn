@@ -17,7 +17,7 @@ export function getDodoClient(mode?: "test" | "production"): DodoPayments {
       liveClient = new DodoPayments({
         bearerToken: apiKey,
         environment: "live_mode",
-        webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SIGNING_SECRET,
+        webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SECRET,
       });
     }
     return liveClient;
@@ -31,7 +31,7 @@ export function getDodoClient(mode?: "test" | "production"): DodoPayments {
     testClient = new DodoPayments({
       bearerToken: apiKey,
       environment: "test_mode",
-      webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SIGNING_SECRET,
+      webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SECRET,
     });
   }
   return testClient;
