@@ -1,8 +1,8 @@
 import { getPostgresDB } from "../db";
 import { sessionsTable } from "../schema";
-import { eq } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { StorageError } from "../../../../errors/storage";
-import type { DateTime } from "luxon";
+import { DateTime } from "luxon";
 import type { UserId } from "../../../../config/identifiers";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
@@ -20,6 +20,43 @@ export async function markSessionProcessed(
   } catch (e) {
     throw StorageError.queryFailed(
       "Failed to mark session as processed",
+      e instanceof Error ? e : new Error(String(e))
+    );
+  }
+}
+
+export async function checkIfExistingCheckoutLink(
+  txn: PgTransaction<any, any, any>,
+  userId: UserId,
+  mode: "test" | "production"
+): Promise<string | undefined> {
+  try {
+    if (!txn) {
+      throw StorageError.invalidData("Missing transaction in checkIfExisting");
+    }
+
+    const [existing] = await txn
+      .select()
+      .from(sessionsTable)
+      .where(
+        and(
+          eq(sessionsTable.userId, userId),
+          eq(sessionsTable.processed, false),
+          eq(sessionsTable.mode, mode),
+          sql`${sessionsTable.createdAt} > ${DateTime.utc().minus({ hours: 24 }).toISO()}`
+        )
+      )
+      .limit(1)
+      .for("update");
+
+    return existing?.id;
+  } catch (e) {
+    if (e instanceof Error && e.name === "StorageError") {
+      throw e;
+    }
+
+    throw StorageError.queryFailed(
+      "Failed to check for existing session",
       e instanceof Error ? e : new Error(String(e))
     );
   }
