@@ -44,6 +44,9 @@ export async function executeInTransaction<T>(
         e instanceof Error ? e : new Error(String(e))
       );
     }
+    if (e instanceof StorageError) {
+      throw e;
+    }
     throw StorageError.transactionFailed(
       `Transaction failed while ${operationName}`,
       e instanceof Error ? e : new Error(String(e))

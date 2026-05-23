@@ -1,5 +1,6 @@
 import type { ServerReadableStream, sendUnaryData } from "@grpc/grpc-js";
 import * as Sentry from "@sentry/bun";
+import { ZodError } from "zod";
 import {
   StreamEventRequest,
   StreamEventResponse,
@@ -26,10 +27,23 @@ function getFailureCode(err: unknown): string {
     if (err.type === "UNSUPPORTED_EVENT_TYPE") return "UNSUPPORTED_EVENT_TYPE";
     return "VALIDATION_FAILED";
   }
-  if (err && typeof err === "object" && (err as Error).name === "ZodError") {
+  if (err instanceof ZodError) {
     return "VALIDATION_FAILED";
   }
   return "INTERNAL_ERROR";
+}
+
+function publicMessageForCode(code: string): string {
+  switch (code) {
+    case "DUPLICATE_IDEMPOTENCY_KEY": return "Duplicate idempotency key";
+    case "VALIDATION_FAILED": return "Event validation failed";
+    case "INVALID_DATA": return "Invalid event data";
+    case "INVALID_TIMESTAMP": return "Invalid event timestamp";
+    case "PRICE_CALCULATION_FAILED": return "Price calculation failed";
+    case "UNSUPPORTED_EVENT_TYPE": return "Unsupported event type";
+    case "STORAGE_FAILURE": return "Storage error";
+    default: return "Internal server error";
+  }
 }
 
 export async function streamEvents(
@@ -75,18 +89,23 @@ export async function streamEvents(
         await storeEvent(event, auth);
         eventsProcessed++;
       } catch (innerError) {
+        const errorCode = getFailureCode(innerError);
+
         Sentry.addBreadcrumb({
           category: "streamEvents",
-          message: `Event processing failed: ${innerError instanceof Error ? innerError.message : String(innerError)}`,
+          message: `Event [${eventIndex}] processing failed: ${innerError instanceof Error ? innerError.message : String(innerError)}`,
+          data: { eventIndex, idempotencyKey: req.idempotencyKey || "<unknown>" },
           level: "error",
         });
-        Sentry.captureException(innerError);
+        Sentry.captureException(innerError, {
+          extra: { eventIndex, idempotencyKey: req.idempotencyKey || "<unknown>", errorCode },
+        });
 
         const failure = EventFailure.create();
         failure.eventIndex = eventIndex;
         failure.idempotencyKey = req.idempotencyKey || "<unknown>";
-        failure.errorCode = getFailureCode(innerError);
-        failure.message = innerError instanceof Error ? innerError.message : String(innerError);
+        failure.errorCode = errorCode;
+        failure.message = publicMessageForCode(errorCode);
         failures.push(failure);
       }
 
