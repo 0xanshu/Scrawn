@@ -130,6 +130,10 @@ export async function handleDodoWebhook(
     }
 
     if (session.processed !== "pending") {
+      Sentry.captureMessage(
+        `Webhook received for session ${checkout_session_id} with non-pending status: ${session.processed}`,
+        { level: "warning" }
+      );
       return ignoredResponse(builder);
     }
 
@@ -141,7 +145,13 @@ export async function handleDodoWebhook(
         claimed = await updateSessionStatus(checkout_session_id, "failed", txn);
         if (!claimed) return;
       });
-      if (!claimed) return ignoredResponse(builder);
+      if (!claimed) {
+        Sentry.captureMessage(
+          `Session ${checkout_session_id} already processed (failed path), no rows updated`,
+          { level: "warning" }
+        );
+        return ignoredResponse(builder);
+      }
 
       builder.setSuccess(200);
     }
@@ -161,7 +171,13 @@ export async function handleDodoWebhook(
         await updateUserBilledTimestamp(userId, billed_upto, txn);
         await handleAddPayment(userId, creditAmount, apiKeyId, mode, txn);
       });
-      if (!claimed) return ignoredResponse(builder);
+      if (!claimed) {
+        Sentry.captureMessage(
+          `Session ${checkout_session_id} already processed (succeeded path), no rows updated`,
+          { level: "warning" }
+        );
+        return ignoredResponse(builder);
+      }
 
       builder.setUser(userId);
       builder.setPaymentContext({ creditAmount });
