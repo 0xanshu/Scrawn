@@ -38,9 +38,11 @@ export const usersRelation = relations(usersTable, ({ many }) => ({
 export const sessionsTable = pgTable(
   "sessions",
   {
-    id: uuid("id").primaryKey().defaultRandom(),
+    proxy_link_id: uuid("proxy_link_id").primaryKey().defaultRandom(),
     sessionId: text("session_id").notNull().unique(),
-    processed: boolean("processed").default(false),
+    processed: text("processed", { enum: ["pending", "failed", "succeeded"] })
+      .default("pending")
+      .notNull(),
     userId: USER_ID_CONFIG.dbType("user_id")
       .references(() => usersTable.id)
       .notNull(),
@@ -71,6 +73,10 @@ export const sessionRelations = relations(sessionsTable, ({ one }) => ({
   user: one(usersTable, {
     fields: [sessionsTable.userId],
     references: [usersTable.id],
+  }),
+  apiKey: one(apiKeysTable, {
+    fields: [sessionsTable.apiKeyId],
+    references: [apiKeysTable.id],
   }),
 }));
 
