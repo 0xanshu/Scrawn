@@ -136,14 +136,12 @@ export async function handleDodoWebhook(
     const db = getPostgresDB();
 
     if (webhookPayload.type === "payment.failed") {
+      let claimed: boolean = false;
       await executeInTransaction(db, "process failed", async (txn) => {
-        const claimed = await updateSessionStatus(
-          checkout_session_id,
-          "failed",
-          txn
-        );
+        claimed = await updateSessionStatus(checkout_session_id, "failed", txn);
         if (!claimed) return;
       });
+      if (!claimed) return ignoredResponse(builder);
 
       builder.setSuccess(200);
     }
@@ -151,9 +149,10 @@ export async function handleDodoWebhook(
     if (webhookPayload.type === "payment.succeeded") {
       const creditAmount = Math.round(webhookPayload.data.total_amount);
       const { userId, billed_upto, apiKeyId, mode } = session;
+      let claimed: boolean = false;
 
       await executeInTransaction(db, "process checkout", async (txn) => {
-        const claimed = await updateSessionStatus(
+        claimed = await updateSessionStatus(
           checkout_session_id,
           "succeeded",
           txn
@@ -162,6 +161,7 @@ export async function handleDodoWebhook(
         await updateUserBilledTimestamp(userId, billed_upto, txn);
         await handleAddPayment(userId, creditAmount, apiKeyId, mode, txn);
       });
+      if (!claimed) return ignoredResponse(builder);
 
       builder.setUser(userId);
       builder.setPaymentContext({ creditAmount });
