@@ -6,6 +6,7 @@ import { getDodoClient } from "../gRPC/payment/paymentProvider.ts";
 import {
   getSessionByCheckoutId,
   markSessionProcessed,
+  markSessionFailed,
 } from "../../storage/db/postgres/helpers/sessions";
 import { updateUserBilledTimestamp } from "../../storage/db/postgres/helpers/users";
 import { getPostgresDB } from "../../storage/db/postgres/db";
@@ -95,12 +96,14 @@ export async function handleDodoWebhook(
       );
     }
 
-    if (webhookPayload.type !== "payment.succeeded") {
+    if (
+      webhookPayload.type !== "payment.failed" &&
+      webhookPayload.type !== "payment.succeeded"
+    ) {
       return ignoredResponse(builder);
     }
 
     const { payment_id, checkout_session_id } = webhookPayload.data;
-    const creditAmount = Math.round(webhookPayload.data.total_amount);
 
     builder.setWebhookContext({
       webhookEvent: webhookPayload.type,
@@ -127,25 +130,35 @@ export async function handleDodoWebhook(
       );
     }
 
-    if (session.processed) {
+    if (session.processed !== "pending") {
       return ignoredResponse(builder);
     }
 
-    const userId = session.userId;
-    const billedUpto = session.billed_upto;
-    const apiKeyId = session.apiKeyId;
-    const mode = session.mode;
-
     const db = getPostgresDB();
-    await executeInTransaction(db, "process checkout", async (txn) => {
-      await updateUserBilledTimestamp(userId, billedUpto, txn);
-      await handleAddPayment(userId, creditAmount, apiKeyId, mode, txn);
-      await markSessionProcessed(checkout_session_id, txn);
-    });
 
-    builder.setUser(userId);
-    builder.setPaymentContext({ creditAmount });
-    builder.setSuccess(200);
+    if (webhookPayload.type === "payment.failed") {
+      await executeInTransaction(db, "process failed", async (txn) => {
+        await markSessionFailed(checkout_session_id, txn);
+      });
+
+      builder.setSuccess(200);
+    }
+
+    if (webhookPayload.type === "payment.succeeded") {
+      const creditAmount = Math.round(webhookPayload.data.total_amount);
+      const { userId, billed_upto, apiKeyId, mode } = session;
+
+      await executeInTransaction(db, "process checkout", async (txn) => {
+        await updateUserBilledTimestamp(userId, billed_upto, txn);
+        await handleAddPayment(userId, creditAmount, apiKeyId, mode, txn);
+        await markSessionProcessed(checkout_session_id, txn);
+      });
+
+      builder.setUser(userId);
+      builder.setPaymentContext({ creditAmount });
+      builder.setSuccess(200);
+    }
+
     return okResponse("Webhook processed successfully");
   } catch (error) {
     Sentry.captureException(error, {

@@ -15,11 +15,30 @@ export async function markSessionProcessed(
   try {
     await db
       .update(sessionsTable)
-      .set({ processed: true })
+      .set({ processed: "succeeded" })
       .where(eq(sessionsTable.sessionId, checkoutSessionId));
   } catch (e) {
     throw StorageError.queryFailed(
       "Failed to mark session as processed",
+      e instanceof Error ? e : new Error(String(e))
+    );
+  }
+}
+
+export async function markSessionFailed(
+  checkoutSessionId: string,
+  txn?: PgTransaction<any, any, any>
+): Promise<void> {
+  const db = txn ?? getPostgresDB();
+
+  try {
+    await db
+      .update(sessionsTable)
+      .set({ processed: "failed" })
+      .where(eq(sessionsTable.sessionId, checkoutSessionId));
+  } catch (e) {
+    throw StorageError.queryFailed(
+      "Failed to mark session as failed",
       e instanceof Error ? e : new Error(String(e))
     );
   }
@@ -41,7 +60,7 @@ export async function checkIfExistingCheckoutLink(
       .where(
         and(
           eq(sessionsTable.userId, userId),
-          eq(sessionsTable.processed, false),
+          eq(sessionsTable.processed, "pending"),
           eq(sessionsTable.mode, mode),
           sql`${sessionsTable.createdAt} > ${DateTime.utc().minus({ hours: 24 }).toISO()}`
         )
