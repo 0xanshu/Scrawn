@@ -5,41 +5,59 @@ import { logger } from "../errors/logger";
 import { getMetadata, tryClaimWebhookFire } from "../storage/db/postgres/helpers/metadata";
 import { getPostgresDB } from "../storage/db/postgres/db";
 
+const WEBHOOK_TIMEOUT_MS = 15_000;
+
 export class OnboardingScheduler {
   private tasks: ScheduledTask[] = [];
+  private reloading = false;
 
   async start(): Promise<void> {
     await this.reload();
   }
 
   async reload(): Promise<void> {
-    this.stop();
-
-    const metadata = await getMetadata();
-
-    if (!metadata) {
+    if (this.reloading) {
       return;
     }
 
-    const expressions = metadata.payment_cron
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean);
+    this.reloading = true;
 
-    for (const expr of expressions) {
-      if (!cron.validate(expr)) {
-        logger.lifecycleWarning(`[scheduler] Invalid cron expression: ${expr}`);
-        continue;
+    try {
+      const metadata = await getMetadata();
+
+      if (!metadata) {
+        return;
       }
 
-      const task = cron.schedule(expr, () => {
-        this.fireWebhook(metadata.id).catch((e) => {
-          const err = e instanceof Error ? e : new Error(String(e));
-          logger.fatal(`[scheduler] Unhandled error: ${err.message}`, err);
-        });
-      });
+      const nextTasks: ScheduledTask[] = [];
 
-      this.tasks.push(task);
+      for (const expr of metadata.payment_cron) {
+        if (!cron.validate(expr)) {
+          logger.lifecycleWarning(`[scheduler] Invalid cron expression: ${expr}`);
+          continue;
+        }
+
+        const task = cron.schedule(
+          expr,
+          () => {
+            this.fireWebhook(metadata.id).catch((e) => {
+              const err = e instanceof Error ? e : new Error(String(e));
+              logger.fatal(`[scheduler] Unhandled error: ${err.message}`, err);
+            });
+          },
+          { timezone: "UTC" }
+        );
+
+        nextTasks.push(task);
+      }
+
+      this.stop();
+      this.tasks = nextTasks;
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      logger.fatal(`[scheduler] Reload failed: ${err.message}`, err);
+    } finally {
+      this.reloading = false;
     }
   }
 
@@ -55,6 +73,8 @@ export class OnboardingScheduler {
     }
 
     const timestamp = DateTime.utc().toISO();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), WEBHOOK_TIMEOUT_MS);
 
     try {
       const response = await fetch(webhookUrl, {
@@ -63,11 +83,12 @@ export class OnboardingScheduler {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({ timestamp }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
         logger.fatal(
-          `[scheduler] Webhook failed: ${response.status} ${response.statusText}`
+          `[scheduler] Webhook failed: ${response.status} ${response.statusText} — ${webhookUrl}`
         );
         return;
       }
@@ -75,7 +96,17 @@ export class OnboardingScheduler {
       logger.lifecycle(`[scheduler] Webhook triggered at ${timestamp}`);
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
-      logger.fatal(`[scheduler] Webhook error: ${err.message}`, err);
+
+      if (err.name === "AbortError") {
+        logger.fatal(
+          `[scheduler] Webhook timed out after ${WEBHOOK_TIMEOUT_MS}ms — ${webhookUrl}`
+        );
+        return;
+      }
+
+      logger.fatal(`[scheduler] Webhook error: ${err.message} — ${webhookUrl}`, err);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 

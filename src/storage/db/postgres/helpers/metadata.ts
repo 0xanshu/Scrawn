@@ -7,7 +7,7 @@ import { DateTime } from "luxon";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 type UpsertMetadataInput = {
-  payment_cron: string;
+  payment_cron: string[];
   payment_webhook: string | null;
 };
 
@@ -18,8 +18,8 @@ export async function upsertMetadata(
 
   const { payment_cron: paymentCron, payment_webhook: paymentWebhook } = input;
 
-  if (!paymentCron || paymentCron.trim().length === 0) {
-    throw StorageError.invalidData("Invalid payment_cron: value is required");
+  if (!paymentCron || paymentCron.length === 0) {
+    throw StorageError.invalidData("Invalid payment_cron: at least one expression is required");
   }
 
   if (paymentWebhook !== null && typeof paymentWebhook !== "string") {

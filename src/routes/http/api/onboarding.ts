@@ -30,7 +30,7 @@ export async function handleOnboarding(
         : null;
 
     await upsertMetadata({
-      payment_cron: validated.crons.join(","),
+      payment_cron: validated.crons,
       payment_webhook: webhookUrl,
     });
 

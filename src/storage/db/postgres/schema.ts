@@ -238,7 +238,7 @@ export const tagsTable = pgTable("tags", {
 
 export const metadataTable = pgTable("metadata", {
   id: uuid("id").primaryKey().defaultRandom(),
-  payment_cron: text("payment_cron").notNull(),
+  payment_cron: jsonb("payment_cron").$type<string[]>().notNull(),
   payment_webhook: text("payment_webhook"),
   last_run_at: timestamp("last_run_at", {
     withTimezone: true,
