@@ -13,11 +13,16 @@ export const HTTP_TEST_PORT = 18070;
 export const GRPC_ADDRESS = `localhost:${GRPC_TEST_PORT}`;
 export const HTTP_BASE = `http://localhost:${HTTP_TEST_PORT}`;
 
+type CreateTestApiKeyResult = {
+  rawKey: string;
+  id: (typeof apiKeysTable.$inferSelect)["id"];
+};
+
 export async function httpPost(
   path: string,
   body: unknown,
   headers?: Record<string, string>
-) {
+): Promise<Response> {
   return fetch(`${HTTP_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", ...headers },
@@ -27,7 +32,7 @@ export async function httpPost(
 
 export async function createTestApiKey(
   overrides?: Partial<typeof apiKeysTable.$inferInsert>
-) {
+): Promise<CreateTestApiKeyResult> {
   const db = getPostgresDB();
   const prefix = "scrn_test_";
   const randomPart = crypto.randomUUID().replace(/-/g, "").slice(0, 32);

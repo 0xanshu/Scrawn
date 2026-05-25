@@ -4,8 +4,8 @@ import { resolve } from "node:path";
 import type { FastifyInstance } from "fastify";
 import type * as grpc from "@grpc/grpc-js";
 
-let fastifyServer: FastifyInstance;
-let grpcServer: grpc.Server;
+let fastifyServer: FastifyInstance | undefined;
+let grpcServer: grpc.Server | undefined;
 
 beforeAll(async () => {
   config({ path: resolve(process.cwd(), ".env.test"), override: true });
@@ -20,6 +20,6 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  await fastifyServer.close();
-  grpcServer.forceShutdown();
+  await fastifyServer?.close();
+  grpcServer?.forceShutdown();
 });

@@ -10,6 +10,7 @@ import {
   createTestApiKey,
   GRPC_ADDRESS,
 } from "./helpers";
+import { DateTime } from "luxon";
 
 describe("EventService", () => {
   let rawKey: string;
@@ -27,27 +28,29 @@ describe("EventService", () => {
     const metadata = new grpc.Metadata();
     metadata.set("authorization", `Bearer ${rawKey}`);
 
-    const response = await new Promise<{ random: string }>((resolve, reject) => {
-      client.registerEvent(
-        {
-          type: EventType.BASIC_USAGE,
-          userId: crypto.randomUUID(),
-          reportedTimestamp: Math.floor(Date.now() / 1000),
-          eventId: crypto.randomUUID(),
-          idempotencyKey: crypto.randomUUID(),
-          basicUsage: {
-            basicUsageType: BasicUsageType.RAW,
-            amount: 100,
+    const response = await new Promise<{ random: string }>(
+      (resolve, reject) => {
+        client.registerEvent(
+          {
+            type: EventType.BASIC_USAGE,
+            userId: crypto.randomUUID(),
+            reportedTimestamp: Math.floor(DateTime.utc().toSeconds()),
+            eventId: crypto.randomUUID(),
+            idempotencyKey: crypto.randomUUID(),
+            basicUsage: {
+              basicUsageType: BasicUsageType.RAW,
+              amount: 100,
+            },
           },
-        },
-        metadata,
-        (error, res) => {
-          client.close();
-          if (error) reject(error);
-          else resolve(res);
-        }
-      );
-    });
+          metadata,
+          (error, res) => {
+            client.close();
+            if (error) reject(error);
+            else resolve(res);
+          }
+        );
+      }
+    );
 
     expect(response.random).toBe("Event stored successfully");
   });

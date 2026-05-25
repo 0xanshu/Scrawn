@@ -1,11 +1,14 @@
-import { fastify } from "fastify";
+import { fastify, type FastifyInstance } from "fastify";
 import fastifyRawBody from "fastify-raw-body";
 import { registerWebhookRoutes } from "../routes/http/registerWebhookRoutes.ts";
 import { registerApiRoutes } from "../routes/http/api/registerApiRoutes.ts";
 import { handleCheckoutRedirect } from "../routes/http/checkoutRedirect.ts";
 import { logger } from "../errors/logger.ts";
 
-export async function startFastifyServer(port: number, grpcPort: number) {
+export async function startFastifyServer(
+  port: number,
+  grpcPort: number
+): Promise<FastifyInstance> {
   const server = fastify();
 
   await server.register(fastifyRawBody, {
@@ -20,9 +23,12 @@ export async function startFastifyServer(port: number, grpcPort: number) {
     return "Hello World!";
   });
 
-  server.get<{ Params: { sessionId: string } }>("/checkout/:sessionId", async (request, reply) => {
-    await handleCheckoutRedirect(request, reply);
-  });
+  server.get<{ Params: { sessionId: string } }>(
+    "/checkout/:sessionId",
+    async (request, reply) => {
+      await handleCheckoutRedirect(request, reply);
+    }
+  );
 
   await registerWebhookRoutes(server);
   await registerApiRoutes(server);
