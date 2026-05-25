@@ -3,8 +3,7 @@ import { getPostgresDB } from "./storage/db/postgres/db.ts";
 import { logger } from "./errors/logger.ts";
 import { startRawGrpcServer, type GrpcTlsOptions } from "./servers/rawGrpcServer.ts";
 import { startFastifyServer } from "./servers/fastifyServer.ts";
-import { OnboardingWorker } from "./workers/onboarding.ts";
-import { getRedisConnection } from "./storage/db/redis.ts";
+import { initScheduler, type OnboardingScheduler } from "./schedulers/onboarding.ts";
 import { getClickHouseDB } from "./storage/db/clickhouse.ts";
 import { readFileSync } from "node:fs";
 import * as Sentry from "@sentry/bun";
@@ -33,7 +32,6 @@ process.on("unhandledRejection", (reason) => {
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const HMAC_SECRET = process.env.HMAC_SECRET;
-const REDIS_URL = process.env.REDIS_URL;
 const CLICKHOUSE_URL = process.env.CLICKHOUSE_URL;
 
 if (STORAGE_ADAPTER === "postgres") {
@@ -48,13 +46,6 @@ if (!HMAC_SECRET) {
   logger.fatal("HMAC_SECRET environment variable is not set");
   throw new Error("HMAC_SECRET environment variable is not set");
 }
-
-if (!REDIS_URL) {
-  logger.fatal("REDIS_URL environment variable is not set");
-  throw new Error("REDIS_URL environment variable is not set");
-}
-
-getRedisConnection(REDIS_URL);
 
 if (STORAGE_ADAPTER === "clickhouse") {
   if (!CLICKHOUSE_URL) {
@@ -101,7 +92,7 @@ function loadGrpcTlsOptions(): GrpcTlsOptions | undefined {
   };
 }
 
-let onboardingWorker: OnboardingWorker | undefined;
+let onboardingScheduler: OnboardingScheduler | undefined;
 
 async function main(): Promise<void> {
   const tlsOptions = loadGrpcTlsOptions();
@@ -114,13 +105,14 @@ async function main(): Promise<void> {
     );
   }
 
-  onboardingWorker = new OnboardingWorker();
-  logger.lifecycle("Onboarding worker started");
+  onboardingScheduler = initScheduler();
+  await onboardingScheduler.start();
+  logger.lifecycle("Onboarding scheduler started");
 }
 
 process.on("beforeExit", async () => {
-  if (onboardingWorker) {
-    await onboardingWorker.close();
+  if (onboardingScheduler) {
+    onboardingScheduler.stop();
   }
   await Sentry.flush(2000);
 });
