@@ -240,6 +240,10 @@ export const metadataTable = pgTable("metadata", {
   id: uuid("id").primaryKey().defaultRandom(),
   payment_cron: text("payment_cron").notNull(),
   payment_webhook: text("payment_webhook"),
+  last_run_at: timestamp("last_run_at", {
+    withTimezone: true,
+    mode: "string",
+  }),
 });
 
 export const expressionsTable = pgTable("expressions", {

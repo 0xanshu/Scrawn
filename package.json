@@ -20,6 +20,7 @@
     "@types/bun": "^1.3.14",
     "@types/expr-eval": "^1.1.2",
     "@types/luxon": "^3.7.1",
+    "@types/node-cron": "^3.0.11",
     "@vitest/ui": "^4.1.6",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
@@ -38,14 +39,15 @@
     "@clickhouse/client": "^1.18.5",
     "@grpc/grpc-js": "^1.14.3",
     "@sentry/bun": "^10.53.1",
-    "bullmq": "^5.76.8",
+
     "dodopayments": "^2.31.2",
     "drizzle-orm": "^0.45.2",
     "expr-eval": "^2.0.2",
     "fastify": "^5.8.5",
     "fastify-raw-body": "^5.0.0",
-    "ioredis": "^5.10.1",
+
     "luxon": "^3.7.2",
+    "node-cron": "^4.2.1",
     "pino": "^10.3.1",
     "postgres": "^3.4.9",
     "zod": "^4.4.3"

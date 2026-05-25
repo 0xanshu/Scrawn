@@ -2,7 +2,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import * as Sentry from "@sentry/bun";
 import { ZodError } from "zod";
 import { onboardingCronSchema } from "../../../zod/internals.ts";
-import { addOnboardingCronJob } from "../../../queues/onboarding.ts";
+import { reloadScheduler } from "../../../schedulers/onboarding.ts";
 import {
   createWideEventBuilder,
   generateRequestId,
@@ -24,29 +24,24 @@ export async function handleOnboarding(
     const body = await request.body;
     const validated = onboardingCronSchema.parse(body);
 
-    const crons: string[] = [];
-
-    for (const cronExpression of validated.crons) {
-      await addOnboardingCronJob(cronExpression);
-      crons.push(cronExpression);
-    }
-
     const webhookUrl =
       validated.webhookUrl && validated.webhookUrl !== ""
         ? validated.webhookUrl
         : null;
 
     await upsertMetadata({
-      payment_cron: crons.join(","),
+      payment_cron: validated.crons.join(","),
       payment_webhook: webhookUrl,
     });
 
+    await reloadScheduler();
+
     builder.setSuccess(200).addContext({
-      cronCount: crons.length,
+      cronCount: validated.crons.length,
     });
 
     reply.code(201);
-    return { crons };
+    return { crons: validated.crons };
   } catch (error) {
     Sentry.captureException(error, {
       extra: { context: "onboarding route handler" },

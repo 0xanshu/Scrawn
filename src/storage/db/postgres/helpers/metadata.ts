@@ -1,8 +1,10 @@
 import { getPostgresDB } from "../db";
 import { metadataTable } from "../schema";
 import { StorageError } from "../../../../errors/storage";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { executeInTransaction } from "../../../adapter/postgres/handlers/addEventUtils";
+import { DateTime } from "luxon";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 
 type UpsertMetadataInput = {
   payment_cron: string;
@@ -55,4 +57,46 @@ export async function upsertMetadata(
       );
     }
   });
+}
+
+export async function getMetadata(): Promise<
+  typeof metadataTable.$inferSelect | undefined
+> {
+  const db = getPostgresDB();
+  const [metadata] = await db.select().from(metadataTable).limit(1);
+  return metadata;
+}
+
+export async function tryClaimWebhookFire(
+  txn: PgTransaction<any, any, any>,
+  metadataId: string
+): Promise<string | null> {
+  const [metadata] = await txn.execute(
+    sql`SELECT id, payment_webhook, last_run_at FROM ${metadataTable} WHERE ${eq(metadataTable.id, metadataId)} FOR UPDATE`
+  ) as unknown as Array<{
+    id: string;
+    payment_webhook: string | null;
+    last_run_at: string | null;
+  }>;
+
+  if (!metadata?.payment_webhook) {
+    return null;
+  }
+
+  if (metadata.last_run_at) {
+    const lastRun = DateTime.fromISO(metadata.last_run_at, {
+      zone: "utc",
+    });
+    const minutesSince = DateTime.utc().diff(lastRun, "minutes").minutes;
+    if (minutesSince < 30) {
+      return null;
+    }
+  }
+
+  await txn
+    .update(metadataTable)
+    .set({ last_run_at: DateTime.utc().toISO() })
+    .where(eq(metadataTable.id, metadata.id));
+
+  return metadata.payment_webhook;
 }
