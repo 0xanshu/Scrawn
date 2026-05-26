@@ -101,7 +101,7 @@ function buildAiTokenInsertValues(
     ingestedTimestamp: DateTime.utc().toString(),
     userId: aggEvent.userId,
     apiKeyId: auth.apiKeyId,
-    mode: auth.mode,
+    mode: auth.mode as "production" | "test",
     model: aggEvent.model,
     provider: aggEvent.provider,
     metrics: metricsSchema.parse({

@@ -5,7 +5,7 @@ import type { ApiKeyRole } from "./keyFormat";
 interface CachedAPIKey {
   id: string;
   role: ApiKeyRole;
-  mode: "production" | "test";
+  mode: "production" | "test" | null;
   expiresAt: string;
 }
 

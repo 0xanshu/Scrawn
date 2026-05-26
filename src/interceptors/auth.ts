@@ -95,9 +95,6 @@ export function authInterceptor<Req, Res>(
     }
 
     const mode = getModeForRole(role);
-    if (!mode) {
-      return callback?.(AuthError.permissionDenied(`No mode mapping for role: ${role}`));
-    }
     const apiKeyHash = hashAPIKey(apiKey);
 
     const cached = apiKeyCache.get(apiKeyHash);
@@ -139,11 +136,6 @@ export function authInterceptor<Req, Res>(
         }
 
         const recordMode = getModeForRole(apiKeyRecord.role as ApiKeyRole);
-        if (!recordMode) {
-          return callback?.(
-            AuthError.permissionDenied(`No mode mapping for role: ${apiKeyRecord.role}`)
-          );
-        }
 
         apiKeyCache.set(apiKeyHash, {
           id: apiKeyRecord.id,
