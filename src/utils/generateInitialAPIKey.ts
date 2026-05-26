@@ -62,3 +62,5 @@ export function generateInitialApiKeyData(): InitialApiKeyData {
     authorizationHeader: `Authorization: Bearer ${apiKey}`,
   };
 }
+
+console.log(generateInitialApiKeyData());

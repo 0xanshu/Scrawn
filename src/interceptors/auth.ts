@@ -19,7 +19,11 @@ import { apiKeysTable } from "../storage/db/postgres/schema";
 import { eq } from "drizzle-orm";
 import { hashAPIKey } from "../utils/hashAPIKey";
 import { DateTime } from "luxon";
-import { parseRoleFromApiKey, getModeForRole, isValidApiKeyFormat } from "../utils/keyFormat";
+import {
+  parseRoleFromApiKey,
+  getModeForRole,
+  isValidApiKeyFormat,
+} from "../utils/keyFormat";
 import type { ApiKeyRole } from "../utils/keyFormat";
 
 const no_auth: string[] = [];
@@ -86,7 +90,9 @@ export function authInterceptor<Req, Res>(
     const role = parseRoleFromApiKey(apiKey);
     if (!role) {
       return callback?.(
-        AuthError.invalidAPIKey("Invalid key prefix — expected scrn_dash_, scrn_live_, or scrn_test_")
+        AuthError.invalidAPIKey(
+          "Invalid key prefix — expected scrn_dash_, scrn_live_, or scrn_test_"
+        )
       );
     }
 
@@ -95,16 +101,15 @@ export function authInterceptor<Req, Res>(
     }
 
     const mode = getModeForRole(role);
-    if (!mode) {
-      return callback?.(AuthError.permissionDenied(`No mode mapping for role: ${role}`));
-    }
     const apiKeyHash = hashAPIKey(apiKey);
 
     const cached = apiKeyCache.get(apiKeyHash);
     if (cached) {
       if (cached.role !== role) {
         return callback?.(
-          AuthError.roleMismatch(`Key prefix ${role} doesn't match stored role ${cached.role}`)
+          AuthError.roleMismatch(
+            `Key prefix ${role} doesn't match stored role ${cached.role}`
+          )
         );
       }
       call[apiKeyContextKey] = {
@@ -126,7 +131,10 @@ export function authInterceptor<Req, Res>(
           return callback?.(AuthError.revokedAPIKey());
         }
 
-        if (DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })) {
+        if (
+          DateTime.utc() >
+          DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })
+        ) {
           return callback?.(AuthError.expiredAPIKey());
         }
 
@@ -139,11 +147,6 @@ export function authInterceptor<Req, Res>(
         }
 
         const recordMode = getModeForRole(apiKeyRecord.role as ApiKeyRole);
-        if (!recordMode) {
-          return callback?.(
-            AuthError.permissionDenied(`No mode mapping for role: ${apiKeyRecord.role}`)
-          );
-        }
 
         apiKeyCache.set(apiKeyHash, {
           id: apiKeyRecord.id,

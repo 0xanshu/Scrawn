@@ -80,7 +80,7 @@ export function startRawGrpcServer(
   ) as GrpcUntypedHandler;
 
   server.addService(authGrpc.AuthServiceService, {
-    createAPIKey: wrappedCreateAPIKey,
+    createApiKey: wrappedCreateAPIKey,
   });
 
   server.addService(eventGrpc.EventServiceService, {

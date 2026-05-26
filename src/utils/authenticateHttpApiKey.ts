@@ -3,7 +3,11 @@ import { apiKeyCache } from "./apiKeyCache";
 import { findApiKeyByHash } from "../storage/db/postgres/helpers/apiKeys";
 import { hashAPIKey } from "./hashAPIKey";
 import { DateTime } from "luxon";
-import { parseRoleFromApiKey, isValidApiKeyFormat, getModeForRole } from "./keyFormat";
+import {
+  parseRoleFromApiKey,
+  isValidApiKeyFormat,
+  getModeForRole,
+} from "./keyFormat";
 import type { ApiKeyRole } from "./keyFormat";
 import type { AuthContext } from "../context/auth";
 
@@ -53,7 +57,9 @@ export async function authenticateHttpApiKey(
     throw AuthError.revokedAPIKey();
   }
 
-  if (DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })) {
+  if (
+    DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })
+  ) {
     throw AuthError.expiredAPIKey();
   }
 
@@ -65,9 +71,6 @@ export async function authenticateHttpApiKey(
 
   const recordRole = apiKeyRecord.role as ApiKeyRole;
   const mode = getModeForRole(recordRole);
-  if (!mode) {
-    throw AuthError.permissionDenied(`No mode mapping for role: ${recordRole}`);
-  }
 
   apiKeyCache.set(apiKeyHash, {
     id: apiKeyRecord.id,
