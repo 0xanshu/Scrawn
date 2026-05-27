@@ -6,14 +6,25 @@ import {
   BasicUsageType,
 } from "../gen/event/v1/event";
 import {
-  grpcCredentials,
-  grpcMetadata,
-  createTestApiKey,
-  registerEvent,
-  verifyBasicUsageEventStored,
   GRPC_ADDRESS,
-} from "./helpers";
+  grpcInsecureCredentials,
+  grpcMetadata,
+  registerEvent,
+} from "./fixtures/grpc";
+import { createTestApiKey } from "./fixtures/apiKey";
+import { verifyBasicUsageEventStored } from "./assertions/events";
 import { DateTime } from "luxon";
+
+function makeEventPayload() {
+  return {
+    type: EventType.BASIC_USAGE,
+    userId: crypto.randomUUID(),
+    reportedTimestamp: Math.floor(DateTime.utc().toSeconds()),
+    eventId: crypto.randomUUID(),
+    idempotencyKey: crypto.randomUUID(),
+    basicUsage: { basicUsageType: BasicUsageType.RAW, amount: 100 },
+  };
+}
 
 describe("EventService", () => {
   let client: EventServiceClient;
@@ -21,7 +32,7 @@ describe("EventService", () => {
   let apiKeyId: string;
 
   beforeAll(async () => {
-    client = new EventServiceClient(GRPC_ADDRESS, grpcCredentials());
+    client = new EventServiceClient(GRPC_ADDRESS, grpcInsecureCredentials);
     const key = await createTestApiKey();
     rawKey = key.rawKey;
     apiKeyId = key.id;
@@ -33,14 +44,7 @@ describe("EventService", () => {
 
   describe("registerEvent", () => {
     it("stores a basic usage event with correct data", async () => {
-      const payload = {
-        type: EventType.BASIC_USAGE,
-        userId: crypto.randomUUID(),
-        reportedTimestamp: Math.floor(DateTime.utc().toSeconds()),
-        eventId: crypto.randomUUID(),
-        idempotencyKey: crypto.randomUUID(),
-        basicUsage: { basicUsageType: BasicUsageType.RAW, amount: 100 },
-      };
+      const payload = makeEventPayload();
 
       const res = await registerEvent(
         client,
@@ -62,18 +66,7 @@ describe("EventService", () => {
 
     it("rejects unauthenticated requests", async () => {
       await expect(
-        registerEvent(
-          client,
-          {
-            type: EventType.BASIC_USAGE,
-            userId: crypto.randomUUID(),
-            reportedTimestamp: Math.floor(DateTime.utc().toSeconds()),
-            eventId: crypto.randomUUID(),
-            idempotencyKey: crypto.randomUUID(),
-            basicUsage: { basicUsageType: BasicUsageType.RAW, amount: 100 },
-          },
-          new Metadata()
-        )
+        registerEvent(client, makeEventPayload(), new Metadata())
       ).rejects.toThrow("Missing Authorization header");
     });
 
@@ -81,14 +74,7 @@ describe("EventService", () => {
       await expect(
         registerEvent(
           client,
-          {
-            type: EventType.BASIC_USAGE,
-            userId: crypto.randomUUID(),
-            reportedTimestamp: Math.floor(DateTime.utc().toSeconds()),
-            eventId: crypto.randomUUID(),
-            idempotencyKey: crypto.randomUUID(),
-            basicUsage: { basicUsageType: BasicUsageType.RAW, amount: 100 },
-          },
+          makeEventPayload(),
           grpcMetadata("Bearer bad_key")
         )
       ).rejects.toThrow("Invalid API key");
