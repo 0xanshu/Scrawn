@@ -1,53 +1,50 @@
 import * as grpc from "@grpc/grpc-js";
+import type {
+  EventServiceClient,
+  RegisterEventRequest,
+  RegisterEventResponse,
+} from "../gen/event/v1/event";
 import { getPostgresDB } from "../storage/db/postgres/db";
 import { apiKeysTable } from "../storage/db/postgres/schema";
 import { hashAPIKey } from "../utils/hashAPIKey";
 import { DateTime } from "luxon";
 
-export function createGrpcCredentials(): grpc.ChannelCredentials {
+export const GRPC_ADDRESS = "localhost:18069";
+
+export function grpcCredentials(): grpc.ChannelCredentials {
   return grpc.credentials.createInsecure();
 }
 
-export const GRPC_TEST_PORT = 18069;
-export const HTTP_TEST_PORT = 18070;
-export const GRPC_ADDRESS = `localhost:${GRPC_TEST_PORT}`;
-export const HTTP_BASE = `http://localhost:${HTTP_TEST_PORT}`;
+export function grpcMetadata(authHeader: string): grpc.Metadata {
+  const metadata = new grpc.Metadata();
+  metadata.set("authorization", authHeader);
+  return metadata;
+}
 
-type CreateTestApiKeyResult = {
-  rawKey: string;
-  id: (typeof apiKeysTable.$inferSelect)["id"];
-};
-
-export async function httpPost(
-  path: string,
-  body: unknown,
-  headers?: Record<string, string>
-): Promise<Response> {
-  return fetch(`${HTTP_BASE}${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...headers },
-    body: JSON.stringify(body),
+export function registerEvent(
+  client: EventServiceClient,
+  request: RegisterEventRequest,
+  metadata: grpc.Metadata
+): Promise<RegisterEventResponse> {
+  return new Promise((resolve, reject) => {
+    client.registerEvent(request, metadata, (error, res) => {
+      if (error) reject(error);
+      else if (!res) reject(new Error("empty response"));
+      else resolve(res);
+    });
   });
 }
 
-export async function createTestApiKey(
-  overrides?: Partial<typeof apiKeysTable.$inferInsert>
-): Promise<CreateTestApiKeyResult> {
+export async function createTestApiKey(): Promise<{
+  rawKey: string;
+}> {
   const db = getPostgresDB();
-  const prefix = "scrn_test_";
-  const randomPart = crypto.randomUUID().replace(/-/g, "").slice(0, 32);
-  const rawKey = `${prefix}${randomPart}`;
-  const hashed = hashAPIKey(rawKey);
-  const [key] = await db
-    .insert(apiKeysTable)
-    .values({
-      name: "test-key",
-      key: hashed,
-      role: "test",
-      expiresAt: DateTime.utc().plus({ years: 1 }).toISO(),
-      ...overrides,
-    })
-    .returning({ id: apiKeysTable.id });
-
-  return { rawKey, id: key!.id };
+  const rawKey = `scrn_test_${crypto.randomUUID().replace(/-/g, "").slice(0, 32)}`;
+  await db.insert(apiKeysTable).values({
+    name: `test-key-${crypto.randomUUID()}`,
+    key: hashAPIKey(rawKey),
+    role: "test",
+    expiresAt: DateTime.utc().plus({ years: 1 }).toISO(),
+  });
+  return { rawKey };
 }

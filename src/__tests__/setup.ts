@@ -13,6 +13,11 @@ beforeAll(async () => {
   const { getPostgresDB } = await import("../storage/db/postgres/db");
   getPostgresDB(process.env.DATABASE_URL);
 
+  if (process.env.STORAGE_ADAPTER === "clickhouse") {
+    const { getClickHouseDB } = await import("../storage/db/clickhouse");
+    getClickHouseDB(process.env.CLICKHOUSE_URL);
+  }
+
   const { startRawGrpcServer } = await import("../servers/rawGrpcServer");
   const { startFastifyServer } = await import("../servers/fastifyServer");
   grpcServer = await startRawGrpcServer(18069);
