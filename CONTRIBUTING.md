@@ -11,8 +11,6 @@ Thank you for your interest in contributing! This document covers everything you
 - [Scripts Reference](#scripts-reference)
 - [Submitting a Pull Request](#submitting-a-pull-request)
 
----
-
 ## Development Setup
 
 ### Prerequisites
@@ -71,7 +69,7 @@ Thank you for your interest in contributing! This document covers everything you
 
 ## Project Structure
 
-```
+```text
 src/
   config/           — env parsing and constants
   errors/           — typed error classes and the WideEventLogger
@@ -172,7 +170,7 @@ The test suite spins up gRPC (`:18069`) and Fastify (`:18070`) servers internall
 
 ### Test structure
 
-```
+```text
 src/__tests__/
   fixtures/
     grpc.ts          — gRPC client helpers and typed RPC wrappers

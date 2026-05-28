@@ -21,7 +21,7 @@ Scrawn is a self-hostable billing backend built on [Bun](https://bun.sh), [Drizz
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/0xanshu/Scrawn.git
+git clone https://github.com/ScrawnDotDev/Scrawn.git
 cd Scrawn
 bun install
 ```
