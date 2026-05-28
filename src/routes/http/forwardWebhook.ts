@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/bun";
-import { createSign, createPrivateKey, randomUUID } from "node:crypto";
+import { createPrivateKey, randomUUID, sign } from "node:crypto";
 import { getPostgresDB } from "../../storage/db/postgres/db";
 import { getWebhookEndpointByApiKeyId } from "../../storage/db/postgres/helpers/webhookEndpoints";
 import { webhookDeliveriesTable } from "../../storage/db/postgres/schema";
@@ -16,13 +16,8 @@ function normalizePem(pem: string): string {
 
 function signPayload(payload: string, privateKeyPem: string): string {
   const normalizedPem = normalizePem(privateKeyPem);
-
-  const signer = createSign("ed25519");
-  signer.update(payload);
-  signer.end();
-
   const privateKey = createPrivateKey(normalizedPem);
-  return signer.sign(privateKey, "base64");
+  return sign(null, Buffer.from(payload), privateKey).toString("base64");
 }
 
 function buildSignedPayload(
@@ -66,6 +61,7 @@ export async function forwardWebhook(
     signature = signPayload(signedPayload, endpoint.privateKey);
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Signing failed";
+    console.error("[forwardWebhook] Signing failed:", errorMsg);
     Sentry.captureException(error, {
       extra: { context: "webhook signing failed", error: errorMsg },
     });
@@ -97,6 +93,7 @@ export async function forwardWebhook(
 
     if (!response.ok) {
       errorMessage = `Webhook returned non-2xx status: ${response.status}`;
+      console.error("[forwardWebhook] Non-2xx response:", response.status);
       Sentry.captureMessage(errorMessage, {
         level: "warning",
         extra: { endpointId: endpoint.id, webhookId },
@@ -106,6 +103,7 @@ export async function forwardWebhook(
     const fetchErrorMsg =
       error instanceof Error ? error.message : "Unknown webhook delivery error";
     errorMessage = fetchErrorMsg;
+    console.error("[forwardWebhook] Delivery failed:", fetchErrorMsg);
     Sentry.captureException(error, {
       extra: {
         context: "webhook delivery failed",
