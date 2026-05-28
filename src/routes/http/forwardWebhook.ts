@@ -61,7 +61,6 @@ export async function forwardWebhook(
     signature = signPayload(signedPayload, endpoint.privateKey);
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : "Signing failed";
-    console.error("[forwardWebhook] Signing failed:", errorMsg);
     Sentry.captureException(error, {
       extra: { context: "webhook signing failed", error: errorMsg },
     });
@@ -93,22 +92,19 @@ export async function forwardWebhook(
 
     if (!response.ok) {
       errorMessage = `Webhook returned non-2xx status: ${response.status}`;
-      console.error("[forwardWebhook] Non-2xx response:", response.status);
       Sentry.captureMessage(errorMessage, {
         level: "warning",
         extra: { endpointId: endpoint.id, webhookId },
       });
     }
   } catch (error) {
-    const fetchErrorMsg =
+    errorMessage =
       error instanceof Error ? error.message : "Unknown webhook delivery error";
-    errorMessage = fetchErrorMsg;
-    console.error("[forwardWebhook] Delivery failed:", fetchErrorMsg);
     Sentry.captureException(error, {
       extra: {
         context: "webhook delivery failed",
         endpointId: endpoint.id,
-        error: fetchErrorMsg,
+        error: errorMessage,
       },
     });
   }
