@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/bun";
-import { createSign, randomUUID } from "node:crypto";
+import { createSign, createPrivateKey, randomUUID } from "node:crypto";
 import { getPostgresDB } from "../../storage/db/postgres/db";
 import { getWebhookEndpointByApiKeyId } from "../../storage/db/postgres/helpers/webhookEndpoints";
 import { webhookDeliveriesTable } from "../../storage/db/postgres/schema";
@@ -10,11 +10,19 @@ function generateWebhookId(): string {
   return `msg_${randomUUID().replace(/-/g, "")}`;
 }
 
+function normalizePem(pem: string): string {
+  return pem.replace(/\\n/g, "\n");
+}
+
 function signPayload(payload: string, privateKeyPem: string): string {
+  const normalizedPem = normalizePem(privateKeyPem);
+
   const signer = createSign("ed25519");
   signer.update(payload);
   signer.end();
-  return signer.sign(privateKeyPem, "base64");
+
+  const privateKey = createPrivateKey(normalizedPem);
+  return signer.sign(privateKey, "base64");
 }
 
 function buildSignedPayload(
@@ -57,11 +65,12 @@ export async function forwardWebhook(
   try {
     signature = signPayload(signedPayload, endpoint.privateKey);
   } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : "Signing failed";
     Sentry.captureException(error, {
-      extra: { context: "webhook signing failed" },
+      extra: { context: "webhook signing failed", error: errorMsg },
     });
     await recordDelivery(endpoint.id, webhookId, event, "failed", {
-      error: "Signing failed",
+      error: errorMsg,
     });
     return;
   }
@@ -94,10 +103,15 @@ export async function forwardWebhook(
       });
     }
   } catch (error) {
-    errorMessage =
+    const fetchErrorMsg =
       error instanceof Error ? error.message : "Unknown webhook delivery error";
+    errorMessage = fetchErrorMsg;
     Sentry.captureException(error, {
-      extra: { context: "webhook delivery failed", endpointId: endpoint.id },
+      extra: {
+        context: "webhook delivery failed",
+        endpointId: endpoint.id,
+        error: fetchErrorMsg,
+      },
     });
   }
 
