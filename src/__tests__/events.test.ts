@@ -13,6 +13,7 @@ import {
 } from "./fixtures/grpc";
 import { createTestApiKey } from "./fixtures/apiKey";
 import { verifyBasicUsageEventStored } from "./assertions/events";
+import { clearDatabase } from "./db";
 import { DateTime } from "luxon";
 
 function makeEventPayload() {
@@ -38,7 +39,8 @@ describe("EventService", () => {
     apiKeyId = key.id;
   });
 
-  afterAll(() => {
+  afterAll(async () => {
+    await clearDatabase();
     client.close();
   });
 
