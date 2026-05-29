@@ -280,6 +280,10 @@ export const webhookEndpointsTable = pgTable(
     })
       .defaultNow()
       .notNull(),
+    deletedAt: timestamp("deleted_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
   },
   (table) => ({
     uniqueApiKey: uniqueIndex("unique_webhook_api_key").on(table.apiKeyId),
