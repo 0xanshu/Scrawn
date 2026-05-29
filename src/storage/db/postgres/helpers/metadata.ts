@@ -6,9 +6,15 @@ import { executeInTransaction } from "../../../adapter/postgres/handlers/addEven
 import { DateTime } from "luxon";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
-type UpsertMetadataInput = {
-  payment_cron: string[];
-  payment_webhook: string | null;
+export type UpsertMetadataInput = {
+  payment_cron?: string[];
+  payment_webhook?: string | null;
+  dodo_live_api_key?: string | null;
+  dodo_test_api_key?: string | null;
+  dodo_product_id?: string;
+  dodo_webhook_secret?: string | null;
+  currency?: string;
+  redirect_url?: string;
 };
 
 export async function upsertMetadata(
@@ -16,21 +22,23 @@ export async function upsertMetadata(
 ): Promise<void> {
   const db = getPostgresDB();
 
-  const { payment_cron: paymentCron, payment_webhook: paymentWebhook } = input;
-
-  if (!paymentCron || paymentCron.length === 0) {
-    throw StorageError.invalidData(
-      "Invalid payment_cron: at least one expression is required"
-    );
+  if (input.payment_cron !== undefined) {
+    if (
+      !input.payment_cron ||
+      input.payment_cron.length === 0 ||
+      input.payment_cron.some((e) => !e || e.trim().length === 0)
+    ) {
+      throw StorageError.invalidData(
+        "Invalid payment_cron: at least one non-empty expression is required"
+      );
+    }
   }
 
-  if (paymentCron.some((e) => !e || e.trim().length === 0)) {
-    throw StorageError.invalidData(
-      "Invalid payment_cron: each expression must be a non-empty string"
-    );
-  }
-
-  if (paymentWebhook !== null && typeof paymentWebhook !== "string") {
+  if (
+    input.payment_webhook !== undefined &&
+    input.payment_webhook !== null &&
+    typeof input.payment_webhook !== "string"
+  ) {
     throw StorageError.invalidData(
       "Invalid payment_webhook: must be a string or null"
     );
@@ -43,21 +51,38 @@ export async function upsertMetadata(
         .from(metadataTable)
         .limit(1);
 
+      const setValues: Record<string, unknown> = {};
+      if (input.payment_cron !== undefined)
+        setValues.payment_cron = input.payment_cron;
+      if (input.payment_webhook !== undefined)
+        setValues.payment_webhook = input.payment_webhook;
+      if (input.dodo_live_api_key !== undefined)
+        setValues.dodo_live_api_key = input.dodo_live_api_key;
+      if (input.dodo_test_api_key !== undefined)
+        setValues.dodo_test_api_key = input.dodo_test_api_key;
+      if (input.dodo_product_id !== undefined)
+        setValues.dodo_product_id = input.dodo_product_id;
+      if (input.dodo_webhook_secret !== undefined)
+        setValues.dodo_webhook_secret = input.dodo_webhook_secret;
+      if (input.currency !== undefined) setValues.currency = input.currency;
+      if (input.redirect_url !== undefined)
+        setValues.redirect_url = input.redirect_url;
+
       if (existingMetadata) {
-        await txn
-          .update(metadataTable)
-          .set({
-            payment_cron: paymentCron,
-            payment_webhook: paymentWebhook,
-          })
-          .where(eq(metadataTable.id, existingMetadata.id));
+        if (Object.keys(setValues).length > 0) {
+          await txn
+            .update(metadataTable)
+            .set(setValues)
+            .where(eq(metadataTable.id, existingMetadata.id));
+        }
         return;
       }
 
-      await txn.insert(metadataTable).values({
-        payment_cron: paymentCron,
-        payment_webhook: paymentWebhook,
-      });
+      const insertValues: Record<string, unknown> = {
+        payment_cron: input.payment_cron ?? [],
+        ...setValues,
+      };
+      await txn.insert(metadataTable).values(insertValues);
     } catch (e) {
       throw StorageError.insertFailed(
         "Failed to upsert metadata record",
