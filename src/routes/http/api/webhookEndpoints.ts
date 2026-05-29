@@ -15,6 +15,8 @@ import {
   upsertWebhookEndpoint,
   deleteWebhookEndpoint,
 } from "../../../storage/db/postgres/helpers/webhookEndpoints.ts";
+import { forwardWebhook } from "../forwardWebhook.ts";
+import { DateTime } from "luxon";
 
 function getCreateEndpointSchema(mode: "test" | "production" | null) {
   if (mode === "test") {
@@ -201,6 +203,81 @@ export async function handleDeleteWebhookEndpoint(
   } catch (error) {
     Sentry.captureException(error, {
       extra: { context: "delete webhook endpoint handler" },
+    });
+
+    if (error instanceof AuthError) {
+      builder.setError(401, { type: error.type, message: error.message });
+      reply.code(401);
+      return { error: error.message };
+    }
+
+    const err = error instanceof Error ? error : new Error(String(error));
+    builder.setError(500, { type: "InternalError", message: err.message });
+    reply.code(500);
+    return { error: "Internal server error" };
+  } finally {
+    logger.emit(builder.build());
+  }
+}
+
+export async function handleSendTestWebhook(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<MessageResponse | { error: string }> {
+  const builder = createWideEventBuilder(
+    generateRequestId(),
+    request.method,
+    request.url
+  );
+
+  try {
+    const auth = await authenticateHttpApiKey(request.headers.authorization);
+    builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
+
+    if (auth.role !== "test") {
+      builder.setError(403, {
+        type: "PermissionDenied",
+        message: "Only test API keys can send test webhooks",
+      });
+      reply.code(403);
+      return { error: "Only test API keys can send test webhooks" };
+    }
+
+    const endpoint = await getWebhookEndpointByApiKeyId(auth.apiKeyId);
+
+    if (!endpoint) {
+      builder.setError(404, {
+        type: "NotFoundError",
+        message: "No webhook endpoint configured for this API key",
+      });
+      reply.code(404);
+      return { error: "No webhook endpoint configured for this API key" };
+    }
+
+    const now = DateTime.utc();
+
+    await forwardWebhook(auth.apiKeyId, {
+      eventType: "payment.succeeded",
+      resource: "payment",
+      action: "succeeded",
+      data: {
+        paymentId: "test_pay_000000000000000000000",
+        checkoutSessionId: "test_cks_0000000000000000000",
+        userId: "test-user-00000000-0000-0000-0000-000000000000",
+        amount: 1000,
+        currency: "usd",
+        mode: "test",
+        billed_upto: now.toISO(),
+        createdAt: now.toISO(),
+      },
+    });
+
+    builder.setSuccess(200);
+    reply.code(200);
+    return { message: "Test webhook sent" };
+  } catch (error) {
+    Sentry.captureException(error, {
+      extra: { context: "send test webhook handler" },
     });
 
     if (error instanceof AuthError) {
