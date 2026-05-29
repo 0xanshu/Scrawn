@@ -5,6 +5,34 @@ import { eq } from "drizzle-orm";
 import { executeInTransaction } from "../../../adapter/postgres/handlers/addEventUtils";
 import { DateTime } from "luxon";
 import type { PgTransaction } from "drizzle-orm/pg-core";
+import {
+  encrypt,
+  decrypt,
+  isEncrypted,
+} from "../../../../utils/encryptMetadata";
+
+const DODO_FIELDS = [
+  "dodo_live_api_key",
+  "dodo_test_api_key",
+  "dodo_webhook_secret",
+] as const;
+
+function decryptRow<T extends Record<string, unknown>>(row: T): T {
+  const result = { ...row };
+  for (const field of DODO_FIELDS) {
+    const value = result[field];
+    if (typeof value === "string") {
+      if (isEncrypted(value)) {
+        try {
+          (result as Record<string, unknown>)[field] = decrypt(value);
+        } catch {
+          // leave as-is (e.g. plaintext from migration)
+        }
+      }
+    }
+  }
+  return result;
+}
 
 export type UpsertMetadataInput = {
   payment_cron?: string[];
@@ -57,13 +85,19 @@ export async function upsertMetadata(
       if (input.payment_webhook !== undefined)
         setValues.payment_webhook = input.payment_webhook;
       if (input.dodo_live_api_key !== undefined)
-        setValues.dodo_live_api_key = input.dodo_live_api_key;
+        setValues.dodo_live_api_key = input.dodo_live_api_key
+          ? encrypt(input.dodo_live_api_key)
+          : null;
       if (input.dodo_test_api_key !== undefined)
-        setValues.dodo_test_api_key = input.dodo_test_api_key;
+        setValues.dodo_test_api_key = input.dodo_test_api_key
+          ? encrypt(input.dodo_test_api_key)
+          : null;
       if (input.dodo_product_id !== undefined)
         setValues.dodo_product_id = input.dodo_product_id;
       if (input.dodo_webhook_secret !== undefined)
-        setValues.dodo_webhook_secret = input.dodo_webhook_secret;
+        setValues.dodo_webhook_secret = input.dodo_webhook_secret
+          ? encrypt(input.dodo_webhook_secret)
+          : null;
       if (input.currency !== undefined) setValues.currency = input.currency;
       if (input.redirect_url !== undefined)
         setValues.redirect_url = input.redirect_url;
@@ -97,7 +131,8 @@ export async function getMetadata(): Promise<
 > {
   const db = getPostgresDB();
   const [metadata] = await db.select().from(metadataTable).limit(1);
-  return metadata;
+  if (!metadata) return undefined;
+  return decryptRow(metadata);
 }
 
 export async function tryClaimWebhookFire(
