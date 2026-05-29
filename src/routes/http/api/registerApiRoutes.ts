@@ -6,6 +6,7 @@ import {
   handleCreateWebhookEndpoint,
   handleGetWebhookEndpoint,
   handleDeleteWebhookEndpoint,
+  handleSendTestWebhook,
   handleGetPublicKey,
 } from "./webhookEndpoints.ts";
 
@@ -58,6 +59,13 @@ export async function registerApiRoutes(
     "/api/v1/internals/webhook-endpoint/public-key",
     async (request: FastifyRequest, reply: FastifyReply) => {
       return handleGetPublicKey(request, reply);
+    }
+  );
+
+  server.post(
+    "/api/v1/internals/webhook-endpoint/send-test",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleSendTestWebhook(request, reply);
     }
   );
 }
