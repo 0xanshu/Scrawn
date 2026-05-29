@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/bun";
 import { createPrivateKey, randomUUID, sign } from "node:crypto";
+import { DateTime } from "luxon";
 import { getPostgresDB } from "../../storage/db/postgres/db";
 import { getWebhookEndpointByApiKeyId } from "../../storage/db/postgres/helpers/webhookEndpoints";
 import { webhookDeliveriesTable } from "../../storage/db/postgres/schema";
@@ -46,11 +47,12 @@ export async function forwardWebhook(
   }
 
   const webhookId = generateWebhookId();
-  const timestamp = Math.floor(Date.now() / 1000);
+  const now = DateTime.utc();
+  const timestamp = Math.floor(now.toSeconds());
 
   const body = JSON.stringify({
     type: event.eventType,
-    timestamp: new Date(timestamp * 1000).toISOString(),
+    timestamp: now.toISO(),
     data: event.data,
   });
 

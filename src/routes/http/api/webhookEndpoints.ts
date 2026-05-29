@@ -16,9 +16,23 @@ import {
   deleteWebhookEndpoint,
 } from "../../../storage/db/postgres/helpers/webhookEndpoints.ts";
 
-const createEndpointSchema = z.object({
-  url: z.string().url("Must be a valid URL").max(2048, "URL too long"),
-});
+function getCreateEndpointSchema(mode: "test" | "production" | null) {
+  if (mode === "test") {
+    return z.object({
+      url: z.string().url("Must be a valid URL").max(2048, "URL too long"),
+    });
+  }
+
+  return z.object({
+    url: z
+      .string()
+      .url("Must be a valid URL")
+      .max(2048, "URL too long")
+      .refine((val) => val.startsWith("https://"), {
+        message: "Only HTTPS URLs are allowed in production mode",
+      }),
+  });
+}
 
 interface WebhookEndpointResponse {
   id: string;
@@ -69,7 +83,8 @@ export async function handleCreateWebhookEndpoint(
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
     const body = await request.body;
-    const validated = createEndpointSchema.parse(body);
+    const schema = getCreateEndpointSchema(auth.mode);
+    const validated = schema.parse(body);
 
     const keyPair = generateWebhookKeyPair();
 
@@ -182,7 +197,7 @@ export async function handleDeleteWebhookEndpoint(
 
     builder.setSuccess(200);
     reply.code(200);
-    return { message: "Webhook endpoint deleted" };
+    return { message: "Webhook endpoint disabled" };
   } catch (error) {
     Sentry.captureException(error, {
       extra: { context: "delete webhook endpoint handler" },
