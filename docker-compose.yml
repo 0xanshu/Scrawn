@@ -13,6 +13,7 @@ services:
       - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./scrawn.init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -54,9 +55,25 @@ services:
       DATABASE_URL: postgres://postgres:postgres@db:5432/scrawn
       CLICKHOUSE_URL: http://default:clickhouse@clickhouse:8123/scrawn
       NODE_ENV: production
+      HMAC_SECRET: ${HMAC_SECRET}
     volumes:
       - .:/app
       - /app/node_modules
+
+  dashboard:
+    image: scrawndotdev/dashboard:latest
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/dashboard
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: http://localhost:3000
+      SCRAWN_BASE_URL: http://server:8069
+      SCRAWN_KEY: ${SCRAWN_KEY}
 
 volumes:
   pgdata:
