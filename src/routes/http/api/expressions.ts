@@ -8,12 +8,17 @@ import {
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
 import { AuthError } from "../../../errors/auth.ts";
+import { EventError } from "../../../errors/event.ts";
 import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
 import {
   listExpressions,
   createExpression,
   deleteExpression,
 } from "../../../storage/db/postgres/helpers/expressions.ts";
+import {
+  validateExprSyntax,
+  resolveExprRefsInExpression,
+} from "../../../utils/parseExpr.ts";
 
 const createExpressionSchema = z.object({
   key: z.string().min(1, "Expression key is required").max(128),
@@ -84,6 +89,9 @@ export async function handleCreateExpression(
     const body = await request.body;
     const validated = createExpressionSchema.parse(body);
 
+    validateExprSyntax(validated.expr);
+    await resolveExprRefsInExpression(validated.expr);
+
     await createExpression(validated.key, validated.expr);
 
     builder.setSuccess(200);
@@ -107,6 +115,15 @@ export async function handleCreateExpression(
       builder.setError(400, { type: "ValidationError", message: issues });
       reply.code(400);
       return { error: issues };
+    }
+
+    if (error instanceof EventError) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: error.message,
+      });
+      reply.code(400);
+      return { error: error.message };
     }
 
     const err = error instanceof Error ? error : new Error(String(error));
