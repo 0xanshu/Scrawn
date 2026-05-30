@@ -1,45 +1,61 @@
 import DodoPayments from "dodopayments";
 import { PaymentError } from "../../../errors/payment";
+import { getMetadata } from "../../../storage/db/postgres/helpers/metadata";
 
 let liveClient: DodoPayments | null = null;
 let testClient: DodoPayments | null = null;
 
-export function getDodoClient(mode?: "test" | "production"): DodoPayments {
+function clearClients(): void {
+  liveClient = null;
+  testClient = null;
+}
+
+export async function getDodoClient(
+  mode?: "test" | "production"
+): Promise<DodoPayments> {
   if (!mode) {
     mode = process.env.NODE_ENV === "production" ? "production" : "test";
   }
-  if (mode === "production") {
-    if (!liveClient) {
-      const apiKey = process.env.DODO_PAYMENTS_LIVE_API_KEY;
-      if (!apiKey) {
-        throw PaymentError.missingApiKey();
-      }
-      liveClient = new DodoPayments({
-        bearerToken: apiKey,
-        environment: "live_mode",
-        webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SECRET,
-      });
-    }
-    return liveClient;
-  }
 
-  if (!testClient) {
-    const apiKey = process.env.DODO_PAYMENTS_TEST_API_KEY;
+  if (mode === "production") {
+    if (liveClient) return liveClient;
+
+    const metadata = await getMetadata();
+    const apiKey = metadata?.dodo_live_api_key;
     if (!apiKey) {
       throw PaymentError.missingApiKey();
     }
-    testClient = new DodoPayments({
+
+    liveClient = new DodoPayments({
       bearerToken: apiKey,
-      environment: "test_mode",
-      webhookKey: process.env.DODO_PAYMENTS_WEBHOOK_SECRET,
+      environment: "live_mode",
+      webhookKey: metadata?.dodo_webhook_secret ?? undefined,
     });
+    return liveClient;
   }
+
+  if (testClient) return testClient;
+
+  const metadata = await getMetadata();
+  const apiKey = metadata?.dodo_test_api_key;
+  if (!apiKey) {
+    throw PaymentError.missingApiKey();
+  }
+
+  testClient = new DodoPayments({
+    bearerToken: apiKey,
+    environment: "test_mode",
+    webhookKey: metadata?.dodo_webhook_secret ?? undefined,
+  });
   return testClient;
 }
 
+// Re-export for callers who need to invalidate cached clients after onboarding updates
+export { clearClients };
+
 export interface PaymentProviderConfig {
   productId: string;
-  returnUrl: string;
+  returnUrl: string | null;
 }
 
 export interface CheckoutParams {
@@ -53,9 +69,11 @@ export interface CheckoutResult {
   checkoutUrl: string;
 }
 
-export function getPaymentProviderConfig(): PaymentProviderConfig {
-  const productId = process.env.DODO_PAYMENTS_PRODUCT_ID;
-  const returnUrl = `${process.env.REDIRECT_URL}`;
+export async function getPaymentProviderConfig(): Promise<PaymentProviderConfig> {
+  const metadata = await getMetadata();
+
+  const productId = metadata?.dodo_product_id;
+  const returnUrl = metadata?.redirect_url ?? null;
 
   if (!productId) {
     throw PaymentError.missingProductId();
@@ -69,7 +87,7 @@ export async function createProviderCheckout(
   params: CheckoutParams,
   mode: "test" | "production"
 ): Promise<CheckoutResult> {
-  const client = getDodoClient(mode);
+  const client = await getDodoClient(mode);
 
   const session = await client.checkoutSessions.create({
     product_cart: [
@@ -83,7 +101,7 @@ export async function createProviderCheckout(
       user_id: params.userId,
       api_key_id: params.apiKeyId,
     },
-    return_url: config.returnUrl,
+    ...(config.returnUrl ? { return_url: config.returnUrl } : {}),
   });
 
   if (!session.checkout_url) {
