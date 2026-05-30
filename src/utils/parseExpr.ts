@@ -30,7 +30,17 @@ const TAG_PATTERN = /tag\(([A-Z_][A-Z0-9_]*)\)/g;
 const EXPR_PATTERN = /expr\(([A-Z_][A-Z0-9_]*)\)/g;
 
 // Allowed function names in expressions
-const ALLOWED_FUNCTIONS = new Set(["add", "sub", "mul", "div", "tag", "expr"]);
+const ALLOWED_FUNCTIONS = new Set([
+  "add",
+  "sub",
+  "mul",
+  "div",
+  "tag",
+  "expr",
+  "inputTokens",
+  "outputTokens",
+  "outputCacheTokens",
+]);
 
 /**
  * Token context passed from AI token usage event handlers.
