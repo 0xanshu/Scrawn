@@ -32,7 +32,7 @@ const createApiKeySchema = z.object({
     .int()
     .min(60)
     .max(365 * 24 * 60 * 60),
-  webhookUrl: z.string().url("Invalid webhook URL").max(2048).optional(),
+  webhookUrl: z.string().url("Invalid webhook URL").max(2048),
 });
 
 export async function handleCreateApiKey(
@@ -64,23 +64,14 @@ export async function handleCreateApiKey(
       expiresAt: expiresAt.toISO(),
     });
 
-    let webhookEndpoint: Record<string, unknown> | null = null;
-
-    if (validated.webhookUrl) {
-      const keyPair = generateWebhookKeyPair();
-      const endpoint = await upsertWebhookEndpoint(
-        keyRecord.id,
-        validated.webhookUrl,
-        keyPair.privateKeyPem,
-        keyPair.publicKeyPrefixed
-      );
-      invalidateWebhookEndpointCache(keyRecord.id);
-      webhookEndpoint = {
-        id: endpoint.id,
-        url: endpoint.url,
-        publicKey: endpoint.publicKey,
-      };
-    }
+    const keyPair = generateWebhookKeyPair();
+    const endpoint = await upsertWebhookEndpoint(
+      keyRecord.id,
+      validated.webhookUrl,
+      keyPair.privateKeyPem,
+      keyPair.publicKeyPrefixed
+    );
+    invalidateWebhookEndpointCache(keyRecord.id);
 
     builder.setSuccess(200);
     reply.code(200);
@@ -90,7 +81,11 @@ export async function handleCreateApiKey(
       key: apiKey,
       role: validated.role,
       expiresAt: expiresAt.toISO(),
-      webhookEndpoint,
+      webhookEndpoint: {
+        id: endpoint.id,
+        url: endpoint.url,
+        publicKey: endpoint.publicKey,
+      },
     };
   } catch (error) {
     Sentry.captureException(error, {

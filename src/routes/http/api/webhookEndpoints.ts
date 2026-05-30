@@ -20,20 +20,22 @@ import { forwardWebhook } from "../forwardWebhook.ts";
 import { DateTime } from "luxon";
 
 function getCreateEndpointSchema(mode: "test" | "production" | null) {
-  if (mode === "test") {
-    return z.object({
-      url: z.string().url("Must be a valid URL").max(2048, "URL too long"),
-    });
-  }
+  const urlValidation = z
+    .string()
+    .url("Must be a valid URL")
+    .max(2048, "URL too long");
 
-  return z.object({
-    url: z
-      .string()
-      .url("Must be a valid URL")
-      .max(2048, "URL too long")
-      .refine((val) => val.startsWith("https://"), {
-        message: "Only HTTPS URLs are allowed in production mode",
-      }),
+  const base =
+    mode === "test"
+      ? z.object({ url: urlValidation })
+      : z.object({
+          url: urlValidation.refine((val) => val.startsWith("https://"), {
+            message: "Only HTTPS URLs are allowed in production mode",
+          }),
+        });
+
+  return base.extend({
+    apiKeyId: z.string().uuid("Invalid API key ID").optional(),
   });
 }
 
@@ -41,6 +43,7 @@ interface WebhookEndpointResponse {
   id: string;
   url: string;
   publicKey: string;
+  apiKeyId: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -66,6 +69,7 @@ function toEndpointResponse(
     id: endpoint.id,
     url: endpoint.url,
     publicKey: endpoint.publicKey,
+    apiKeyId: endpoint.apiKeyId,
     createdAt: endpoint.createdAt,
     updatedAt: endpoint.updatedAt,
   };
@@ -89,16 +93,21 @@ export async function handleCreateWebhookEndpoint(
     const schema = getCreateEndpointSchema(auth.mode);
     const validated = schema.parse(body);
 
+    const targetApiKeyId =
+      validated.apiKeyId && auth.role === "dashboard"
+        ? validated.apiKeyId
+        : auth.apiKeyId;
+
     const keyPair = generateWebhookKeyPair();
 
     const endpoint = await upsertWebhookEndpoint(
-      auth.apiKeyId,
+      targetApiKeyId,
       validated.url,
       keyPair.privateKeyPem,
       keyPair.publicKeyPrefixed
     );
 
-    invalidateWebhookEndpointCache(auth.apiKeyId);
+    invalidateWebhookEndpointCache(targetApiKeyId);
 
     builder.setSuccess(200);
     reply.code(200);
