@@ -16,8 +16,11 @@ import { createApiKey } from "../../../storage/db/postgres/helpers/apiKeys";
 import { upsertWebhookEndpoint } from "../../../storage/db/postgres/helpers/webhookEndpoints";
 import { generateWebhookKeyPair } from "../../../utils/generateWebhookKeyPair";
 import { getPostgresDB } from "../../../storage/db/postgres/db";
-import { apiKeysTable } from "../../../storage/db/postgres/schema";
-import { eq, and, isNull, sql } from "drizzle-orm";
+import {
+  apiKeysTable,
+  webhookEndpointsTable,
+} from "../../../storage/db/postgres/schema";
+import { eq, and, isNull, ne, sql } from "drizzle-orm";
 import type { ApiKeyRole } from "../../../utils/keyFormat";
 import { invalidateWebhookEndpointCache } from "../../../interceptors/auth";
 
@@ -140,8 +143,21 @@ export async function handleListApiKeys(
         createdAt: apiKeysTable.createdAt,
         expiresAt: apiKeysTable.expiresAt,
         revoked: apiKeysTable.revoked,
+        webhookUrl: webhookEndpointsTable.url,
+        webhookPublicKey: webhookEndpointsTable.publicKey,
+        webhookEndpointId: webhookEndpointsTable.id,
       })
       .from(apiKeysTable)
+      .leftJoin(
+        webhookEndpointsTable,
+        and(
+          eq(apiKeysTable.id, webhookEndpointsTable.apiKeyId),
+          isNull(webhookEndpointsTable.deletedAt)
+        )
+      )
+      .where(
+        and(ne(apiKeysTable.role, "dashboard"), eq(apiKeysTable.revoked, false))
+      )
       .orderBy(apiKeysTable.createdAt);
 
     builder.setSuccess(200);
