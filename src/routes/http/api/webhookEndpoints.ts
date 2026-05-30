@@ -15,29 +15,19 @@ import {
   upsertWebhookEndpoint,
   deleteWebhookEndpoint,
 } from "../../../storage/db/postgres/helpers/webhookEndpoints.ts";
+import { getApiKeyRoleById } from "../../../storage/db/postgres/helpers/apiKeys.ts";
 import { invalidateWebhookEndpointCache } from "../../../interceptors/auth.ts";
 import { forwardWebhook } from "../forwardWebhook.ts";
 import { DateTime } from "luxon";
 
-function getCreateEndpointSchema(mode: "test" | "production" | null) {
-  const urlValidation = z
-    .string()
-    .url("Must be a valid URL")
-    .max(2048, "URL too long");
+const createEndpointSchema = z.object({
+  url: z.string().url("Must be a valid URL").max(2048, "URL too long"),
+  apiKeyId: z.string().uuid("Invalid API key ID").optional(),
+});
 
-  const base =
-    mode === "test"
-      ? z.object({ url: urlValidation })
-      : z.object({
-          url: urlValidation.refine((val) => val.startsWith("https://"), {
-            message: "Only HTTPS URLs are allowed in production mode",
-          }),
-        });
-
-  return base.extend({
-    apiKeyId: z.string().uuid("Invalid API key ID").optional(),
-  });
-}
+const sendTestSchema = z.object({
+  apiKeyId: z.string().uuid("Invalid API key ID"),
+});
 
 interface WebhookEndpointResponse {
   id: string;
@@ -90,13 +80,52 @@ export async function handleCreateWebhookEndpoint(
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
     const body = await request.body;
-    const schema = getCreateEndpointSchema(auth.mode);
-    const validated = schema.parse(body);
+    const validated = createEndpointSchema.parse(body);
 
     const targetApiKeyId =
       validated.apiKeyId && auth.role === "dashboard"
         ? validated.apiKeyId
         : auth.apiKeyId;
+
+    if (targetApiKeyId !== auth.apiKeyId && auth.role !== "dashboard") {
+      builder.setError(403, {
+        type: "PermissionDenied",
+        message: "Only dashboard keys can set webhooks for other keys",
+      });
+      reply.code(403);
+      return { error: "Only dashboard keys can set webhooks for other keys" };
+    }
+
+    const targetKey = await getApiKeyRoleById(targetApiKeyId);
+    if (!targetKey) {
+      builder.setError(404, {
+        type: "NotFoundError",
+        message: "Target API key not found",
+      });
+      reply.code(404);
+      return { error: "Target API key not found" };
+    }
+
+    if (targetKey.role === "dashboard") {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Cannot set webhook on a dashboard key",
+      });
+      reply.code(400);
+      return { error: "Cannot set webhook on a dashboard key" };
+    }
+
+    if (
+      targetKey.role === "production" &&
+      !validated.url.startsWith("https://")
+    ) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Only HTTPS URLs are allowed for production keys",
+      });
+      reply.code(400);
+      return { error: "Only HTTPS URLs are allowed for production keys" };
+    }
 
     const keyPair = generateWebhookKeyPair();
 
@@ -248,16 +277,38 @@ export async function handleSendTestWebhook(
     const auth = await authenticateHttpApiKey(request.headers.authorization);
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
-    if (auth.role !== "test") {
+    if (auth.role !== "dashboard") {
       builder.setError(403, {
         type: "PermissionDenied",
-        message: "Only test API keys can send test webhooks",
+        message: "Only the dashboard can send test webhooks",
       });
       reply.code(403);
-      return { error: "Only test API keys can send test webhooks" };
+      return { error: "Only the dashboard can send test webhooks" };
     }
 
-    const endpoint = await getWebhookEndpointByApiKeyId(auth.apiKeyId);
+    const body = await request.body;
+    const validated = sendTestSchema.parse(body);
+
+    const targetKey = await getApiKeyRoleById(validated.apiKeyId);
+    if (!targetKey) {
+      builder.setError(404, {
+        type: "NotFoundError",
+        message: "API key not found",
+      });
+      reply.code(404);
+      return { error: "API key not found" };
+    }
+
+    if (targetKey.role !== "test") {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Can only send test webhooks to test API keys",
+      });
+      reply.code(400);
+      return { error: "Can only send test webhooks to test API keys" };
+    }
+
+    const endpoint = await getWebhookEndpointByApiKeyId(validated.apiKeyId);
 
     if (!endpoint) {
       builder.setError(404, {
@@ -270,7 +321,7 @@ export async function handleSendTestWebhook(
 
     const now = DateTime.utc();
 
-    await forwardWebhook(auth.apiKeyId, {
+    await forwardWebhook(validated.apiKeyId, {
       eventType: "payment.succeeded",
       resource: "payment",
       action: "succeeded",
