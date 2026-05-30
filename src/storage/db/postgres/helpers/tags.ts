@@ -3,6 +3,7 @@ import { tagsTable } from "../schema";
 import { eq, and, isNull } from "drizzle-orm";
 import { StorageError } from "../../../../errors/storage";
 import { DateTime } from "luxon";
+import { tagCache } from "../../../../utils/tagCache";
 
 export async function listTags(): Promise<string[]> {
   const db = getPostgresDB();
@@ -36,10 +37,12 @@ export async function createTag(key: string, amount: number): Promise<void> {
         .update(tagsTable)
         .set({ amount })
         .where(eq(tagsTable.id, existing[0].id));
+      tagCache.delete(key);
       return;
     }
 
     await db.insert(tagsTable).values({ key, amount });
+    tagCache.delete(key);
   } catch (e) {
     throw StorageError.insertFailed(
       `Failed to upsert tag '${key}'`,
@@ -58,7 +61,11 @@ export async function deleteTag(key: string): Promise<boolean> {
       .set({ deletedAt: now })
       .where(and(eq(tagsTable.key, key), isNull(tagsTable.deletedAt)));
 
-    return (result.count ?? 0) > 0;
+    if ((result.count ?? 0) > 0) {
+      tagCache.delete(key);
+      return true;
+    }
+    return false;
   } catch (e) {
     throw StorageError.queryFailed(
       `Failed to soft-delete tag '${key}'`,

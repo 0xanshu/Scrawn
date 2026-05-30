@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { EventError } from "../errors/event";
 import { getPostgresDB } from "../storage/db/postgres/db";
 import { tagsTable } from "../storage/db/postgres/schema";
@@ -17,7 +17,7 @@ export async function fetchTagAmount(
   const [tagRow] = await db
     .select()
     .from(tagsTable)
-    .where(eq(tagsTable.key, tag))
+    .where(and(eq(tagsTable.key, tag), isNull(tagsTable.deletedAt)))
     .limit(1);
 
   if (!tagRow) {
