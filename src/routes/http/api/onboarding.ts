@@ -8,7 +8,12 @@ import {
   generateRequestId,
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
-import { upsertMetadata } from "../../../storage/db/postgres/helpers/metadata.ts";
+import { AuthError } from "../../../errors/auth.ts";
+import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
+import {
+  upsertMetadata,
+  getMetadata,
+} from "../../../storage/db/postgres/helpers/metadata.ts";
 
 export async function handleOnboarding(
   request: FastifyRequest,
@@ -21,6 +26,9 @@ export async function handleOnboarding(
   );
 
   try {
+    const authHeader = request.headers.authorization;
+    await authenticateHttpApiKey(authHeader);
+
     const body = await request.body;
     const validated = onboardingCronSchema.parse(body);
 
@@ -47,6 +55,15 @@ export async function handleOnboarding(
       extra: { context: "onboarding route handler" },
     });
 
+    if (error instanceof AuthError) {
+      builder.setError(401, {
+        type: error.type,
+        message: error.message,
+      });
+      reply.code(401);
+      return { crons: [] };
+    }
+
     if (error instanceof ZodError) {
       const issues = error.issues
         .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
@@ -66,6 +83,63 @@ export async function handleOnboarding(
     });
     reply.code(500);
     return { crons: [] };
+  } finally {
+    logger.emit(builder.build());
+  }
+}
+
+function maskKey(key: string | null | undefined): string | null {
+  if (!key) return null;
+  if (key.length <= 8) return "****";
+  return key.slice(0, 4) + "****" + key.slice(-4);
+}
+
+export async function handleGetConfig(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<Record<string, unknown>> {
+  const builder = createWideEventBuilder(
+    generateRequestId(),
+    request.method,
+    request.url
+  );
+
+  try {
+    const authHeader = request.headers.authorization;
+    await authenticateHttpApiKey(authHeader);
+
+    const metadata = await getMetadata();
+
+    if (!metadata) {
+      builder.setSuccess(200);
+      reply.code(200);
+      return { configured: false };
+    }
+
+    builder.setSuccess(200);
+    reply.code(200);
+    return {
+      configured: true,
+      payment_cron: metadata.payment_cron,
+      payment_webhook: metadata.payment_webhook,
+    };
+  } catch (error) {
+    Sentry.captureException(error, {
+      extra: { context: "get config handler" },
+    });
+
+    if (error instanceof AuthError) {
+      builder.setError(401, { type: error.type, message: error.message });
+      reply.code(401);
+      return { error: error.message };
+    }
+
+    builder.setError(500, {
+      type: "InternalError",
+      message: "Failed to read config",
+    });
+    reply.code(500);
+    return { error: "Internal server error" };
   } finally {
     logger.emit(builder.build());
   }

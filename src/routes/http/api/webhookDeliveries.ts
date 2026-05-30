@@ -1,0 +1,71 @@
+import type { FastifyRequest, FastifyReply } from "fastify";
+import * as Sentry from "@sentry/bun";
+import { z } from "zod";
+import {
+  createWideEventBuilder,
+  generateRequestId,
+} from "../../../context/requestContext.ts";
+import { logger } from "../../../errors/logger.ts";
+import { AuthError } from "../../../errors/auth.ts";
+import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
+import { getPostgresDB } from "../../../storage/db/postgres/db";
+import { webhookDeliveriesTable } from "../../../storage/db/postgres/schema";
+import { eq, desc } from "drizzle-orm";
+
+const listDeliveriesQuerySchema = z.object({
+  apiKeyId: z.string().uuid("Invalid API key ID").optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+export async function handleListDeliveries(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<Record<string, unknown> | { error: string }> {
+  const builder = createWideEventBuilder(
+    generateRequestId(),
+    request.method,
+    request.url
+  );
+
+  try {
+    await authenticateHttpApiKey(request.headers.authorization);
+
+    const query = listDeliveriesQuerySchema.parse(request.query);
+    const db = getPostgresDB();
+
+    let conditions = undefined;
+    if (query.apiKeyId) {
+      conditions = eq(webhookDeliveriesTable.endpointId, query.apiKeyId);
+    }
+
+    const rows = await db
+      .select()
+      .from(webhookDeliveriesTable)
+      .where(conditions)
+      .orderBy(desc(webhookDeliveriesTable.createdAt))
+      .limit(query.limit)
+      .offset(query.offset);
+
+    builder.setSuccess(200);
+    reply.code(200);
+    return { deliveries: rows };
+  } catch (error) {
+    Sentry.captureException(error, {
+      extra: { context: "list webhook deliveries handler" },
+    });
+
+    if (error instanceof AuthError) {
+      builder.setError(401, { type: error.type, message: error.message });
+      reply.code(401);
+      return { error: error.message };
+    }
+
+    const err = error instanceof Error ? error : new Error(String(error));
+    builder.setError(500, { type: "InternalError", message: err.message });
+    reply.code(500);
+    return { error: "Internal server error" };
+  } finally {
+    logger.emit(builder.build());
+  }
+}
