@@ -21,6 +21,7 @@ const listDeliveriesQuerySchema = z.object({
   apiKeyId: z.string().uuid("Invalid API key ID").optional(),
   eventType: z.string().optional(),
   status: z.string().optional(),
+  role: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -68,6 +69,12 @@ export async function handleListDeliveries(
       conditions = conditions
         ? and(conditions, eq(webhookDeliveriesTable.status, query.status))
         : eq(webhookDeliveriesTable.status, query.status);
+    }
+
+    if (query.role) {
+      conditions = conditions
+        ? and(conditions, eq(apiKeysTable.role, query.role))
+        : eq(apiKeysTable.role, query.role);
     }
 
     const rows = await db
