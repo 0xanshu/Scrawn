@@ -5,15 +5,15 @@ import { StorageError } from "../../../../errors/storage";
 import { DateTime } from "luxon";
 import { tagCache } from "../../../../utils/tagCache";
 
-export async function listTags(): Promise<string[]> {
+export async function listTags(): Promise<{ key: string; amount: number }[]> {
   const db = getPostgresDB();
 
   try {
     const rows = await db
-      .select({ key: tagsTable.key })
+      .select({ key: tagsTable.key, amount: tagsTable.amount })
       .from(tagsTable)
       .where(isNull(tagsTable.deletedAt));
-    return rows.map((row) => row.key);
+    return rows;
   } catch (e) {
     throw StorageError.queryFailed(
       "Failed to list tags",

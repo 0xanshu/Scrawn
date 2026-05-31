@@ -28,7 +28,7 @@ const tagParamsSchema = z.object({
 });
 
 interface ListTagsResponse {
-  tags: string[];
+  tags: { key: string; amount: number }[];
 }
 
 interface MessageResponse {
