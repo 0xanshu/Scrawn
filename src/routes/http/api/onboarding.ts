@@ -27,6 +27,9 @@ export async function handleOnboarding(
   );
 
   try {
+    const authHeader = request.headers.authorization;
+    await authenticateHttpApiKey(authHeader);
+
     const body = await request.body;
     const validated = onboardingCronSchema.parse(body);
 
@@ -60,6 +63,15 @@ export async function handleOnboarding(
     Sentry.captureException(error, {
       extra: { context: "onboarding route handler" },
     });
+
+    if (error instanceof AuthError) {
+      builder.setError(401, {
+        type: error.type,
+        message: error.message,
+      });
+      reply.code(401);
+      return { crons: [] };
+    }
 
     if (error instanceof ZodError) {
       const issues = error.issues

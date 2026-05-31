@@ -1,7 +1,11 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { handleOnboarding, handleGetConfig } from "./onboarding.ts";
-import { handleListTags } from "./tags.ts";
-import { handleListExpressions } from "./expressions.ts";
+import { handleListTags, handleCreateTag, handleDeleteTag } from "./tags.ts";
+import {
+  handleListExpressions,
+  handleCreateExpression,
+  handleDeleteExpression,
+} from "./expressions.ts";
 import {
   handleCreateWebhookEndpoint,
   handleGetWebhookEndpoint,
@@ -9,10 +13,17 @@ import {
   handleSendTestWebhook,
   handleGetPublicKey,
 } from "./webhookEndpoints.ts";
+import {
+  handleCreateApiKey,
+  handleListApiKeys,
+  handleRevokeApiKey,
+} from "./apiKeys.ts";
+import { handleListDeliveries } from "./webhookDeliveries.ts";
 
 export async function registerApiRoutes(
   server: ReturnType<(typeof import("fastify"))["fastify"]>
 ): Promise<void> {
+  // Onboarding / config
   server.post(
     "/api/v1/internals/onboarding",
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -21,12 +32,35 @@ export async function registerApiRoutes(
   );
 
   server.get(
+    "/api/v1/internals/config",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleGetConfig(request, reply);
+    }
+  );
+
+  // Tags
+  server.get(
     "/api/v1/tags",
     async (request: FastifyRequest, reply: FastifyReply) => {
       return handleListTags(request, reply);
     }
   );
 
+  server.post(
+    "/api/v1/tags",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleCreateTag(request, reply);
+    }
+  );
+
+  server.delete(
+    "/api/v1/tags/:key",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleDeleteTag(request, reply);
+    }
+  );
+
+  // Expressions
   server.get(
     "/api/v1/expressions",
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -34,6 +68,43 @@ export async function registerApiRoutes(
     }
   );
 
+  server.post(
+    "/api/v1/expressions",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleCreateExpression(request, reply);
+    }
+  );
+
+  server.delete(
+    "/api/v1/expressions/:key",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleDeleteExpression(request, reply);
+    }
+  );
+
+  // API keys
+  server.post(
+    "/api/v1/api-keys",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleCreateApiKey(request, reply);
+    }
+  );
+
+  server.get(
+    "/api/v1/api-keys",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleListApiKeys(request, reply);
+    }
+  );
+
+  server.delete(
+    "/api/v1/api-keys/:id",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleRevokeApiKey(request, reply);
+    }
+  );
+
+  // Webhook endpoints
   server.post(
     "/api/v1/internals/webhook-endpoint",
     async (request: FastifyRequest, reply: FastifyReply) => {
@@ -69,10 +140,11 @@ export async function registerApiRoutes(
     }
   );
 
+  // Webhook deliveries
   server.get(
-    "/api/v1/internals/config",
+    "/api/v1/internals/webhook-deliveries",
     async (request: FastifyRequest, reply: FastifyReply) => {
-      return handleGetConfig(request, reply);
+      return handleListDeliveries(request, reply);
     }
   );
 }

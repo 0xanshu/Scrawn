@@ -30,7 +30,18 @@ const TAG_PATTERN = /tag\(([A-Z_][A-Z0-9_]*)\)/g;
 const EXPR_PATTERN = /expr\(([A-Z_][A-Z0-9_]*)\)/g;
 
 // Allowed function names in expressions
-const ALLOWED_FUNCTIONS = new Set(["add", "sub", "mul", "div", "tag", "expr"]);
+const ALLOWED_FUNCTIONS = new Set([
+  "add",
+  "sub",
+  "mul",
+  "div",
+  "tag",
+  "expr",
+  "inputTokens",
+  "outputTokens",
+  "inputCacheTokens",
+  "outputCacheTokens",
+]);
 
 /**
  * Token context passed from AI token usage event handlers.
@@ -38,6 +49,7 @@ const ALLOWED_FUNCTIONS = new Set(["add", "sub", "mul", "div", "tag", "expr"]);
 export interface EvalTokenContext {
   inputTokens?: number;
   outputTokens?: number;
+  inputCacheTokens?: number;
   outputCacheTokens?: number;
 }
 
@@ -101,7 +113,7 @@ function extractTagNames(exprString: string): string[] {
   return Array.from(tags);
 }
 
-function validateExprSyntax(exprString: string): void {
+export function validateExprSyntax(exprString: string): void {
   if (!exprString || exprString.trim() === "") {
     throw EventError.validationFailed("Expression cannot be empty");
   }
@@ -170,7 +182,7 @@ function validateExprSyntax(exprString: string): void {
  * @returns The expression string with all expr() refs expanded
  * @throws EventError if an expression is not found or a cycle is detected
  */
-async function resolveExprRefsInExpression(
+export async function resolveExprRefsInExpression(
   exprString: string,
   resolving: Set<string> = new Set()
 ): Promise<string> {
@@ -270,6 +282,7 @@ function resolveTokenPlaceholders(
   return exprString
     .replace(/inputTokens\(\)/g, String(context.inputTokens ?? 0))
     .replace(/outputTokens\(\)/g, String(context.outputTokens ?? 0))
+    .replace(/inputCacheTokens\(\)/g, String(context.inputCacheTokens ?? 0))
     .replace(/outputCacheTokens\(\)/g, String(context.outputCacheTokens ?? 0));
 }
 

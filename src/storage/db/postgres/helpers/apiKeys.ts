@@ -76,6 +76,27 @@ type ApiKeyRecord = {
   revoked: boolean;
 };
 
+export async function getApiKeyRoleById(
+  id: string
+): Promise<{ role: "dashboard" | "production" | "test" } | null> {
+  const db = getPostgresDB();
+
+  try {
+    const [record] = await db
+      .select({ role: apiKeysTable.role })
+      .from(apiKeysTable)
+      .where(eq(apiKeysTable.id, id))
+      .limit(1);
+
+    return record ?? null;
+  } catch (e) {
+    throw StorageError.queryFailed(
+      "Failed to look up API key role",
+      e instanceof Error ? e : new Error(String(e))
+    );
+  }
+}
+
 export async function findApiKeyByHash(
   apiKeyHash: string
 ): Promise<ApiKeyRecord | null> {
