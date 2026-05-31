@@ -200,7 +200,7 @@ export async function handleQueryEvents(
   request: QueryRequest,
   auth: AuthContext
 ): Promise<QueryResponse> {
-  const tables = getTablesForRequest(request.where);
+  const tables = getTablesForRequest(request.where).filter((t) => CH_FIELDS[t]);
   if (tables.length === 0) {
     return { rows: [], total: 0 };
   }
