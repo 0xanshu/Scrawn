@@ -15,7 +15,7 @@ import {
   webhookEndpointsTable,
   apiKeysTable,
 } from "../../../storage/db/postgres/schema";
-import { and, eq, desc, inArray } from "drizzle-orm";
+import { and, eq, desc, inArray, sql } from "drizzle-orm";
 
 const listDeliveriesQuerySchema = z.object({
   apiKeyId: z.string().uuid("Invalid API key ID").optional(),
@@ -67,14 +67,17 @@ export async function handleListDeliveries(
 
     if (query.status) {
       conditions = conditions
-        ? and(conditions, eq(webhookDeliveriesTable.status, query.status))
-        : eq(webhookDeliveriesTable.status, query.status);
+        ? and(
+            conditions,
+            sql`${webhookDeliveriesTable.status} = ${query.status}`
+          )
+        : sql`${webhookDeliveriesTable.status} = ${query.status}`;
     }
 
     if (query.role) {
       conditions = conditions
-        ? and(conditions, eq(apiKeysTable.role, query.role))
-        : eq(apiKeysTable.role, query.role);
+        ? and(conditions, sql`${apiKeysTable.role} = ${query.role}`)
+        : sql`${apiKeysTable.role} = ${query.role}`;
     }
 
     const rows = await db

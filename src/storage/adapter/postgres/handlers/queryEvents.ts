@@ -22,7 +22,9 @@ interface PGFieldDef {
   aggExpr?: string;
 }
 
-type PGFieldRegistry = Record<EventTableName, Record<string, PGFieldDef>>;
+type PGFieldRegistry = Partial<
+  Record<EventTableName, Record<string, PGFieldDef>>
+>;
 
 const PG_FIELDS: PGFieldRegistry = {
   basic_usage_events: {
@@ -190,7 +192,7 @@ const PG_FIELDS: PGFieldRegistry = {
   },
 };
 
-const OUTPUT_FIELDS = Object.keys(PG_FIELDS.basic_usage_events);
+const OUTPUT_FIELDS = Object.keys(PG_FIELDS.basic_usage_events!);
 
 function buildConditionParts(
   group: QueryFilterGroup,

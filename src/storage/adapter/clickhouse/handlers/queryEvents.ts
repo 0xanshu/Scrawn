@@ -25,7 +25,9 @@ interface ChFieldDef {
 
 type ChFieldKey = QueryFieldName | "eventId" | "idempotencyKey";
 
-const CH_FIELDS: Record<EventTableName, Record<ChFieldKey, ChFieldDef>> = {
+const CH_FIELDS: Partial<
+  Record<EventTableName, Record<ChFieldKey, ChFieldDef>>
+> = {
   basic_usage_events: {
     eventId: { select: "event_id", where: "event_id" },
     idempotencyKey: { select: "idempotency_key", where: "idempotency_key" },
@@ -137,7 +139,7 @@ const CH_PARAM_TYPE: Record<string, string> = {
 };
 
 const OUTPUT_FIELDS: ChFieldKey[] = Object.keys(
-  CH_FIELDS.basic_usage_events
+  CH_FIELDS.basic_usage_events!
 ) as ChFieldKey[];
 
 function buildSelectColumns(table: EventTableName): string {
