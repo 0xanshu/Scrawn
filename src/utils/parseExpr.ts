@@ -39,6 +39,7 @@ const ALLOWED_FUNCTIONS = new Set([
   "expr",
   "inputTokens",
   "outputTokens",
+  "inputCacheTokens",
   "outputCacheTokens",
 ]);
 
@@ -48,6 +49,7 @@ const ALLOWED_FUNCTIONS = new Set([
 export interface EvalTokenContext {
   inputTokens?: number;
   outputTokens?: number;
+  inputCacheTokens?: number;
   outputCacheTokens?: number;
 }
 
@@ -280,6 +282,7 @@ function resolveTokenPlaceholders(
   return exprString
     .replace(/inputTokens\(\)/g, String(context.inputTokens ?? 0))
     .replace(/outputTokens\(\)/g, String(context.outputTokens ?? 0))
+    .replace(/inputCacheTokens\(\)/g, String(context.inputCacheTokens ?? 0))
     .replace(/outputCacheTokens\(\)/g, String(context.outputCacheTokens ?? 0));
 }
 
