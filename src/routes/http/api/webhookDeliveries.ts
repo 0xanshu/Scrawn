@@ -15,10 +15,12 @@ import {
   webhookEndpointsTable,
   apiKeysTable,
 } from "../../../storage/db/postgres/schema";
-import { eq, desc, inArray } from "drizzle-orm";
+import { and, eq, desc, inArray } from "drizzle-orm";
 
 const listDeliveriesQuerySchema = z.object({
   apiKeyId: z.string().uuid("Invalid API key ID").optional(),
+  eventType: z.string().optional(),
+  status: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
 });
@@ -51,6 +53,18 @@ export async function handleListDeliveries(
       } else {
         conditions = eq(webhookDeliveriesTable.endpointId, "");
       }
+    }
+
+    if (query.eventType) {
+      conditions = conditions
+        ? and(conditions, eq(webhookDeliveriesTable.eventType, query.eventType))
+        : eq(webhookDeliveriesTable.eventType, query.eventType);
+    }
+
+    if (query.status) {
+      conditions = conditions
+        ? and(conditions, eq(webhookDeliveriesTable.status, query.status))
+        : eq(webhookDeliveriesTable.status, query.status);
     }
 
     const rows = await db
