@@ -135,6 +135,8 @@ export async function streamEvents(
     const total = eventsProcessed + failures.length;
     const response: StreamEventResponse = {
       eventsProcessed,
+      eventsFailed: failures.length,
+      failures,
       message: `Processed ${total} events (${eventsProcessed} succeeded, ${failures.length} failed)`,
     };
 

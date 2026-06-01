@@ -54,7 +54,7 @@ describe("EventService", () => {
         grpcMetadata(`Bearer ${rawKey}`)
       );
 
-      expect(res.random).toBe("Event stored successfully");
+      expect(res.message).toBe("Event stored successfully");
 
       await verifyBasicUsageEventStored({
         userId: payload.userId,
