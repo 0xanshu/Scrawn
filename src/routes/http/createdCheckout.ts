@@ -188,7 +188,14 @@ export async function handleDodoWebhook(
         );
         if (!claimed) return;
         await updateUserBilledTimestamp(userId, billed_upto, txn);
-        await handleAddPayment(userId, creditAmount, apiKeyId, mode, txn);
+        await handleAddPayment(
+          userId,
+          creditAmount,
+          apiKeyId,
+          mode,
+          session.proxy_link_id,
+          txn
+        );
       });
       if (!claimed) {
         Sentry.captureMessage(

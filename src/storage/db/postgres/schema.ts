@@ -69,7 +69,7 @@ export const sessionsTable = pgTable(
   })
 );
 
-export const sessionRelations = relations(sessionsTable, ({ one }) => ({
+export const sessionRelations = relations(sessionsTable, ({ one, many }) => ({
   user: one(usersTable, {
     fields: [sessionsTable.userId],
     references: [usersTable.id],
@@ -78,6 +78,7 @@ export const sessionRelations = relations(sessionsTable, ({ one }) => ({
     fields: [sessionsTable.apiKeyId],
     references: [apiKeysTable.id],
   }),
+  paymentEvents: many(paymentEventsTable),
 }));
 
 export const apiKeysTable = pgTable(
@@ -179,6 +180,9 @@ export const paymentEventsTable = pgTable("payment_events", {
     .notNull(),
   mode: text("mode", { enum: ["test", "production"] }).notNull(),
   creditAmount: bigint("credit_amount", { mode: "number" }).notNull(),
+  proxyId: uuid("proxy_id")
+    .references(() => sessionsTable.proxy_link_id)
+    .notNull(),
 });
 
 export const paymentEventsRelation = relations(
@@ -191,6 +195,10 @@ export const paymentEventsRelation = relations(
     apiKey: one(apiKeysTable, {
       fields: [paymentEventsTable.apiKeyId],
       references: [apiKeysTable.id],
+    }),
+    session: one(sessionsTable, {
+      fields: [paymentEventsTable.proxyId],
+      references: [sessionsTable.proxy_link_id],
     }),
   })
 );

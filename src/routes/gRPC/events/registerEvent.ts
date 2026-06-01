@@ -42,7 +42,7 @@ export async function registerEvent(
     await storeEvent(event, auth);
 
     const response = RegisterEventResponse.create();
-    response.random = "Event stored successfully";
+    response.message = "Event stored successfully";
     callback?.(null, response);
   } catch (error) {
     callback?.(error as Error);
