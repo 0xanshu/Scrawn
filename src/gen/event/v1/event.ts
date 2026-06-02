@@ -120,7 +120,12 @@ export interface BasicUsage {
 }
 
 export interface RegisterEventResponse {
-  random: string;
+  eventId: string;
+  idempotencyKey: string;
+  ingestedTimestamp: number;
+  eventType: string;
+  userId: string;
+  message: string;
 }
 
 export interface StreamEventRequest {
@@ -159,9 +164,18 @@ export interface AITokenUsage {
   metadata?: string | undefined;
 }
 
+export interface EventFailure {
+  eventIndex: number;
+  idempotencyKey: string;
+  errorCode: string;
+  message: string;
+}
+
 export interface StreamEventResponse {
   eventsProcessed: number;
   message: string;
+  eventsFailed: number;
+  failures: EventFailure[];
 }
 
 function createBaseRegisterEventRequest(): RegisterEventRequest {
@@ -474,7 +488,14 @@ export const BasicUsage: MessageFns<BasicUsage> = {
 };
 
 function createBaseRegisterEventResponse(): RegisterEventResponse {
-  return { random: "" };
+  return {
+    eventId: "",
+    idempotencyKey: "",
+    ingestedTimestamp: 0,
+    eventType: "",
+    userId: "",
+    message: "",
+  };
 }
 
 export const RegisterEventResponse: MessageFns<RegisterEventResponse> = {
@@ -482,8 +503,23 @@ export const RegisterEventResponse: MessageFns<RegisterEventResponse> = {
     message: RegisterEventResponse,
     writer: BinaryWriter = new BinaryWriter()
   ): BinaryWriter {
-    if (message.random !== "") {
-      writer.uint32(10).string(message.random);
+    if (message.eventId !== "") {
+      writer.uint32(10).string(message.eventId);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(18).string(message.idempotencyKey);
+    }
+    if (message.ingestedTimestamp !== 0) {
+      writer.uint32(24).int64(message.ingestedTimestamp);
+    }
+    if (message.eventType !== "") {
+      writer.uint32(34).string(message.eventType);
+    }
+    if (message.userId !== "") {
+      writer.uint32(42).string(message.userId);
+    }
+    if (message.message !== "") {
+      writer.uint32(50).string(message.message);
     }
     return writer;
   },
@@ -504,7 +540,47 @@ export const RegisterEventResponse: MessageFns<RegisterEventResponse> = {
             break;
           }
 
-          message.random = reader.string();
+          message.eventId = reader.string();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.idempotencyKey = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.ingestedTimestamp = longToNumber(reader.int64());
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.eventType = reader.string();
+          continue;
+        }
+        case 5: {
+          if (tag !== 42) {
+            break;
+          }
+
+          message.userId = reader.string();
+          continue;
+        }
+        case 6: {
+          if (tag !== 50) {
+            break;
+          }
+
+          message.message = reader.string();
           continue;
         }
       }
@@ -518,14 +594,40 @@ export const RegisterEventResponse: MessageFns<RegisterEventResponse> = {
 
   fromJSON(object: any): RegisterEventResponse {
     return {
-      random: isSet(object.random) ? globalThis.String(object.random) : "",
+      eventId: isSet(object.eventId) ? globalThis.String(object.eventId) : "",
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : "",
+      ingestedTimestamp: isSet(object.ingestedTimestamp)
+        ? globalThis.Number(object.ingestedTimestamp)
+        : 0,
+      eventType: isSet(object.eventType)
+        ? globalThis.String(object.eventType)
+        : "",
+      userId: isSet(object.userId) ? globalThis.String(object.userId) : "",
+      message: isSet(object.message) ? globalThis.String(object.message) : "",
     };
   },
 
   toJSON(message: RegisterEventResponse): unknown {
     const obj: any = {};
-    if (message.random !== "") {
-      obj.random = message.random;
+    if (message.eventId !== "") {
+      obj.eventId = message.eventId;
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.ingestedTimestamp !== 0) {
+      obj.ingestedTimestamp = Math.round(message.ingestedTimestamp);
+    }
+    if (message.eventType !== "") {
+      obj.eventType = message.eventType;
+    }
+    if (message.userId !== "") {
+      obj.userId = message.userId;
+    }
+    if (message.message !== "") {
+      obj.message = message.message;
     }
     return obj;
   },
@@ -539,7 +641,12 @@ export const RegisterEventResponse: MessageFns<RegisterEventResponse> = {
     object: I
   ): RegisterEventResponse {
     const message = createBaseRegisterEventResponse();
-    message.random = object.random ?? "";
+    message.eventId = object.eventId ?? "";
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.ingestedTimestamp = object.ingestedTimestamp ?? 0;
+    message.eventType = object.eventType ?? "";
+    message.userId = object.userId ?? "";
+    message.message = object.message ?? "";
     return message;
   },
 };
@@ -1148,8 +1255,130 @@ export const AITokenUsage: MessageFns<AITokenUsage> = {
   },
 };
 
+function createBaseEventFailure(): EventFailure {
+  return { eventIndex: 0, idempotencyKey: "", errorCode: "", message: "" };
+}
+
+export const EventFailure: MessageFns<EventFailure> = {
+  encode(
+    message: EventFailure,
+    writer: BinaryWriter = new BinaryWriter()
+  ): BinaryWriter {
+    if (message.eventIndex !== 0) {
+      writer.uint32(8).int32(message.eventIndex);
+    }
+    if (message.idempotencyKey !== "") {
+      writer.uint32(18).string(message.idempotencyKey);
+    }
+    if (message.errorCode !== "") {
+      writer.uint32(26).string(message.errorCode);
+    }
+    if (message.message !== "") {
+      writer.uint32(34).string(message.message);
+    }
+    return writer;
+  },
+
+  decode(input: BinaryReader | Uint8Array, length?: number): EventFailure {
+    const reader =
+      input instanceof BinaryReader ? input : new BinaryReader(input);
+    const end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseEventFailure();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1: {
+          if (tag !== 8) {
+            break;
+          }
+
+          message.eventIndex = reader.int32();
+          continue;
+        }
+        case 2: {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.idempotencyKey = reader.string();
+          continue;
+        }
+        case 3: {
+          if (tag !== 26) {
+            break;
+          }
+
+          message.errorCode = reader.string();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.message = reader.string();
+          continue;
+        }
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skip(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): EventFailure {
+    return {
+      eventIndex: isSet(object.eventIndex)
+        ? globalThis.Number(object.eventIndex)
+        : 0,
+      idempotencyKey: isSet(object.idempotencyKey)
+        ? globalThis.String(object.idempotencyKey)
+        : "",
+      errorCode: isSet(object.errorCode)
+        ? globalThis.String(object.errorCode)
+        : "",
+      message: isSet(object.message) ? globalThis.String(object.message) : "",
+    };
+  },
+
+  toJSON(message: EventFailure): unknown {
+    const obj: any = {};
+    if (message.eventIndex !== 0) {
+      obj.eventIndex = Math.round(message.eventIndex);
+    }
+    if (message.idempotencyKey !== "") {
+      obj.idempotencyKey = message.idempotencyKey;
+    }
+    if (message.errorCode !== "") {
+      obj.errorCode = message.errorCode;
+    }
+    if (message.message !== "") {
+      obj.message = message.message;
+    }
+    return obj;
+  },
+
+  create<I extends Exact<DeepPartial<EventFailure>, I>>(
+    base?: I
+  ): EventFailure {
+    return EventFailure.fromPartial(base ?? ({} as any));
+  },
+  fromPartial<I extends Exact<DeepPartial<EventFailure>, I>>(
+    object: I
+  ): EventFailure {
+    const message = createBaseEventFailure();
+    message.eventIndex = object.eventIndex ?? 0;
+    message.idempotencyKey = object.idempotencyKey ?? "";
+    message.errorCode = object.errorCode ?? "";
+    message.message = object.message ?? "";
+    return message;
+  },
+};
+
 function createBaseStreamEventResponse(): StreamEventResponse {
-  return { eventsProcessed: 0, message: "" };
+  return { eventsProcessed: 0, message: "", eventsFailed: 0, failures: [] };
 }
 
 export const StreamEventResponse: MessageFns<StreamEventResponse> = {
@@ -1162,6 +1391,12 @@ export const StreamEventResponse: MessageFns<StreamEventResponse> = {
     }
     if (message.message !== "") {
       writer.uint32(18).string(message.message);
+    }
+    if (message.eventsFailed !== 0) {
+      writer.uint32(24).int32(message.eventsFailed);
+    }
+    for (const v of message.failures) {
+      EventFailure.encode(v!, writer.uint32(34).fork()).join();
     }
     return writer;
   },
@@ -1193,6 +1428,22 @@ export const StreamEventResponse: MessageFns<StreamEventResponse> = {
           message.message = reader.string();
           continue;
         }
+        case 3: {
+          if (tag !== 24) {
+            break;
+          }
+
+          message.eventsFailed = reader.int32();
+          continue;
+        }
+        case 4: {
+          if (tag !== 34) {
+            break;
+          }
+
+          message.failures.push(EventFailure.decode(reader, reader.uint32()));
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1208,6 +1459,12 @@ export const StreamEventResponse: MessageFns<StreamEventResponse> = {
         ? globalThis.Number(object.eventsProcessed)
         : 0,
       message: isSet(object.message) ? globalThis.String(object.message) : "",
+      eventsFailed: isSet(object.eventsFailed)
+        ? globalThis.Number(object.eventsFailed)
+        : 0,
+      failures: globalThis.Array.isArray(object?.failures)
+        ? object.failures.map((e: any) => EventFailure.fromJSON(e))
+        : [],
     };
   },
 
@@ -1218,6 +1475,12 @@ export const StreamEventResponse: MessageFns<StreamEventResponse> = {
     }
     if (message.message !== "") {
       obj.message = message.message;
+    }
+    if (message.eventsFailed !== 0) {
+      obj.eventsFailed = Math.round(message.eventsFailed);
+    }
+    if (message.failures?.length) {
+      obj.failures = message.failures.map((e) => EventFailure.toJSON(e));
     }
     return obj;
   },
@@ -1233,6 +1496,9 @@ export const StreamEventResponse: MessageFns<StreamEventResponse> = {
     const message = createBaseStreamEventResponse();
     message.eventsProcessed = object.eventsProcessed ?? 0;
     message.message = object.message ?? "";
+    message.eventsFailed = object.eventsFailed ?? 0;
+    message.failures =
+      object.failures?.map((e) => EventFailure.fromPartial(e)) || [];
     return message;
   },
 };
@@ -1374,6 +1640,17 @@ export type Exact<P, I extends P> = P extends Builtin
   : P & { [K in keyof P]: Exact<P[K], I[K]> } & {
       [K in Exclude<keyof I, KeysOfUnion<P>>]: never;
     };
+
+function longToNumber(int64: { toString(): string }): number {
+  const num = globalThis.Number(int64.toString());
+  if (num > globalThis.Number.MAX_SAFE_INTEGER) {
+    throw new globalThis.Error("Value is larger than Number.MAX_SAFE_INTEGER");
+  }
+  if (num < globalThis.Number.MIN_SAFE_INTEGER) {
+    throw new globalThis.Error("Value is smaller than Number.MIN_SAFE_INTEGER");
+  }
+  return num;
+}
 
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;

@@ -249,6 +249,81 @@ export function sessionsFieldToJSON(object: SessionsField): string {
   }
 }
 
+export enum PaymentEventsField {
+  PAYMENT_EVENTS_FIELD_UNSPECIFIED = 0,
+  PAYMENT_EVENTS_ID = 1,
+  PAYMENT_EVENTS_USER_ID = 2,
+  PAYMENT_EVENTS_API_KEY_ID = 3,
+  PAYMENT_EVENTS_MODE = 4,
+  PAYMENT_EVENTS_CREDIT_AMOUNT = 5,
+  PAYMENT_EVENTS_SESSION_ID = 6,
+  PAYMENT_EVENTS_REPORTED_TIMESTAMP = 7,
+  PAYMENT_EVENTS_INGESTED_TIMESTAMP = 8,
+  UNRECOGNIZED = -1,
+}
+
+export function paymentEventsFieldFromJSON(object: any): PaymentEventsField {
+  switch (object) {
+    case 0:
+    case "PAYMENT_EVENTS_FIELD_UNSPECIFIED":
+      return PaymentEventsField.PAYMENT_EVENTS_FIELD_UNSPECIFIED;
+    case 1:
+    case "PAYMENT_EVENTS_ID":
+      return PaymentEventsField.PAYMENT_EVENTS_ID;
+    case 2:
+    case "PAYMENT_EVENTS_USER_ID":
+      return PaymentEventsField.PAYMENT_EVENTS_USER_ID;
+    case 3:
+    case "PAYMENT_EVENTS_API_KEY_ID":
+      return PaymentEventsField.PAYMENT_EVENTS_API_KEY_ID;
+    case 4:
+    case "PAYMENT_EVENTS_MODE":
+      return PaymentEventsField.PAYMENT_EVENTS_MODE;
+    case 5:
+    case "PAYMENT_EVENTS_CREDIT_AMOUNT":
+      return PaymentEventsField.PAYMENT_EVENTS_CREDIT_AMOUNT;
+    case 6:
+    case "PAYMENT_EVENTS_SESSION_ID":
+      return PaymentEventsField.PAYMENT_EVENTS_SESSION_ID;
+    case 7:
+    case "PAYMENT_EVENTS_REPORTED_TIMESTAMP":
+      return PaymentEventsField.PAYMENT_EVENTS_REPORTED_TIMESTAMP;
+    case 8:
+    case "PAYMENT_EVENTS_INGESTED_TIMESTAMP":
+      return PaymentEventsField.PAYMENT_EVENTS_INGESTED_TIMESTAMP;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return PaymentEventsField.UNRECOGNIZED;
+  }
+}
+
+export function paymentEventsFieldToJSON(object: PaymentEventsField): string {
+  switch (object) {
+    case PaymentEventsField.PAYMENT_EVENTS_FIELD_UNSPECIFIED:
+      return "PAYMENT_EVENTS_FIELD_UNSPECIFIED";
+    case PaymentEventsField.PAYMENT_EVENTS_ID:
+      return "PAYMENT_EVENTS_ID";
+    case PaymentEventsField.PAYMENT_EVENTS_USER_ID:
+      return "PAYMENT_EVENTS_USER_ID";
+    case PaymentEventsField.PAYMENT_EVENTS_API_KEY_ID:
+      return "PAYMENT_EVENTS_API_KEY_ID";
+    case PaymentEventsField.PAYMENT_EVENTS_MODE:
+      return "PAYMENT_EVENTS_MODE";
+    case PaymentEventsField.PAYMENT_EVENTS_CREDIT_AMOUNT:
+      return "PAYMENT_EVENTS_CREDIT_AMOUNT";
+    case PaymentEventsField.PAYMENT_EVENTS_SESSION_ID:
+      return "PAYMENT_EVENTS_SESSION_ID";
+    case PaymentEventsField.PAYMENT_EVENTS_REPORTED_TIMESTAMP:
+      return "PAYMENT_EVENTS_REPORTED_TIMESTAMP";
+    case PaymentEventsField.PAYMENT_EVENTS_INGESTED_TIMESTAMP:
+      return "PAYMENT_EVENTS_INGESTED_TIMESTAMP";
+    case PaymentEventsField.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum TagsField {
   TAGS_FIELD_UNSPECIFIED = 0,
   TAGS_ID = 1,
