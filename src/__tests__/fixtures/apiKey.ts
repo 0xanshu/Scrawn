@@ -31,3 +31,23 @@ export async function createTestApiKey(): Promise<{
 
   return { rawKey, id: key!.id };
 }
+
+export async function insertKey(
+  rawKey: string,
+  role: "dashboard" | "test" | "production",
+  overrides: Partial<{ revoked: boolean; expiresAt: string }> = {}
+): Promise<string> {
+  const db = getPostgresDB();
+  const [key] = await db
+    .insert(apiKeysTable)
+    .values({
+      name: `auth-test-key-${crypto.randomUUID()}`,
+      key: hashAPIKey(rawKey),
+      role,
+      expiresAt:
+        overrides.expiresAt ?? DateTime.utc().plus({ years: 1 }).toISO(),
+      revoked: overrides.revoked ?? false,
+    })
+    .returning({ id: apiKeysTable.id });
+  return key!.id;
+}

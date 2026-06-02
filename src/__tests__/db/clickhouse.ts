@@ -1,12 +1,5 @@
-import { eq } from "drizzle-orm";
 import { getClickHouseDB } from "../../storage/db/clickhouse";
-import { getPostgresDB } from "../../storage/db/postgres/db";
-import { apiKeysTable } from "../../storage/db/postgres/schema";
-import type {
-  TestDBAdapter,
-  NormalizedBasicUsageEvent,
-  NormalizedAPIKey,
-} from "./types";
+import type { TestDBAdapter, NormalizedBasicUsageEvent } from "./types";
 
 type ClickHouseBasicUsageRow = {
   event_id: string;
@@ -40,24 +33,6 @@ export class ClickHouseTestDB implements TestDBAdapter {
       mode: row.mode,
       type: row.type,
       debitAmount: row.debit_amount,
-    };
-  }
-
-  async findAPIKey(apiKeyId: string): Promise<NormalizedAPIKey | undefined> {
-    const db = getPostgresDB();
-    const [row] = await db
-      .select()
-      .from(apiKeysTable)
-      .where(eq(apiKeysTable.id, apiKeyId))
-      .limit(1);
-
-    if (!row) return undefined;
-
-    return {
-      id: row.id,
-      name: row.name,
-      role: row.role,
-      revoked: row.revoked,
     };
   }
 }
