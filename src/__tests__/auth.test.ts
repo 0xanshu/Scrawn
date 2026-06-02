@@ -130,9 +130,9 @@ describe("Auth Interceptor", () => {
     const meta = grpcMetadata(`Bearer ${raw}`);
 
     const res1 = await registerEvent(client, makeEvent(), meta);
-    expect(res1.random).toBe("Event stored successfully");
+    expect(res1.message).toBe("Event stored successfully");
 
     const res2 = await registerEvent(client, makeEvent(), meta);
-    expect(res2.random).toBe("Event stored successfully");
+    expect(res2.message).toBe("Event stored successfully");
   });
 });

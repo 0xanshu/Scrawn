@@ -172,7 +172,7 @@ describe("AuthService", () => {
         grpcMetadata(`Bearer ${res.apiKey}`)
       );
 
-      expect(eventRes.random).toBe("Event stored successfully");
+      expect(eventRes.message).toBe("Event stored successfully");
 
       await verifyBasicUsageEventStored({
         userId,
