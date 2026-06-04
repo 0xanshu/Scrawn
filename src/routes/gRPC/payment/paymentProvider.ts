@@ -71,7 +71,7 @@ export interface CheckoutResult {
 }
 
 export async function getPaymentProviderConfig(
-  mode?: "test" | "production"
+  mode: "test" | "production"
 ): Promise<PaymentProviderConfig> {
   if (!mode) {
     mode = process.env.NODE_ENV === "production" ? "production" : "test";
