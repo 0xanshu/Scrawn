@@ -47,7 +47,7 @@ export async function handleAddBasicUsage(
             mode: auth.mode as "production" | "test",
             type: event_data.data.basicUsageType,
             debitAmount: event_data.data.debitAmount,
-            metadata: event_data.data.metadata ?? null,
+            metadata: event_data.data.metadata ?? {},
           })
           .returning({ id: basicUsageEventsTable.id });
 

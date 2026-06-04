@@ -6,10 +6,7 @@ import {
   type GrpcTlsOptions,
 } from "./servers/rawGrpcServer.ts";
 import { startFastifyServer } from "./servers/fastifyServer.ts";
-import {
-  initScheduler,
-  type OnboardingScheduler,
-} from "./schedulers/onboarding.ts";
+
 import { getClickHouseDB } from "./storage/db/clickhouse.ts";
 import { readFileSync } from "node:fs";
 import * as Sentry from "@sentry/bun";
@@ -102,8 +99,6 @@ function loadGrpcTlsOptions(): GrpcTlsOptions | undefined {
   };
 }
 
-let onboardingScheduler: OnboardingScheduler | undefined;
-
 async function main(): Promise<void> {
   const tlsOptions = loadGrpcTlsOptions();
   await startRawGrpcServer(GRPC_PORT, tlsOptions);
@@ -115,15 +110,10 @@ async function main(): Promise<void> {
     );
   }
 
-  onboardingScheduler = initScheduler();
-  await onboardingScheduler.start();
-  logger.lifecycle("Onboarding scheduler started");
+  logger.lifecycle("Server started");
 }
 
 process.on("beforeExit", async () => {
-  if (onboardingScheduler) {
-    onboardingScheduler.stop();
-  }
   await Sentry.flush(2000);
 });
 

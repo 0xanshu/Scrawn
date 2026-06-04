@@ -1,6 +1,6 @@
 import { getPostgresDB } from "../db";
 import { webhookEndpointsTable } from "../schema";
-import { eq, isNull, and } from "drizzle-orm";
+import { eq, and, isNull } from "drizzle-orm";
 import { StorageError } from "../../../../errors/storage";
 import { DateTime } from "luxon";
 
