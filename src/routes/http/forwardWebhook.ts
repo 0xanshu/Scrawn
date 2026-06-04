@@ -147,9 +147,9 @@ async function recordDelivery(
       resource: event.resource,
       action: event.action,
       status,
-      requestBody: event.data as Record<string, unknown>,
-      responseStatus: details.responseStatus ?? null,
-      error: details.error ?? null,
+      requestBody: (event.data ?? {}) as Record<string, unknown>,
+      responseStatus: details.responseStatus ?? 0,
+      error: details.error ?? "",
     });
   } catch (error) {
     Sentry.captureException(error, {

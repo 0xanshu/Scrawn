@@ -15,7 +15,7 @@ import type { AuthContext } from "../context/auth";
 
 export function createEventInstance(
   eventSkeleton: RegisterEventSchemaType | StreamEventSchemaType
-): Event {
+): BasicUsage | AITokenUsage {
   if (eventSkeleton.type === "BASIC_USAGE") {
     const data = eventSkeleton.basicUsage;
     return new BasicUsage(

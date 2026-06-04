@@ -70,14 +70,23 @@ export interface CheckoutResult {
   checkoutUrl: string;
 }
 
-export async function getPaymentProviderConfig(): Promise<PaymentProviderConfig> {
+export async function getPaymentProviderConfig(
+  mode: "test" | "production"
+): Promise<PaymentProviderConfig> {
+  if (!mode) {
+    mode = process.env.NODE_ENV === "production" ? "production" : "test";
+  }
+
   const metadata = await getMetadata();
 
   if (!metadata) {
     throw PaymentError.missingMetadata();
   }
 
-  const productId = metadata?.dodo_product_id;
+  const productId =
+    mode === "production"
+      ? metadata?.dodo_live_product_id
+      : metadata?.dodo_test_product_id;
   const returnUrl = metadata?.redirect_url ?? null;
 
   if (!productId) {

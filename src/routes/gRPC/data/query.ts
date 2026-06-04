@@ -100,8 +100,6 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     table: metadataTable,
     fields: {
       id: { col: metadataTable.id, cast: "uuid" },
-      paymentCron: { col: metadataTable.payment_cron, cast: "text" },
-      paymentWebhook: { col: metadataTable.payment_webhook, cast: "text" },
     },
   },
 };

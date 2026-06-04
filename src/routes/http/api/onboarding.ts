@@ -2,7 +2,6 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import * as Sentry from "@sentry/bun";
 import { ZodError } from "zod";
 import { onboardingCronSchema } from "../../../zod/internals.ts";
-import { reloadScheduler } from "../../../schedulers/onboarding.ts";
 import {
   createWideEventBuilder,
   generateRequestId,
@@ -33,29 +32,19 @@ export async function handleOnboarding(
     const body = await request.body;
     const validated = onboardingCronSchema.parse(body);
 
-    const webhookUrl =
-      validated.webhookUrl && validated.webhookUrl !== ""
-        ? validated.webhookUrl
-        : null;
-
     await upsertMetadata({
-      payment_cron: validated.crons,
-      payment_webhook: webhookUrl,
-      dodo_live_api_key: validated.dodoLiveApiKey ?? undefined,
-      dodo_test_api_key: validated.dodoTestApiKey ?? undefined,
-      dodo_product_id: validated.dodoProductId,
-      dodo_webhook_secret: validated.dodoWebhookSecret ?? undefined,
+      dodo_live_api_key: validated.dodoLiveApiKey,
+      dodo_test_api_key: validated.dodoTestApiKey,
+      dodo_live_product_id: validated.dodoLiveProductId,
+      dodo_test_product_id: validated.dodoTestProductId,
+      dodo_webhook_secret: validated.dodoWebhookSecret,
       currency: validated.currency,
       redirect_url: validated.redirectUrl,
     });
 
     clearClients();
 
-    await reloadScheduler();
-
-    builder.setSuccess(200).addContext({
-      cronCount: validated.crons.length,
-    });
+    builder.setSuccess(200);
 
     reply.code(201);
     return { crons: validated.crons };
@@ -129,11 +118,10 @@ export async function handleGetConfig(
     reply.code(200);
     return {
       configured: true,
-      payment_cron: metadata.payment_cron,
-      payment_webhook: metadata.payment_webhook,
       dodo_live_api_key: maskApiKey(metadata.dodo_live_api_key),
       dodo_test_api_key: maskApiKey(metadata.dodo_test_api_key),
-      dodo_product_id: metadata.dodo_product_id,
+      dodo_live_product_id: metadata.dodo_live_product_id,
+      dodo_test_product_id: metadata.dodo_test_product_id,
       dodo_webhook_secret: maskApiKey(metadata.dodo_webhook_secret),
       currency: metadata.currency,
       redirect_url: metadata.redirect_url,

@@ -140,7 +140,7 @@ function buildAiTokenInsertValues(
         output_cache: aggEvent.outputCacheDebitAmount,
       },
     } satisfies Metrics),
-    metadata: aggEvent.metadata ?? null,
+    metadata: aggEvent.metadata ?? {},
   }));
 }
 

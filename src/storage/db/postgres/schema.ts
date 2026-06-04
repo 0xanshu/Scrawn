@@ -256,18 +256,17 @@ export const tagsTable = pgTable("tags", {
 
 export const metadataTable = pgTable("metadata", {
   id: uuid("id").primaryKey().defaultRandom(),
-  payment_cron: jsonb("payment_cron").$type<string[]>().notNull(),
-  payment_webhook: text("payment_webhook"),
   last_run_at: timestamp("last_run_at", {
     withTimezone: true,
     mode: "string",
   }),
-  dodo_live_api_key: text("dodo_live_api_key"),
-  dodo_test_api_key: text("dodo_test_api_key"),
-  dodo_product_id: text("dodo_product_id").notNull().default(""),
-  dodo_webhook_secret: text("dodo_webhook_secret"),
+  dodo_live_api_key: text("dodo_live_api_key").notNull(),
+  dodo_test_api_key: text("dodo_test_api_key").notNull(),
+  dodo_live_product_id: text("dodo_live_product_id").notNull(),
+  dodo_test_product_id: text("dodo_test_product_id").notNull(),
+  dodo_webhook_secret: text("dodo_webhook_secret").notNull(),
   currency: text("currency").notNull().default("usd"),
-  redirect_url: text("redirect_url"),
+  redirect_url: text("redirect_url").notNull(),
 });
 
 export const expressionsTable = pgTable("expressions", {

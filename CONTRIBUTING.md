@@ -39,7 +39,7 @@ Thank you for your interest in contributing! This document covers everything you
    cp .env.example .env.local
    ```
 
-   Fill in `.env.local` — at minimum you need `DATABASE_URL`, `HMAC_SECRET`, and `DODO_PAYMENTS_API_KEY`. For ClickHouse development also add `CLICKHOUSE_URL` and set `STORAGE_ADAPTER=clickhouse`.
+   Fill in `.env.local` — at minimum you need `DATABASE_URL`, `HMAC_SECRET`, `DODO_PAYMENTS_LIVE_API_KEY`, `DODO_PAYMENTS_TEST_API_KEY`, `DODO_PAYMENTS_LIVE_PRODUCT_ID`, `DODO_PAYMENTS_TEST_PRODUCT_ID`, and `DODO_PAYMENTS_WEBHOOK_SECRET`. For ClickHouse development also add `CLICKHOUSE_URL` and set `STORAGE_ADAPTER=clickhouse`.
 
 4. **Start infrastructure**
 
