@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { DateTime } from "luxon";
 import { createEventInstance } from "../utils/eventHelpers";
+import type { BasicUsage } from "../events/BasicUsage";
+import type { AITokenUsage } from "../events/AITokenUsage";
 
 describe("createEventInstance", () => {
   it("creates a BasicUsage event", () => {
@@ -17,7 +19,7 @@ describe("createEventInstance", () => {
     });
     expect(result.type).toBe("BASIC_USAGE");
     expect(result.userId).toBe("user-1");
-    expect(result.data.debitAmount).toBe(100);
+    expect((result as BasicUsage).data.debitAmount).toBe(100);
   });
 
   it("creates an AITokenUsage event", () => {
@@ -42,18 +44,18 @@ describe("createEventInstance", () => {
     });
     expect(result.type).toBe("AI_TOKEN_USAGE");
     expect(result.userId).toBe("user-2");
-    expect(result.data.model).toBe("gpt-4");
+    expect((result as AITokenUsage).data.model).toBe("gpt-4");
   });
 
   it("throws for unsupported event type", () => {
     expect(() =>
       createEventInstance({
-        type: "UNSUPPORTED" as never,
+        type: "UNSUPPORTED",
         userId: "user-3",
         reportedTimestamp: DateTime.utc(),
         eventId: "550e8400-e29b-41d4-a716-446655440002",
         idempotencyKey: "idem-3",
-      })
+      } as never)
     ).toThrow("Unsupported event type");
   });
 
