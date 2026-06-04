@@ -12,6 +12,7 @@ export async function verifyBasicUsageEventStored(expected: {
   debitAmount: number;
   apiKeyId: string;
   type: string;
+  metadata?: Record<string, unknown> | null;
 }): Promise<void> {
   const db = await testDB;
   const row = await db.findBasicUsageEvent(expected.eventId);
@@ -24,6 +25,9 @@ export async function verifyBasicUsageEventStored(expected: {
   expect(row!.mode).toBe("test");
   expect(row!.type).toBe(expected.type);
   expect(row!.debitAmount).toBe(expected.debitAmount);
+  if (expected.metadata !== undefined) {
+    expect(row!.metadata).toEqual(expected.metadata);
+  }
 }
 
 async function findAPIKey(

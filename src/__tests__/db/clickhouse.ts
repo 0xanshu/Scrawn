@@ -9,6 +9,7 @@ type ClickHouseBasicUsageRow = {
   mode: string;
   type: string;
   debit_amount: number;
+  metadata?: Record<string, unknown> | null;
 };
 
 export class ClickHouseTestDB implements TestDBAdapter {
@@ -33,6 +34,7 @@ export class ClickHouseTestDB implements TestDBAdapter {
       mode: row.mode,
       type: row.type,
       debitAmount: row.debit_amount,
+      metadata: row.metadata ?? null,
     };
   }
 }

@@ -6,6 +6,7 @@ export type NormalizedBasicUsageEvent = {
   mode: string;
   type: string;
   debitAmount: number;
+  metadata: Record<string, unknown> | null;
 };
 
 export type NormalizedAPIKey = {

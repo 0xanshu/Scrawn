@@ -24,6 +24,7 @@ export class PostgresTestDB implements TestDBAdapter {
       mode: row.mode,
       type: row.type,
       debitAmount: row.debitAmount,
+      metadata: row.metadata ?? null,
     };
   }
 }
