@@ -47,14 +47,14 @@ export const onboardingCronSchema = z.object({
     .array(cronField)
     .min(1, "At least one cron expression is required")
     .max(100, "Maximum 100 cron expressions allowed"),
-  webhookUrl: z.url("Invalid webhook URL").or(z.literal("")),
-  dodoLiveApiKey: z.string().min(1, "Dodo live API key is required").optional(),
-  dodoTestApiKey: z.string().min(1, "Dodo test API key is required").optional(),
-  dodoProductId: z.string().min(1, "Dodo product ID is required").optional(),
-  dodoWebhookSecret: z
-    .string()
-    .min(1, "Dodo webhook secret is required")
-    .optional(),
-  currency: z.string().min(1, "Currency is required").optional(),
-  redirectUrl: z.url("Redirect URL must be a valid URL").optional(),
+  webhookUrl: z.union([z.url("Invalid webhook URL"), z.literal("")], {
+    error: "Webhook URL is required (use an empty string to disable webhooks)",
+  }),
+  dodoLiveApiKey: z.string().min(1, "Dodo live API key is required"),
+  dodoTestApiKey: z.string().min(1, "Dodo test API key is required"),
+  dodoLiveProductId: z.string().min(1, "Dodo live product ID is required"),
+  dodoTestProductId: z.string().min(1, "Dodo test product ID is required"),
+  dodoWebhookSecret: z.string().min(1, "Dodo webhook secret is required"),
+  currency: z.string().min(1, "Currency is required"),
+  redirectUrl: z.url("Redirect URL must be a valid URL"),
 });

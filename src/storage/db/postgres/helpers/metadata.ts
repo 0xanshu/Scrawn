@@ -14,6 +14,8 @@ import {
 const DODO_FIELDS = [
   "dodo_live_api_key",
   "dodo_test_api_key",
+  "dodo_live_product_id",
+  "dodo_test_product_id",
   "dodo_webhook_secret",
 ] as const;
 
@@ -39,7 +41,8 @@ export type UpsertMetadataInput = {
   payment_webhook?: string | null;
   dodo_live_api_key?: string | null;
   dodo_test_api_key?: string | null;
-  dodo_product_id?: string;
+  dodo_live_product_id?: string | null;
+  dodo_test_product_id?: string | null;
   dodo_webhook_secret?: string | null;
   currency?: string;
   redirect_url?: string;
@@ -93,8 +96,14 @@ export async function upsertMetadata(
         setValues.dodo_test_api_key = input.dodo_test_api_key
           ? encrypt(input.dodo_test_api_key)
           : null;
-      if (input.dodo_product_id !== undefined)
-        setValues.dodo_product_id = input.dodo_product_id;
+      if (input.dodo_live_product_id !== undefined)
+        setValues.dodo_live_product_id = input.dodo_live_product_id
+          ? encrypt(input.dodo_live_product_id)
+          : null;
+      if (input.dodo_test_product_id !== undefined)
+        setValues.dodo_test_product_id = input.dodo_test_product_id
+          ? encrypt(input.dodo_test_product_id)
+          : null;
       if (input.dodo_webhook_secret !== undefined)
         setValues.dodo_webhook_secret = input.dodo_webhook_secret
           ? encrypt(input.dodo_webhook_secret)

@@ -38,7 +38,10 @@ Edit `.env.local`:
 DATABASE_URL=postgresql://user:password@localhost:5432/scrawn
 CLICKHOUSE_URL=http://default:password@localhost:8123/scrawn
 HMAC_SECRET=your-hmac-secret-key
-DODO_PAYMENTS_API_KEY=your-dodo-api-key
+DODO_PAYMENTS_LIVE_API_KEY=your-dodo-live-api-key
+DODO_PAYMENTS_TEST_API_KEY=your-dodo-test-api-key
+DODO_PAYMENTS_LIVE_PRODUCT_ID=your-dodo-live-product-id
+DODO_PAYMENTS_TEST_PRODUCT_ID=your-dodo-test-product-id
 DODO_PAYMENTS_WEBHOOK_SECRET=your-webhook-secret
 STORAGE_ADAPTER=postgres   # or "clickhouse"
 SENTRY_DSN=https://your-dsn@sentry.io/your-project
