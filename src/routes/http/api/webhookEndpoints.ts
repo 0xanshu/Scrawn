@@ -68,7 +68,7 @@ function toEndpointResponse(
 export async function handleCreateWebhookEndpoint(
   request: FastifyRequest,
   reply: FastifyReply
-): Promise<WebhookEndpointResponse | { error: string; crons?: never }> {
+): Promise<WebhookEndpointResponse | { error: string }> {
   const builder = createWideEventBuilder(
     generateRequestId(),
     request.method,

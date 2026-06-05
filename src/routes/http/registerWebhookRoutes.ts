@@ -36,6 +36,17 @@ export async function registerWebhookRoutes(
       );
 
       try {
+        const mode = (request.query as Record<string, string>)?.mode;
+        if (mode !== "production" && mode !== "test") {
+          builder.setError(400, {
+            type: "ValidationError",
+            message:
+              "Invalid or missing 'mode' query parameter. Must be 'production' or 'test'.",
+          });
+          reply.code(400);
+          return { error: "Invalid mode query parameter" };
+        }
+
         const signatureHeader = request.headers["webhook-signature"];
         const timestampHeader = request.headers["webhook-timestamp"];
         const webhookIdHeader = request.headers["webhook-id"];
@@ -60,6 +71,7 @@ export async function registerWebhookRoutes(
           signature,
           timestamp,
           webhookId,
+          mode,
           builder
         );
 
