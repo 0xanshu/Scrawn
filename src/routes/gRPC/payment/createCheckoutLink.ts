@@ -30,6 +30,9 @@ import { handleAddSession } from "../../../storage/db/postgres/helpers/sessions"
 import { type ContextUnaryCall } from "../../../interface/types/context.ts";
 import { getPostgresDB } from "../../../storage/db/postgres/db";
 import { checkIfExistingCheckoutLink } from "../../../storage/db/postgres/helpers/sessions";
+import { ensureUserExists } from "../../../storage/db/postgres/helpers/users";
+import { usersTable } from "../../../storage/db/postgres/schema";
+import { eq } from "drizzle-orm";
 
 export async function createCheckoutLink(
   call: ContextUnaryCall<CreateCheckoutLinkRequest, CreateCheckoutLinkResponse>,
@@ -89,6 +92,14 @@ export async function createCheckoutLink(
       db,
       "create checkout link",
       async (txn) => {
+        await ensureUserExists(validatedData.userId, txn);
+
+        await txn
+          .select({ id: usersTable.id })
+          .from(usersTable)
+          .where(eq(usersTable.id, validatedData.userId))
+          .for("update");
+
         const existingId = await checkIfExistingCheckoutLink(
           txn,
           validatedData.userId,
