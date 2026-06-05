@@ -59,6 +59,7 @@ services:
       CLICKHOUSE_URL: http://default:clickhouse@clickhouse:8123/scrawn
       NODE_ENV: production
       HMAC_SECRET: ${HMAC_SECRET}
+      APP_URL: ${APP_URL}
 
   dashboard:
     profiles:

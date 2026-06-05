@@ -71,10 +71,13 @@ export async function handleDodoWebhook(
   signature: string | undefined,
   timestamp: string | undefined,
   webhookId: string | undefined,
+  mode: "production" | "test",
   builder: WideEventBuilder
 ): Promise<WebhookResponse> {
   try {
-    const client = await getDodoClient();
+    const client = await getDodoClient(
+      mode === "production" ? "production" : "test"
+    );
     const headers = buildWebhookHeaders(signature, timestamp, webhookId);
     const webhookPayload = unwrapWebhookPayload(client, rawBody, headers);
 

@@ -32,29 +32,11 @@ export function createFilterGroupSchema<C extends z.ZodTypeAny>(
   return filterGroupSchema;
 }
 
-const cronField = z
-  .string()
-  .min(9, "Cron expression must be at least 9 characters")
-  .max(100, "Cron expression must be less than 100 characters")
-  .refine((val) => {
-    const parts = val.trim().split(/\s+/);
-    if (parts.length < 5 || parts.length > 6) return false;
-    return true;
-  }, "Cron expression must have 5 or 6 fields (minute hour day month weekday or with seconds)");
-
-export const onboardingCronSchema = z.object({
-  crons: z
-    .array(cronField)
-    .min(1, "At least one cron expression is required")
-    .max(100, "Maximum 100 cron expressions allowed"),
-  webhookUrl: z.union([z.url("Invalid webhook URL"), z.literal("")], {
-    error: "Webhook URL is required (use an empty string to disable webhooks)",
-  }),
+export const onboardingSchema = z.object({
   dodoLiveApiKey: z.string().min(1, "Dodo live API key is required"),
   dodoTestApiKey: z.string().min(1, "Dodo test API key is required"),
   dodoLiveProductId: z.string().min(1, "Dodo live product ID is required"),
   dodoTestProductId: z.string().min(1, "Dodo test product ID is required"),
-  dodoWebhookSecret: z.string().min(1, "Dodo webhook secret is required"),
   currency: z.string().min(1, "Currency is required"),
   redirectUrl: z.url("Redirect URL must be a valid URL"),
 });

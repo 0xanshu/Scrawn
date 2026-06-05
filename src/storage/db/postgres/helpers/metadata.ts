@@ -9,7 +9,8 @@ export type UpsertMetadataInput = {
   dodo_test_api_key?: string;
   dodo_live_product_id?: string;
   dodo_test_product_id?: string;
-  dodo_webhook_secret?: string;
+  dodo_live_webhook_secret?: string;
+  dodo_test_webhook_secret?: string;
   currency?: string;
   redirect_url?: string;
 };
@@ -36,8 +37,10 @@ export async function upsertMetadata(
         setValues.dodo_live_product_id = input.dodo_live_product_id;
       if (input.dodo_test_product_id !== undefined)
         setValues.dodo_test_product_id = input.dodo_test_product_id;
-      if (input.dodo_webhook_secret !== undefined)
-        setValues.dodo_webhook_secret = input.dodo_webhook_secret;
+      if (input.dodo_live_webhook_secret !== undefined)
+        setValues.dodo_live_webhook_secret = input.dodo_live_webhook_secret;
+      if (input.dodo_test_webhook_secret !== undefined)
+        setValues.dodo_test_webhook_secret = input.dodo_test_webhook_secret;
       if (input.currency !== undefined) setValues.currency = input.currency;
       if (input.redirect_url !== undefined)
         setValues.redirect_url = input.redirect_url;

@@ -29,7 +29,7 @@ export async function getDodoClient(
     liveClient = new DodoPayments({
       bearerToken: apiKey,
       environment: "live_mode",
-      webhookKey: metadata?.dodo_webhook_secret ?? undefined,
+      webhookKey: metadata?.dodo_live_webhook_secret ?? undefined,
     });
     return liveClient;
   }
@@ -45,7 +45,7 @@ export async function getDodoClient(
   testClient = new DodoPayments({
     bearerToken: apiKey,
     environment: "test_mode",
-    webhookKey: metadata?.dodo_webhook_secret ?? undefined,
+    webhookKey: metadata?.dodo_test_webhook_secret ?? undefined,
   });
   return testClient;
 }

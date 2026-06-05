@@ -1,13 +1,14 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import * as Sentry from "@sentry/bun";
 import { ZodError } from "zod";
-import { onboardingCronSchema } from "../../../zod/internals.ts";
+import DodoPayments from "dodopayments";
+import { onboardingSchema } from "../../../zod/internals.ts";
 import {
   createWideEventBuilder,
   generateRequestId,
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
-import { AuthError } from "../../../errors/auth.ts";
+import { AuthError } from "../../../errors/auth";
 import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
 import {
   upsertMetadata,
@@ -18,7 +19,7 @@ import { clearClients } from "../../gRPC/payment/paymentProvider.ts";
 export async function handleOnboarding(
   request: FastifyRequest,
   reply: FastifyReply
-): Promise<{ crons: string[] }> {
+): Promise<Record<string, never>> {
   const builder = createWideEventBuilder(
     generateRequestId(),
     request.method,
@@ -30,14 +31,65 @@ export async function handleOnboarding(
     await authenticateHttpApiKey(authHeader);
 
     const body = await request.body;
-    const validated = onboardingCronSchema.parse(body);
+    const validated = onboardingSchema.parse(body);
+
+    const appUrl = process.env.APP_URL;
+    if (!appUrl) {
+      builder.setError(500, {
+        type: "ConfigError",
+        message: "APP_URL environment variable is not set",
+      });
+      reply.code(500);
+      return {};
+    }
+
+    const liveClient = new DodoPayments({
+      bearerToken: validated.dodoLiveApiKey,
+      environment: "live_mode",
+    });
+    const testClient = new DodoPayments({
+      bearerToken: validated.dodoTestApiKey,
+      environment: "test_mode",
+    });
+
+    let liveSecret: string;
+    let testSecret: string;
+    try {
+      const liveWebhook = await liveClient.webhooks.create({
+        url: `${appUrl}/webhooks/payment/createdCheckout?mode=production`,
+        description: "Scrawn live payment webhook",
+        filter_types: ["payment.succeeded", "payment.failed"],
+      });
+      liveSecret = (await liveClient.webhooks.retrieveSecret(liveWebhook.id))
+        .secret;
+
+      const testWebhook = await testClient.webhooks.create({
+        url: `${appUrl}/webhooks/payment/createdCheckout?mode=test`,
+        description: "Scrawn test payment webhook",
+        filter_types: ["payment.succeeded", "payment.failed"],
+      });
+      testSecret = (await testClient.webhooks.retrieveSecret(testWebhook.id))
+        .secret;
+    } catch (error) {
+      const errMsg = error instanceof Error ? error.message : String(error);
+      Sentry.captureException(error, {
+        extra: { context: "dodo webhook registration during onboarding" },
+      });
+      builder.setError(400, {
+        type: "DodoApiError",
+        message: `Failed to register webhook with Dodo: ${errMsg}`,
+      });
+      reply.code(400);
+      return {};
+    }
 
     await upsertMetadata({
       dodo_live_api_key: validated.dodoLiveApiKey,
       dodo_test_api_key: validated.dodoTestApiKey,
       dodo_live_product_id: validated.dodoLiveProductId,
       dodo_test_product_id: validated.dodoTestProductId,
-      dodo_webhook_secret: validated.dodoWebhookSecret,
+      dodo_live_webhook_secret: liveSecret,
+      dodo_test_webhook_secret: testSecret,
       currency: validated.currency,
       redirect_url: validated.redirectUrl,
     });
@@ -47,7 +99,7 @@ export async function handleOnboarding(
     builder.setSuccess(200);
 
     reply.code(201);
-    return { crons: validated.crons };
+    return {};
   } catch (error) {
     Sentry.captureException(error, {
       extra: { context: "onboarding route handler" },
@@ -59,7 +111,7 @@ export async function handleOnboarding(
         message: error.message,
       });
       reply.code(401);
-      return { crons: [] };
+      return {};
     }
 
     if (error instanceof ZodError) {
@@ -71,7 +123,7 @@ export async function handleOnboarding(
         message: issues,
       });
       reply.code(400);
-      return { crons: [] };
+      return {};
     }
 
     const err = error instanceof Error ? error : new Error(String(error));
@@ -80,7 +132,7 @@ export async function handleOnboarding(
       message: err.message,
     });
     reply.code(500);
-    return { crons: [] };
+    return {};
   } finally {
     logger.emit(builder.build());
   }
@@ -122,7 +174,8 @@ export async function handleGetConfig(
       dodo_test_api_key: maskApiKey(metadata.dodo_test_api_key),
       dodo_live_product_id: metadata.dodo_live_product_id,
       dodo_test_product_id: metadata.dodo_test_product_id,
-      dodo_webhook_secret: maskApiKey(metadata.dodo_webhook_secret),
+      dodo_live_webhook_secret: maskApiKey(metadata.dodo_live_webhook_secret),
+      dodo_test_webhook_secret: maskApiKey(metadata.dodo_test_webhook_secret),
       currency: metadata.currency,
       redirect_url: metadata.redirect_url,
     };

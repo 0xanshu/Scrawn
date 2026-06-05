@@ -264,7 +264,8 @@ export const metadataTable = pgTable("metadata", {
   dodo_test_api_key: text("dodo_test_api_key").notNull(),
   dodo_live_product_id: text("dodo_live_product_id").notNull(),
   dodo_test_product_id: text("dodo_test_product_id").notNull(),
-  dodo_webhook_secret: text("dodo_webhook_secret").notNull(),
+  dodo_live_webhook_secret: text("dodo_live_webhook_secret").notNull(),
+  dodo_test_webhook_secret: text("dodo_test_webhook_secret").notNull(),
   currency: text("currency").notNull().default("usd"),
   redirect_url: text("redirect_url").notNull(),
 });
