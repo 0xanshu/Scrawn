@@ -8,7 +8,7 @@ import {
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16;
 
-class MetadataEncryptionError extends Error {
+export class MetadataEncryptionError extends Error {
   public readonly type = "MetadataEncryptionError";
 
   constructor(message: string, options?: { cause?: Error }) {
