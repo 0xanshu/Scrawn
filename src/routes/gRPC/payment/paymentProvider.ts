@@ -1,6 +1,7 @@
 import DodoPayments from "dodopayments";
 import { PaymentError } from "../../../errors/payment";
 import { getMetadata } from "../../../storage/db/postgres/helpers/metadata";
+import { decrypt } from "../../../utils/encryptMetadata.ts";
 
 let liveClient: DodoPayments | null = null;
 let testClient: DodoPayments | null = null;
@@ -27,9 +28,11 @@ export async function getDodoClient(
     }
 
     liveClient = new DodoPayments({
-      bearerToken: apiKey,
+      bearerToken: decrypt(apiKey),
       environment: "live_mode",
-      webhookKey: metadata?.dodo_live_webhook_secret ?? undefined,
+      webhookKey: metadata?.dodo_live_webhook_secret
+        ? decrypt(metadata.dodo_live_webhook_secret)
+        : undefined,
     });
     return liveClient;
   }
@@ -43,9 +46,11 @@ export async function getDodoClient(
   }
 
   testClient = new DodoPayments({
-    bearerToken: apiKey,
+    bearerToken: decrypt(apiKey),
     environment: "test_mode",
-    webhookKey: metadata?.dodo_test_webhook_secret ?? undefined,
+    webhookKey: metadata?.dodo_test_webhook_secret
+      ? decrypt(metadata.dodo_test_webhook_secret)
+      : undefined,
   });
   return testClient;
 }

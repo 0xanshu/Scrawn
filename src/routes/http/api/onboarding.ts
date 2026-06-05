@@ -15,6 +15,7 @@ import {
   getMetadata,
 } from "../../../storage/db/postgres/helpers/metadata.ts";
 import { clearClients } from "../../gRPC/payment/paymentProvider.ts";
+import { encrypt, decrypt } from "../../../utils/encryptMetadata.ts";
 
 export async function handleOnboarding(
   request: FastifyRequest,
@@ -84,12 +85,12 @@ export async function handleOnboarding(
     }
 
     await upsertMetadata({
-      dodo_live_api_key: validated.dodoLiveApiKey,
-      dodo_test_api_key: validated.dodoTestApiKey,
+      dodo_live_api_key: encrypt(validated.dodoLiveApiKey),
+      dodo_test_api_key: encrypt(validated.dodoTestApiKey),
       dodo_live_product_id: validated.dodoLiveProductId,
       dodo_test_product_id: validated.dodoTestProductId,
-      dodo_live_webhook_secret: liveSecret,
-      dodo_test_webhook_secret: testSecret,
+      dodo_live_webhook_secret: encrypt(liveSecret),
+      dodo_test_webhook_secret: encrypt(testSecret),
       currency: validated.currency,
       redirect_url: validated.redirectUrl,
     });
@@ -170,12 +171,16 @@ export async function handleGetConfig(
     reply.code(200);
     return {
       configured: true,
-      dodo_live_api_key: maskApiKey(metadata.dodo_live_api_key),
-      dodo_test_api_key: maskApiKey(metadata.dodo_test_api_key),
+      dodo_live_api_key: maskApiKey(decrypt(metadata.dodo_live_api_key)),
+      dodo_test_api_key: maskApiKey(decrypt(metadata.dodo_test_api_key)),
       dodo_live_product_id: metadata.dodo_live_product_id,
       dodo_test_product_id: metadata.dodo_test_product_id,
-      dodo_live_webhook_secret: maskApiKey(metadata.dodo_live_webhook_secret),
-      dodo_test_webhook_secret: maskApiKey(metadata.dodo_test_webhook_secret),
+      dodo_live_webhook_secret: maskApiKey(
+        decrypt(metadata.dodo_live_webhook_secret)
+      ),
+      dodo_test_webhook_secret: maskApiKey(
+        decrypt(metadata.dodo_test_webhook_secret)
+      ),
       currency: metadata.currency,
       redirect_url: metadata.redirect_url,
     };
