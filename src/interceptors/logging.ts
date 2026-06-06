@@ -1,5 +1,5 @@
 import { status as grpcStatus } from "@grpc/grpc-js";
-import type { sendUnaryData, ServerErrorResponse } from "@grpc/grpc-js";
+import type { sendUnaryData } from "@grpc/grpc-js";
 import * as Sentry from "@sentry/bun";
 import { logger } from "../errors/logger";
 import {
@@ -72,10 +72,10 @@ export function loggingInterceptor(
     // Handle async handlers that might throw
     if (result && typeof result.then === "function") {
       return result.catch((error: unknown) => {
-        if (!builder["event"].outcome) {
-          const errorDetails = extractErrorDetails(error);
-          const statusCode = grpcStatusToHttpStatus(errorDetails.code);
+        const errorDetails = extractErrorDetails(error);
+        const statusCode = grpcStatusToHttpStatus(errorDetails.code);
 
+        if (!builder["event"].outcome) {
           Sentry.captureException(error, {
             extra: { requestId, method: url, statusCode },
           });
@@ -89,7 +89,11 @@ export function loggingInterceptor(
           const event = builder.build();
           logger.emit(event);
         }
-        throw error;
+
+        originalCallback?.({
+          code: errorDetails.code,
+          details: errorDetails.message,
+        });
       });
     }
   };
