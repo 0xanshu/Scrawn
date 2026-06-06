@@ -171,7 +171,7 @@ export function authInterceptor<Req, Res>(
       wideEventBuilder?.setAuth(cached.id, true);
 
       if (needsWebhook) {
-        checkWebhookEndpoint(cached.id)
+        return checkWebhookEndpoint(cached.id)
           .then((hasEndpoint) => {
             if (!hasEndpoint) {
               return callback?.(
@@ -184,13 +184,12 @@ export function authInterceptor<Req, Res>(
             return handler(call, callback);
           })
           .catch((error) => callback?.(error));
-        return;
       }
 
       return handler(call, callback);
     }
 
-    lookupApiKey(apiKeyHash)
+    return lookupApiKey(apiKeyHash)
       .then((apiKeyRecord) => {
         if (!apiKeyRecord) {
           return callback?.(AuthError.invalidAPIKey("API key not found"));
