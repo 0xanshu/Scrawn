@@ -243,13 +243,21 @@ export function authInterceptor<Req, Res>(
               }
               return handler(call, callback);
             })
-            .catch((error) => callback?.(error));
+            .catch((error) => {
+              return callback?.({
+                code: grpcStatus.UNAVAILABLE,
+                details: error instanceof Error ? error.message : String(error),
+              });
+            });
         }
 
         return handler(call, callback);
       })
       .catch((error) => {
-        return callback?.(error);
+        return callback?.({
+          code: grpcStatus.UNAVAILABLE,
+          details: error instanceof Error ? error.message : String(error),
+        });
       });
   };
 }

@@ -26,10 +26,14 @@ static_resources:
                                   prefix: application/grpc
                           route:
                             cluster: grpc_backend
+                            timeout: 60s
+                            max_stream_duration:
+                              max_stream_duration: 300s
                         - match:
                             prefix: "/"
                           route:
                             cluster: http_backend
+                            timeout: 60s
                 http_filters:
                   - name: envoy.filters.http.router
                     typed_config:
