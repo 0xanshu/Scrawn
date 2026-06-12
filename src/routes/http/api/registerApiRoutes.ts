@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { handleOnboarding, handleGetConfig } from "./onboarding.ts";
+import { handleOnboarding, handleGetConfig } from "./onBoarding.ts";
 import { handleListTags, handleCreateTag, handleDeleteTag } from "./tags.ts";
 import {
   handleListExpressions,
@@ -19,6 +19,7 @@ import {
   handleRevokeApiKey,
 } from "./apiKeys.ts";
 import { handleListDeliveries } from "./webhookDeliveries.ts";
+import { handleCreateProject } from "./project.ts";
 
 export async function registerApiRoutes(
   server: ReturnType<(typeof import("fastify"))["fastify"]>
@@ -35,6 +36,13 @@ export async function registerApiRoutes(
     "/api/v1/internals/config",
     async (request: FastifyRequest, reply: FastifyReply) => {
       return handleGetConfig(request, reply);
+    }
+  );
+
+  server.post(
+    "/api/v1/internals/projects",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleCreateProject(request, reply);
     }
   );
 

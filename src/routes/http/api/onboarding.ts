@@ -8,7 +8,7 @@ import {
   generateRequestId,
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
-import { AuthError } from "../../../errors/auth";
+import { AuthError } from "../../../errors/auth.ts";
 import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
 import {
   upsertMetadata,
@@ -93,6 +93,7 @@ export async function handleOnboarding(
       dodo_test_webhook_secret: encrypt(testSecret),
       currency: validated.currency,
       redirect_url: validated.redirectUrl,
+      project_id: validated.project_id,
     });
 
     clearClients();
@@ -183,6 +184,7 @@ export async function handleGetConfig(
       ),
       currency: metadata.currency,
       redirect_url: metadata.redirect_url,
+      project_id: metadata.project_id,
     };
   } catch (error) {
     Sentry.captureException(error, {

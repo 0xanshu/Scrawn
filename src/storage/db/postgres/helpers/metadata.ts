@@ -13,6 +13,7 @@ export type UpsertMetadataInput = {
   dodo_test_webhook_secret?: string;
   currency?: string;
   redirect_url?: string;
+  project_id?: string;
 };
 
 export async function upsertMetadata(
@@ -44,6 +45,8 @@ export async function upsertMetadata(
       if (input.currency !== undefined) setValues.currency = input.currency;
       if (input.redirect_url !== undefined)
         setValues.redirect_url = input.redirect_url;
+      if (input.project_id !== undefined)
+        setValues.project_id = input.project_id;
 
       if (existingMetadata) {
         if (Object.keys(setValues).length > 0) {

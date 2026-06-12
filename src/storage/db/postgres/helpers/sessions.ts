@@ -74,6 +74,7 @@ export async function handleAddSession(
   apiKeyId: string,
   mode: "test" | "production",
   checkoutUrl: string,
+  project_id: string,
   txn?: PgTransaction<any, any, any>
 ): Promise<{ id: string }> {
   const connectionObject = txn ?? getPostgresDB();
@@ -97,6 +98,7 @@ export async function handleAddSession(
         apiKeyId: apiKeyId,
         mode: mode,
         checkoutUrl: checkoutUrl,
+        project_id: project_id,
       })
       .returning({ proxy_link_id: sessionsTable.proxy_link_id });
 

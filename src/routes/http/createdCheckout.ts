@@ -180,7 +180,7 @@ export async function handleDodoWebhook(
 
     if (webhookPayload.type === "payment.succeeded") {
       const creditAmount = Math.round(webhookPayload.data.total_amount);
-      const { userId, billed_upto, apiKeyId, mode } = session;
+      const { userId, billed_upto, apiKeyId, mode, project_id } = session;
       let claimed: boolean = false;
 
       await executeInTransaction(db, "process checkout", async (txn) => {
@@ -197,6 +197,7 @@ export async function handleDodoWebhook(
           apiKeyId,
           mode,
           session.proxy_link_id,
+          project_id,
           txn
         );
       });
