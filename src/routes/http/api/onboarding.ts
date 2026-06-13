@@ -45,8 +45,6 @@ export async function handleOnboarding(
       return {};
     }
 
-    await createProject(project_id, validated.dodoLiveProductId);
-
     const liveClient = new DodoPayments({
       bearerToken: validated.dodoLiveApiKey,
       environment: "live_mode",
@@ -87,6 +85,7 @@ export async function handleOnboarding(
       return {};
     }
 
+    await createProject(project_id, validated.dodoLiveProductId);
     await upsertMetadata({
       dodo_live_api_key: encrypt(validated.dodoLiveApiKey),
       dodo_test_api_key: encrypt(validated.dodoTestApiKey),
