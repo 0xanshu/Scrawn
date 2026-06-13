@@ -30,10 +30,10 @@ export async function handleOnboarding(
 
   try {
     const authHeader = request.headers.authorization;
+    const { project_id } = await authenticateHttpApiKey(authHeader);
+
     const body = await request.body;
     const validated = onboardingSchema.parse(body);
-
-    const { project_id } = await authenticateHttpApiKey(authHeader);
 
     const appUrl = process.env.APP_URL;
     if (!appUrl) {

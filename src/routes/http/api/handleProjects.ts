@@ -12,7 +12,6 @@ import { AuthError } from "../../../errors/auth";
 import { logger } from "../../../errors/logger";
 
 const checkProject = z.object({
-  project_id: z.string().min(1, "Project ID is required").max(128),
   product_id: z.string().min(1, "Product ID is required").max(128),
 });
 
@@ -28,12 +27,18 @@ export async function handleCreateProject(
 
   try {
     const authHeader = request.headers.authorization;
-    const { project_id } = await authenticateHttpApiKey(authHeader);
+    const { project_id, role } = await authenticateHttpApiKey(authHeader);
+
+    if (role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage projects"
+      );
+    }
 
     const body = await request.body;
     const validated = checkProject.parse(body);
 
-    await createProject(validated.project_id, validated.product_id);
+    await createProject(project_id, validated.product_id);
 
     builder.setSuccess(200);
     reply.code(200);
