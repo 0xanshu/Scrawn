@@ -16,6 +16,7 @@ import {
 } from "../../../storage/db/postgres/helpers/metadata.ts";
 import { clearClients } from "../../gRPC/payment/paymentProvider.ts";
 import { encrypt, decrypt } from "../../../utils/encryptMetadata.ts";
+import { createProject } from "../../../storage/db/postgres/helpers/projects.ts";
 
 export async function handleOnboarding(
   request: FastifyRequest,
@@ -43,6 +44,8 @@ export async function handleOnboarding(
       reply.code(500);
       return {};
     }
+
+    await createProject(validated.project_id, validated.dodoLiveProductId);
 
     const liveClient = new DodoPayments({
       bearerToken: validated.dodoLiveApiKey,
@@ -96,7 +99,7 @@ export async function handleOnboarding(
       project_id: validated.project_id,
     });
 
-    clearClients();
+    clearClients(validated.project_id);
 
     builder.setSuccess(200);
 
@@ -158,9 +161,9 @@ export async function handleGetConfig(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const { project_id } = await authenticateHttpApiKey(authHeader);
 
-    const metadata = await getMetadata();
+    const metadata = await getMetadata(project_id);
 
     if (!metadata) {
       builder.setSuccess(200);

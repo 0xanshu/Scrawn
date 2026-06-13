@@ -33,7 +33,8 @@ export async function updateSessionStatus(
 export async function checkIfExistingCheckoutLink(
   txn: PgTransaction<any, any, any>,
   userId: UserId,
-  mode: "test" | "production"
+  mode: "test" | "production",
+  project_id: string
 ): Promise<string | undefined> {
   try {
     if (!txn) {
@@ -48,6 +49,7 @@ export async function checkIfExistingCheckoutLink(
           eq(sessionsTable.userId, userId),
           eq(sessionsTable.processed, "pending"),
           eq(sessionsTable.mode, mode),
+          eq(sessionsTable.project_id, project_id),
           sql`${sessionsTable.createdAt} > ${DateTime.utc().minus({ hours: 24 }).toISO()}`
         )
       )

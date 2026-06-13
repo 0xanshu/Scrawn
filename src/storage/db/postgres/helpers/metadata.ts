@@ -13,7 +13,7 @@ export type UpsertMetadataInput = {
   dodo_test_webhook_secret?: string;
   currency?: string;
   redirect_url?: string;
-  project_id?: string;
+  project_id: string;
 };
 
 export async function upsertMetadata(
@@ -26,6 +26,7 @@ export async function upsertMetadata(
       const [existingMetadata] = await txn
         .select({ id: metadataTable.id })
         .from(metadataTable)
+        .where(eq(metadataTable.project_id, input.project_id))
         .limit(1)
         .for("update");
 
@@ -45,8 +46,6 @@ export async function upsertMetadata(
       if (input.currency !== undefined) setValues.currency = input.currency;
       if (input.redirect_url !== undefined)
         setValues.redirect_url = input.redirect_url;
-      if (input.project_id !== undefined)
-        setValues.project_id = input.project_id;
 
       if (existingMetadata) {
         if (Object.keys(setValues).length > 0) {
@@ -60,6 +59,7 @@ export async function upsertMetadata(
 
       const insertValues: typeof metadataTable.$inferInsert = {
         ...setValues,
+        project_id: input.project_id,
       } as typeof metadataTable.$inferInsert;
       await txn.insert(metadataTable).values(insertValues);
     } catch (e) {
@@ -71,10 +71,14 @@ export async function upsertMetadata(
   });
 }
 
-export async function getMetadata(): Promise<
-  typeof metadataTable.$inferSelect | undefined
-> {
+export async function getMetadata(
+  project_id: string
+): Promise<typeof metadataTable.$inferSelect | undefined> {
   const db = getPostgresDB();
-  const [metadata] = await db.select().from(metadataTable).limit(1);
+  const [metadata] = await db
+    .select()
+    .from(metadataTable)
+    .where(eq(metadataTable.project_id, project_id))
+    .limit(1);
   return metadata;
 }
