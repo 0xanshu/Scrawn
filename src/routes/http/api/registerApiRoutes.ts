@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { handleOnboarding, handleGetConfig } from "./onBoarding.ts";
+import { handleOnboarding, handleGetConfig } from "./onboarding.ts";
 import { handleListTags, handleCreateTag, handleDeleteTag } from "./tags.ts";
 import {
   handleListExpressions,

@@ -72,31 +72,13 @@ export async function handleDodoWebhook(
   timestamp: string | undefined,
   webhookId: string | undefined,
   mode: "production" | "test",
+  project_id: string,
   builder: WideEventBuilder
 ): Promise<WebhookResponse> {
   try {
-    if (!webhookId) {
-      return errorResponse(
-        400,
-        "ValidationError",
-        "Missing webhook-id header",
-        builder
-      );
-    }
-
-    const preSession = await getSessionByCheckoutId(webhookId);
-    if (!preSession) {
-      return errorResponse(
-        404,
-        "NotFoundError",
-        "No session found for this webhook",
-        builder
-      );
-    }
-
     const client = await getDodoClient(
       mode === "production" ? "production" : "test",
-      preSession.project_id
+      project_id
     );
     const headers = buildWebhookHeaders(signature, timestamp, webhookId);
     const webhookPayload = unwrapWebhookPayload(client, rawBody, headers);

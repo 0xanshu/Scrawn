@@ -39,5 +39,4 @@ export const onboardingSchema = z.object({
   dodoTestProductId: z.string().min(1, "Dodo test product ID is required"),
   currency: z.string().min(1, "Currency is required"),
   redirectUrl: z.url("Redirect URL must be a valid URL"),
-  project_id: z.string().min(1, "Project ID is required"),
 });

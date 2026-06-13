@@ -30,10 +30,10 @@ export async function handleOnboarding(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
-
     const body = await request.body;
     const validated = onboardingSchema.parse(body);
+
+    const { project_id } = await authenticateHttpApiKey(authHeader);
 
     const appUrl = process.env.APP_URL;
     if (!appUrl) {
@@ -45,7 +45,7 @@ export async function handleOnboarding(
       return {};
     }
 
-    await createProject(validated.project_id, validated.dodoLiveProductId);
+    await createProject(project_id, validated.dodoLiveProductId);
 
     const liveClient = new DodoPayments({
       bearerToken: validated.dodoLiveApiKey,
@@ -60,7 +60,7 @@ export async function handleOnboarding(
     let testSecret: string;
     try {
       const liveWebhook = await liveClient.webhooks.create({
-        url: `${appUrl}/webhooks/payment/createdCheckout?mode=production`,
+        url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&project_id=${project_id}`,
         description: "Scrawn live payment webhook",
         filter_types: ["payment.succeeded", "payment.failed"],
       });
@@ -68,7 +68,7 @@ export async function handleOnboarding(
         .secret;
 
       const testWebhook = await testClient.webhooks.create({
-        url: `${appUrl}/webhooks/payment/createdCheckout?mode=test`,
+        url: `${appUrl}/webhooks/payment/createdCheckout?mode=test&project_id=${project_id}`,
         description: "Scrawn test payment webhook",
         filter_types: ["payment.succeeded", "payment.failed"],
       });
@@ -96,10 +96,10 @@ export async function handleOnboarding(
       dodo_test_webhook_secret: encrypt(testSecret),
       currency: validated.currency,
       redirect_url: validated.redirectUrl,
-      project_id: validated.project_id,
+      project_id,
     });
 
-    clearClients(validated.project_id);
+    clearClients(project_id);
 
     builder.setSuccess(200);
 
