@@ -192,7 +192,7 @@ export async function handleDodoWebhook(
           txn
         );
         if (!claimed) return;
-        await updateUserBilledTimestamp(userId, billed_upto, txn);
+        await updateUserBilledTimestamp(userId, project_id, billed_upto, txn);
         await handleAddPayment(
           userId,
           creditAmount,

@@ -47,9 +47,9 @@ export async function handleListTags(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const { project_id } = await authenticateHttpApiKey(authHeader);
 
-    const tags = await listTags();
+    const tags = await listTags(project_id);
 
     builder.setSuccess(200).addContext({ tagCount: tags.length });
     reply.code(200);
@@ -137,10 +137,10 @@ export async function handleDeleteTag(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const { project_id } = await authenticateHttpApiKey(authHeader);
 
     const params = tagParamsSchema.parse(request.params);
-    const deleted = await deleteTag(params.key);
+    const deleted = await deleteTag(params.key, project_id);
 
     if (!deleted) {
       builder.setError(404, {
