@@ -111,9 +111,9 @@ export const apiKeysTable = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(),
     key: text("key").notNull().unique(),
-    role: text("role", { enum: ["project", "production", "test"] })
+    role: text("role", { enum: ["dashboard", "production", "test"] })
       .notNull()
-      .default("project"),
+      .default("dashboard"),
     createdAt: timestamp("created_at", {
       withTimezone: true,
       mode: "string",
