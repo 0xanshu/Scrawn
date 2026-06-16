@@ -70,6 +70,7 @@ export async function createAPIKey(
       key: apiKeyHash,
       role: validatedData.role,
       expiresAt: expiresAt.toISO(),
+      projectId: auth.projectId,
     });
 
     if (!keyEventData) {

@@ -106,6 +106,15 @@ export async function handleCreateWebhookEndpoint(
       return { error: "Target API key not found" };
     }
 
+    if (targetKey.projectId !== auth.projectId) {
+      builder.setError(403, {
+        type: "PermissionDenied",
+        message: "Target API key does not belong to this project",
+      });
+      reply.code(403);
+      return { error: "Target API key does not belong to this project" };
+    }
+
     if (targetKey.role === "dashboard") {
       builder.setError(400, {
         type: "ValidationError",
@@ -130,6 +139,7 @@ export async function handleCreateWebhookEndpoint(
     const keyPair = generateWebhookKeyPair();
 
     const endpoint = await upsertWebhookEndpoint(
+      auth.projectId,
       targetApiKeyId,
       validated.url,
       keyPair.privateKeyPem,
@@ -184,7 +194,10 @@ export async function handleGetWebhookEndpoint(
     const auth = await authenticateHttpApiKey(request.headers.authorization);
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
-    const endpoint = await getWebhookEndpointByApiKeyId(auth.apiKeyId);
+    const endpoint = await getWebhookEndpointByApiKeyId(
+      auth.projectId,
+      auth.apiKeyId
+    );
 
     const endpoints: WebhookEndpointResponse[] = endpoint
       ? [toEndpointResponse(endpoint)]
@@ -299,6 +312,15 @@ export async function handleSendTestWebhook(
       return { error: "API key not found" };
     }
 
+    if (targetKey.projectId !== auth.projectId) {
+      builder.setError(403, {
+        type: "PermissionDenied",
+        message: "API key does not belong to this project",
+      });
+      reply.code(403);
+      return { error: "API key does not belong to this project" };
+    }
+
     if (targetKey.role !== "test") {
       builder.setError(400, {
         type: "ValidationError",
@@ -308,7 +330,10 @@ export async function handleSendTestWebhook(
       return { error: "Can only send test webhooks to test API keys" };
     }
 
-    const endpoint = await getWebhookEndpointByApiKeyId(validated.apiKeyId);
+    const endpoint = await getWebhookEndpointByApiKeyId(
+      auth.projectId,
+      validated.apiKeyId
+    );
 
     if (!endpoint) {
       builder.setError(404, {
@@ -321,7 +346,7 @@ export async function handleSendTestWebhook(
 
     const now = DateTime.utc();
 
-    await forwardWebhook(validated.apiKeyId, {
+    await forwardWebhook(auth.projectId, validated.apiKeyId, {
       eventType: "payment.succeeded",
       resource: "payment",
       action: "succeeded",
@@ -374,7 +399,10 @@ export async function handleGetPublicKey(
     const auth = await authenticateHttpApiKey(request.headers.authorization);
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
-    const endpoint = await getWebhookEndpointByApiKeyId(auth.apiKeyId);
+    const endpoint = await getWebhookEndpointByApiKeyId(
+      auth.projectId,
+      auth.apiKeyId
+    );
 
     if (!endpoint) {
       builder.setError(404, {

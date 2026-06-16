@@ -62,10 +62,12 @@ export async function handleCreateApiKey(
       key: apiKeyHash,
       role: validated.role,
       expiresAt: expiresAt.toISO(),
+      projectId: auth.projectId,
     });
 
     const keyPair = generateWebhookKeyPair();
     const endpoint = await upsertWebhookEndpoint(
+      auth.projectId,
       keyRecord.id,
       validated.webhookUrl,
       keyPair.privateKeyPem,
@@ -127,7 +129,7 @@ export async function handleListApiKeys(
   );
 
   try {
-    await authenticateHttpApiKey(request.headers.authorization);
+    const auth = await authenticateHttpApiKey(request.headers.authorization);
 
     const db = getPostgresDB();
     const keys = await db
@@ -151,7 +153,11 @@ export async function handleListApiKeys(
         )
       )
       .where(
-        and(ne(apiKeysTable.role, "dashboard"), eq(apiKeysTable.revoked, false))
+        and(
+          eq(apiKeysTable.projectId, auth.projectId),
+          ne(apiKeysTable.role, "dashboard"),
+          eq(apiKeysTable.revoked, false)
+        )
       )
       .orderBy(apiKeysTable.createdAt);
 
@@ -189,7 +195,7 @@ export async function handleRevokeApiKey(
   );
 
   try {
-    await authenticateHttpApiKey(request.headers.authorization);
+    const auth = await authenticateHttpApiKey(request.headers.authorization);
 
     const params = request.params as { id: string };
     const db = getPostgresDB();
@@ -199,7 +205,11 @@ export async function handleRevokeApiKey(
       .update(apiKeysTable)
       .set({ revoked: true, revokedAt: now })
       .where(
-        and(eq(apiKeysTable.id, params.id), eq(apiKeysTable.revoked, false))
+        and(
+          eq(apiKeysTable.projectId, auth.projectId),
+          eq(apiKeysTable.id, params.id),
+          eq(apiKeysTable.revoked, false)
+        )
       );
 
     if ((result.count ?? 0) === 0) {

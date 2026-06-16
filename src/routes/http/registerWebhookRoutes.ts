@@ -36,7 +36,10 @@ export async function registerWebhookRoutes(
       );
 
       try {
-        const mode = (request.query as Record<string, string>)?.mode;
+        const query = request.query as Record<string, string>;
+        const mode = query?.mode;
+        const projectId = query?.projectId;
+
         if (mode !== "production" && mode !== "test") {
           builder.setError(400, {
             type: "ValidationError",
@@ -45,6 +48,15 @@ export async function registerWebhookRoutes(
           });
           reply.code(400);
           return { error: "Invalid mode query parameter" };
+        }
+
+        if (!projectId) {
+          builder.setError(400, {
+            type: "ValidationError",
+            message: "Missing 'projectId' query parameter.",
+          });
+          reply.code(400);
+          return { error: "Missing projectId query parameter" };
         }
 
         const signatureHeader = request.headers["webhook-signature"];
@@ -72,6 +84,7 @@ export async function registerWebhookRoutes(
           timestamp,
           webhookId,
           mode,
+          projectId,
           builder
         );
 

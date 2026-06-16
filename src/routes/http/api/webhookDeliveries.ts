@@ -16,6 +16,7 @@ import {
   apiKeysTable,
 } from "../../../storage/db/postgres/schema";
 import { and, eq, desc, inArray, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 const listDeliveriesQuerySchema = z.object({
   apiKeyId: z.string().uuid("Invalid API key ID").optional(),
@@ -37,12 +38,15 @@ export async function handleListDeliveries(
   );
 
   try {
-    await authenticateHttpApiKey(request.headers.authorization);
+    const auth = await authenticateHttpApiKey(request.headers.authorization);
 
     const query = listDeliveriesQuerySchema.parse(request.query);
     const db = getPostgresDB();
 
-    let conditions = undefined;
+    let conditions: SQL | undefined = eq(
+      webhookDeliveriesTable.projectId,
+      auth.projectId
+    );
     if (query.apiKeyId) {
       const endpoints = await db
         .select({ id: webhookEndpointsTable.id })

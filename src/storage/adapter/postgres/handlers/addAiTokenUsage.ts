@@ -117,6 +117,7 @@ function buildAiTokenInsertValues(
   auth: AuthContext
 ) {
   return aggregatedEvents.map((aggEvent) => ({
+    projectId: auth.projectId,
     eventId: aggEvent.eventId,
     idempotencyKey: aggEvent.idempotencyKey,
     reportedTimestamp: aggEvent.reported_timestamp,
@@ -166,7 +167,7 @@ export async function handleAddAiTokenUsage(
     `storing ${events.length} AI_TOKEN_USAGE event(s)`,
     async (txn) => {
       if (firstEvent) {
-        await ensureUserExists(firstEvent.userId, txn);
+        await ensureUserExists(auth.projectId, firstEvent.userId, txn);
       }
 
       try {

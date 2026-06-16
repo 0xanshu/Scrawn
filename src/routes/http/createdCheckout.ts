@@ -72,10 +72,12 @@ export async function handleDodoWebhook(
   timestamp: string | undefined,
   webhookId: string | undefined,
   mode: "production" | "test",
+  projectId: string,
   builder: WideEventBuilder
 ): Promise<WebhookResponse> {
   try {
     const client = await getDodoClient(
+      projectId,
       mode === "production" ? "production" : "test"
     );
     const headers = buildWebhookHeaders(signature, timestamp, webhookId);
@@ -158,7 +160,7 @@ export async function handleDodoWebhook(
       }
 
       builder.setSuccess(200);
-      forwardWebhook(session.apiKeyId, {
+      forwardWebhook(session.projectId, session.apiKeyId, {
         eventType: "payment.failed",
         resource: "payment",
         action: "failed",
@@ -192,6 +194,7 @@ export async function handleDodoWebhook(
         if (!claimed) return;
         await updateUserBilledTimestamp(userId, billed_upto, txn);
         await handleAddPayment(
+          session.projectId,
           userId,
           creditAmount,
           apiKeyId,
@@ -212,7 +215,7 @@ export async function handleDodoWebhook(
       builder.setPaymentContext({ creditAmount });
       builder.setSuccess(200);
 
-      forwardWebhook(apiKeyId, {
+      forwardWebhook(session.projectId, apiKeyId, {
         eventType: "payment.succeeded",
         resource: "payment",
         action: "succeeded",

@@ -211,9 +211,9 @@ export async function handleQueryEvents(
 
   try {
     if (request.aggregation) {
-      return await handleAggregationQuery(request, tables);
+      return await handleAggregationQuery(request, tables, auth);
     }
-    return await handleListQuery(request, tables);
+    return await handleListQuery(request, tables, auth);
   } catch (e) {
     if (
       e &&
@@ -232,11 +232,12 @@ export async function handleQueryEvents(
 
 async function handleListQuery(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<QueryResponse> {
   const client = getClickHouseDB();
   const paramIndex = { value: 0 };
-  const params: Record<string, unknown> = {};
+  const params: Record<string, unknown> = { projectId: auth.projectId };
 
   const queries = tables.map((t) => {
     const whereClause = buildWhereFromGroup(
@@ -246,7 +247,8 @@ async function handleListQuery(
       paramIndex
     );
     let q = `SELECT ${buildSelectColumns(t)} FROM ${t}`;
-    if (whereClause) q += ` WHERE ${whereClause}`;
+    q += ` WHERE project_id = {projectId:String}`;
+    if (whereClause) q += ` AND ${whereClause}`;
     return q;
   });
 
@@ -276,20 +278,21 @@ async function handleListQuery(
     data as unknown as Record<string, string>[]
   ).map(normalizeRow);
 
-  const total = await getTotalCount(request, tables);
+  const total = await getTotalCount(request, tables, auth);
 
   return { rows, total };
 }
 
 async function handleAggregationQuery(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<QueryResponse> {
   const client = getClickHouseDB();
   const agg = request.aggregation!;
   const isSum = agg.type === "SUM";
   const paramIndex = { value: 0 };
-  const params: Record<string, unknown> = {};
+  const params: Record<string, unknown> = { projectId: auth.projectId };
 
   const subQueries = tables.map((t) => {
     const cols: string[] = [];
@@ -325,7 +328,8 @@ async function handleAggregationQuery(
       paramIndex
     );
     let q = `SELECT ${cols.join(", ")} FROM ${t}`;
-    if (whereClause) q += ` WHERE ${whereClause}`;
+    q += ` WHERE project_id = {projectId:String}`;
+    if (whereClause) q += ` AND ${whereClause}`;
     return q;
   });
 
@@ -364,11 +368,12 @@ async function handleAggregationQuery(
 
 async function getTotalCount(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<number> {
   const client = getClickHouseDB();
   const paramIndex = { value: 0 };
-  const params: Record<string, unknown> = {};
+  const params: Record<string, unknown> = { projectId: auth.projectId };
 
   const subQueries = tables.map((t) => {
     const whereClause = buildWhereFromGroup(
@@ -378,7 +383,8 @@ async function getTotalCount(
       paramIndex
     );
     let q = `SELECT count() as cnt FROM ${t}`;
-    if (whereClause) q += ` WHERE ${whereClause}`;
+    q += ` WHERE project_id = {projectId:String}`;
+    if (whereClause) q += ` AND ${whereClause}`;
     return q;
   });
 

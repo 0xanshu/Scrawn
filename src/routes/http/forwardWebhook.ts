@@ -38,10 +38,11 @@ export interface WebhookForwardEvent {
 }
 
 export async function forwardWebhook(
+  projectId: string,
   apiKeyId: string,
   event: WebhookForwardEvent
 ): Promise<void> {
-  const endpoint = await getWebhookEndpointByApiKeyId(apiKeyId);
+  const endpoint = await getWebhookEndpointByApiKeyId(projectId, apiKeyId);
 
   if (!endpoint) {
     return;
@@ -71,7 +72,7 @@ export async function forwardWebhook(
     Sentry.captureException(error, {
       extra: { context: "webhook signing failed", error: errorMsg },
     });
-    await recordDelivery(endpoint.id, webhookId, event, "failed", {
+    await recordDelivery(projectId, endpoint.id, webhookId, event, "failed", {
       error: errorMsg,
     });
     return;
@@ -117,6 +118,7 @@ export async function forwardWebhook(
   }
 
   await recordDelivery(
+    projectId,
     endpoint.id,
     webhookId,
     event,
@@ -129,6 +131,7 @@ export async function forwardWebhook(
 }
 
 async function recordDelivery(
+  projectId: string,
   endpointId: string,
   eventId: string,
   event: WebhookForwardEvent,
@@ -141,6 +144,7 @@ async function recordDelivery(
   try {
     const db = getPostgresDB();
     await db.insert(webhookDeliveriesTable).values({
+      projectId,
       endpointId,
       eventId,
       eventType: event.eventType,

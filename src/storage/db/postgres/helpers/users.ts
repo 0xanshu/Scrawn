@@ -1,6 +1,6 @@
 import { getPostgresDB } from "../db";
 import { usersTable } from "../schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { StorageError } from "../../../../errors/storage";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
@@ -24,17 +24,21 @@ export async function updateUserBilledTimestamp(
   }
 }
 
-export async function userExists(userId: string): Promise<boolean> {
+export async function userExists(
+  projectId: string,
+  userId: string
+): Promise<boolean> {
   const db = getPostgresDB();
   const result = await db
     .select({ id: usersTable.id })
     .from(usersTable)
-    .where(eq(usersTable.id, userId))
+    .where(and(eq(usersTable.projectId, projectId), eq(usersTable.id, userId)))
     .limit(1);
   return result.length > 0;
 }
 
 export async function ensureUserExists(
+  projectId: string,
   userId: string,
   txn?: PgTransaction<any, any, any>
 ): Promise<void> {
@@ -43,7 +47,7 @@ export async function ensureUserExists(
   try {
     await db
       .insert(usersTable)
-      .values({ id: userId })
+      .values({ id: userId, projectId })
       .onConflictDoNothing({ target: usersTable.id });
   } catch (e) {
     if (

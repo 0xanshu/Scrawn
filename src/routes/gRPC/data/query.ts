@@ -2,6 +2,7 @@ import type { sendUnaryData } from "@grpc/grpc-js";
 import { QueryRequest, QueryResponse, Row } from "../../../gen/data/v1/data";
 import { dataQuerySchema, type DataQueryRequest } from "../../../zod/data";
 import { EventError } from "../../../errors/event";
+import { AuthError } from "../../../errors/auth";
 import { formatZodError } from "../../../utils/formatZodError";
 import { getPostgresDB } from "../../../storage/db/postgres/db";
 import {
@@ -29,6 +30,7 @@ import type { SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { WideEventBuilder } from "../../../context/requestContext";
 import { wideEventContextKey } from "../../../context/requestContext";
+import { apiKeyContextKey } from "../../../context/auth";
 import type { ContextUnaryCall } from "../../../interface/types/context.js";
 
 interface FieldDef {
@@ -206,6 +208,11 @@ export async function queryData(
     | undefined;
 
   try {
+    const auth = call[apiKeyContextKey];
+    if (!auth) {
+      return callback?.(AuthError.invalidAPIKey("API key context not found"));
+    }
+
     const req = { ...call.request } as Record<string, unknown>;
 
     const validated = dataQuerySchema.parse(req);
@@ -223,7 +230,14 @@ export async function queryData(
     }
 
     const db = getPostgresDB();
-    const whereClause = buildWhere(validated.where, tableDef);
+    const userWhere = buildWhere(validated.where, tableDef);
+    const projectFilter = eq(
+      (tableDef.table as any).projectId,
+      auth.projectId
+    ) as SQL;
+    const whereClause = userWhere
+      ? and(projectFilter, userWhere)
+      : projectFilter;
     const selectCols = buildSelect(tableDef);
     const columns = Object.keys(tableDef.fields);
 

@@ -135,6 +135,7 @@ function buildAiTokenInsertRows(
 
     return {
       id: index === 0 ? firstId : crypto.randomUUID(),
+      project_id: auth.projectId,
       event_id: aggEvent.eventId,
       idempotency_key: aggEvent.idempotencyKey,
       user_id: aggEvent.userId,
@@ -166,7 +167,7 @@ export async function handleAddAiTokenUsage(
 
   const firstEvent = events[0];
   if (firstEvent) {
-    await ensureUserExists(firstEvent.userId);
+    await ensureUserExists(auth.projectId, firstEvent.userId);
   }
 
   const aggregatedEvents = aggregateAiTokenEvents(events);

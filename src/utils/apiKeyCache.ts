@@ -6,6 +6,7 @@ interface CachedAPIKey {
   id: string;
   role: ApiKeyRole;
   mode: "production" | "test" | null;
+  projectId: string;
   expiresAt: string;
 }
 

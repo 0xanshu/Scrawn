@@ -33,6 +33,7 @@ export function createFilterGroupSchema<C extends z.ZodTypeAny>(
 }
 
 export const onboardingSchema = z.object({
+  name: z.string().min(1, "Project name is required").max(255),
   dodoLiveApiKey: z.string().min(1, "Dodo live API key is required"),
   dodoTestApiKey: z.string().min(1, "Dodo test API key is required"),
   dodoLiveProductId: z.string().min(1, "Dodo live product ID is required"),

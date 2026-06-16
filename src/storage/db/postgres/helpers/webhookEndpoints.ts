@@ -7,6 +7,7 @@ import { DateTime } from "luxon";
 export type WebhookEndpoint = typeof webhookEndpointsTable.$inferSelect;
 
 export async function getWebhookEndpointByApiKeyId(
+  projectId: string,
   apiKeyId: string
 ): Promise<WebhookEndpoint | undefined> {
   const db = getPostgresDB();
@@ -17,6 +18,7 @@ export async function getWebhookEndpointByApiKeyId(
       .from(webhookEndpointsTable)
       .where(
         and(
+          eq(webhookEndpointsTable.projectId, projectId),
           eq(webhookEndpointsTable.apiKeyId, apiKeyId),
           isNull(webhookEndpointsTable.deletedAt)
         )
@@ -33,6 +35,7 @@ export async function getWebhookEndpointByApiKeyId(
 }
 
 export async function upsertWebhookEndpoint(
+  projectId: string,
   apiKeyId: string,
   url: string,
   privateKey: string,
@@ -46,6 +49,7 @@ export async function upsertWebhookEndpoint(
     const [result] = await db
       .insert(webhookEndpointsTable)
       .values({
+        projectId,
         apiKeyId,
         url,
         privateKey,

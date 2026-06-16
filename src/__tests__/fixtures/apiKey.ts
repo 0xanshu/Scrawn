@@ -6,6 +6,8 @@ import {
 import { hashAPIKey } from "../../utils/hashAPIKey";
 import { DateTime } from "luxon";
 
+export const TEST_PROJECT_ID = "00000000-0000-0000-0000-000000000001";
+
 export async function createTestApiKey(): Promise<{
   rawKey: string;
   id: string;
@@ -19,10 +21,12 @@ export async function createTestApiKey(): Promise<{
       key: hashAPIKey(rawKey),
       role: "test",
       expiresAt: DateTime.utc().plus({ years: 1 }).toISO(),
+      projectId: TEST_PROJECT_ID,
     })
     .returning({ id: apiKeysTable.id });
 
   await db.insert(webhookEndpointsTable).values({
+    projectId: TEST_PROJECT_ID,
     apiKeyId: key!.id,
     url: "https://example.com/webhook",
     privateKey: "test-private-key",
@@ -47,6 +51,7 @@ export async function insertKey(
       expiresAt:
         overrides.expiresAt ?? DateTime.utc().plus({ years: 1 }).toISO(),
       revoked: overrides.revoked ?? false,
+      projectId: TEST_PROJECT_ID,
     })
     .returning({ id: apiKeysTable.id });
   return key!.id;

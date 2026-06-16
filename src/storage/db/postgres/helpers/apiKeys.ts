@@ -9,6 +9,7 @@ type CreateApiKeyInput = {
   key: string;
   role: string;
   expiresAt: string;
+  projectId: string;
 };
 
 export async function createApiKey(
@@ -37,6 +38,7 @@ export async function createApiKey(
         key: input.key,
         role: input.role as "dashboard" | "production" | "test",
         expiresAt: input.expiresAt,
+        projectId: input.projectId,
       })
       .returning({ id: apiKeysTable.id });
 
@@ -74,16 +76,20 @@ type ApiKeyRecord = {
   role: string;
   expiresAt: string;
   revoked: boolean;
+  projectId: string;
 };
 
 export async function getApiKeyRoleById(
   id: string
-): Promise<{ role: "dashboard" | "production" | "test" } | null> {
+): Promise<{
+  role: "dashboard" | "production" | "test";
+  projectId: string;
+} | null> {
   const db = getPostgresDB();
 
   try {
     const [record] = await db
-      .select({ role: apiKeysTable.role })
+      .select({ role: apiKeysTable.role, projectId: apiKeysTable.projectId })
       .from(apiKeysTable)
       .where(eq(apiKeysTable.id, id))
       .limit(1);
@@ -109,6 +115,7 @@ export async function findApiKeyByHash(
         role: apiKeysTable.role,
         expiresAt: apiKeysTable.expiresAt,
         revoked: apiKeysTable.revoked,
+        projectId: apiKeysTable.projectId,
       })
       .from(apiKeysTable)
       .where(eq(apiKeysTable.key, apiKeyHash))

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import * as Sentry from "@sentry/bun";
 import { ZodError } from "zod";
@@ -9,18 +10,26 @@ import {
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
 import { AuthError } from "../../../errors/auth";
+import { authenticateMasterApiKey } from "../../../utils/authenticateMasterApiKey.ts";
 import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
-import {
-  upsertMetadata,
-  getMetadata,
-} from "../../../storage/db/postgres/helpers/metadata.ts";
-import { clearClients } from "../../gRPC/payment/paymentProvider.ts";
+import { generateAPIKey } from "../../../utils/generateAPIKey";
+import { hashAPIKey } from "../../../utils/hashAPIKey";
 import { encrypt, decrypt } from "../../../utils/encryptMetadata.ts";
+import { getPostgresDB } from "../../../storage/db/postgres/db";
+import {
+  projectsTable,
+  apiKeysTable,
+  metadataTable,
+} from "../../../storage/db/postgres/schema";
+import { getMetadata } from "../../../storage/db/postgres/helpers/metadata";
+import { clearClients } from "../../gRPC/payment/paymentProvider.ts";
+import { DateTime } from "luxon";
+import { executeInTransaction } from "../../../storage/adapter/postgres/handlers/addEventUtils";
 
 export async function handleOnboarding(
   request: FastifyRequest,
   reply: FastifyReply
-): Promise<Record<string, never>> {
+): Promise<Record<string, unknown>> {
   const builder = createWideEventBuilder(
     generateRequestId(),
     request.method,
@@ -29,7 +38,7 @@ export async function handleOnboarding(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    authenticateMasterApiKey(authHeader);
 
     const body = await request.body;
     const validated = onboardingSchema.parse(body);
@@ -44,6 +53,8 @@ export async function handleOnboarding(
       return {};
     }
 
+    const projectId = randomUUID();
+
     const liveClient = new DodoPayments({
       bearerToken: validated.dodoLiveApiKey,
       environment: "live_mode",
@@ -57,7 +68,7 @@ export async function handleOnboarding(
     let testSecret: string;
     try {
       const liveWebhook = await liveClient.webhooks.create({
-        url: `${appUrl}/webhooks/payment/createdCheckout?mode=production`,
+        url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&projectId=${projectId}`,
         description: "Scrawn live payment webhook",
         filter_types: ["payment.succeeded", "payment.failed"],
       });
@@ -65,7 +76,7 @@ export async function handleOnboarding(
         .secret;
 
       const testWebhook = await testClient.webhooks.create({
-        url: `${appUrl}/webhooks/payment/createdCheckout?mode=test`,
+        url: `${appUrl}/webhooks/payment/createdCheckout?mode=test&projectId=${projectId}`,
         description: "Scrawn test payment webhook",
         filter_types: ["payment.succeeded", "payment.failed"],
       });
@@ -84,23 +95,44 @@ export async function handleOnboarding(
       return {};
     }
 
-    await upsertMetadata({
-      dodo_live_api_key: encrypt(validated.dodoLiveApiKey),
-      dodo_test_api_key: encrypt(validated.dodoTestApiKey),
-      dodo_live_product_id: validated.dodoLiveProductId,
-      dodo_test_product_id: validated.dodoTestProductId,
-      dodo_live_webhook_secret: encrypt(liveSecret),
-      dodo_test_webhook_secret: encrypt(testSecret),
-      currency: validated.currency,
-      redirect_url: validated.redirectUrl,
+    const dashboardKey = generateAPIKey("dashboard");
+    const dashboardKeyHash = hashAPIKey(dashboardKey);
+    const expiresAt = DateTime.utc().plus({ years: 10 }).toISO();
+
+    const db = getPostgresDB();
+    await executeInTransaction(db, "create project", async (txn) => {
+      await txn.insert(projectsTable).values({
+        id: projectId,
+        name: validated.name,
+      });
+
+      await txn.insert(metadataTable).values({
+        projectId,
+        dodo_live_api_key: encrypt(validated.dodoLiveApiKey),
+        dodo_test_api_key: encrypt(validated.dodoTestApiKey),
+        dodo_live_product_id: validated.dodoLiveProductId,
+        dodo_test_product_id: validated.dodoTestProductId,
+        dodo_live_webhook_secret: encrypt(liveSecret),
+        dodo_test_webhook_secret: encrypt(testSecret),
+        currency: validated.currency,
+        redirect_url: validated.redirectUrl,
+      });
+
+      await txn.insert(apiKeysTable).values({
+        projectId,
+        name: "Default dashboard key",
+        key: dashboardKeyHash,
+        role: "dashboard",
+        expiresAt,
+      });
     });
 
     clearClients();
 
-    builder.setSuccess(200);
+    builder.setSuccess(201);
 
     reply.code(201);
-    return {};
+    return { projectId, apiKey: dashboardKey };
   } catch (error) {
     Sentry.captureException(error, {
       extra: { context: "onboarding route handler" },
@@ -157,9 +189,9 @@ export async function handleGetConfig(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const auth = await authenticateHttpApiKey(authHeader);
 
-    const metadata = await getMetadata();
+    const metadata = await getMetadata(auth.projectId);
 
     if (!metadata) {
       builder.setSuccess(200);

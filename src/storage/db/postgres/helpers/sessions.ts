@@ -32,6 +32,7 @@ export async function updateSessionStatus(
 
 export async function checkIfExistingCheckoutLink(
   txn: PgTransaction<any, any, any>,
+  projectId: string,
   userId: UserId,
   mode: "test" | "production"
 ): Promise<string | undefined> {
@@ -45,6 +46,7 @@ export async function checkIfExistingCheckoutLink(
       .from(sessionsTable)
       .where(
         and(
+          eq(sessionsTable.projectId, projectId),
           eq(sessionsTable.userId, userId),
           eq(sessionsTable.processed, "pending"),
           eq(sessionsTable.mode, mode),
@@ -68,6 +70,7 @@ export async function checkIfExistingCheckoutLink(
 }
 
 export async function handleAddSession(
+  projectId: string,
   userId: UserId,
   sessionId: string,
   billedUpto: DateTime,
@@ -91,6 +94,7 @@ export async function handleAddSession(
     const insertResult = await connectionObject
       .insert(sessionsTable)
       .values({
+        projectId,
         userId: userId,
         sessionId: sessionId,
         billed_upto: billedUptoStr,
