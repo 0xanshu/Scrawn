@@ -51,16 +51,23 @@ export async function handleListDeliveries(
       const endpoints = await db
         .select({ id: webhookEndpointsTable.id })
         .from(webhookEndpointsTable)
-        .where(eq(webhookEndpointsTable.apiKeyId, query.apiKeyId));
-      const ids = endpoints.map((e) => e.id);
-      if (ids.length > 0) {
-        conditions = inArray(webhookDeliveriesTable.endpointId, ids);
-      } else {
-        conditions = eq(
-          webhookDeliveriesTable.id,
-          "00000000-0000-0000-0000-000000000000"
+        .where(
+          and(
+            eq(webhookEndpointsTable.projectId, auth.projectId),
+            eq(webhookEndpointsTable.apiKeyId, query.apiKeyId)
+          )
         );
-      }
+      const ids = endpoints.map((e) => e.id);
+      conditions =
+        ids.length > 0
+          ? and(conditions, inArray(webhookDeliveriesTable.endpointId, ids))
+          : and(
+              conditions,
+              eq(
+                webhookDeliveriesTable.id,
+                "00000000-0000-0000-0000-000000000000"
+              )
+            );
     }
 
     if (query.eventType) {
