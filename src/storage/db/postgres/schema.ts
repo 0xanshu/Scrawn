@@ -25,22 +25,31 @@ export const projectsTable = pgTable("projects", {
     .notNull(),
 });
 
-export const usersTable = pgTable("users", {
-  id: USER_ID_CONFIG.dbType("id").primaryKey(),
-  projectId: uuid("project_id")
-    .references(() => projectsTable.id)
-    .notNull(),
-  last_billed_timestamp: timestamp("last_billed_timestamp", {
-    withTimezone: true,
-    mode: "string",
+export const usersTable = pgTable(
+  "users",
+  {
+    id: USER_ID_CONFIG.dbType("id").primaryKey(),
+    projectId: uuid("project_id")
+      .references(() => projectsTable.id)
+      .notNull(),
+    last_billed_timestamp: timestamp("last_billed_timestamp", {
+      withTimezone: true,
+      mode: "string",
+    })
+      .default(DateTime.utc(1).toString())
+      .notNull(),
+    payment_provider_user_id: text("payment_provider_user_id"),
+    mode: text("mode", { enum: ["test", "production"] })
+      .notNull()
+      .default("production"),
+  },
+  (table) => ({
+    uniqueUserPerProject: uniqueIndex("uq_users_project_id").on(
+      table.projectId,
+      table.id
+    ),
   })
-    .default(DateTime.utc(1).toString())
-    .notNull(),
-  payment_provider_user_id: text("payment_provider_user_id"),
-  mode: text("mode", { enum: ["test", "production"] })
-    .notNull()
-    .default("production"),
-});
+);
 
 export const usersRelation = relations(usersTable, ({ one, many }) => ({
   project: one(projectsTable, {

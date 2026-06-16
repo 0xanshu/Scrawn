@@ -45,10 +45,17 @@ export async function ensureUserExists(
   const db = txn ?? getPostgresDB();
 
   try {
-    await db
-      .insert(usersTable)
-      .values({ id: userId, projectId })
-      .onConflictDoNothing({ target: usersTable.id });
+    const [existing] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(
+        and(eq(usersTable.projectId, projectId), eq(usersTable.id, userId))
+      )
+      .limit(1);
+
+    if (existing) return;
+
+    await db.insert(usersTable).values({ id: userId, projectId });
   } catch (e) {
     if (
       e instanceof Error &&

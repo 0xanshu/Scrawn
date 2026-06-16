@@ -51,12 +51,12 @@ export async function createTag(
         .update(tagsTable)
         .set({ amount })
         .where(eq(tagsTable.id, existing[0].id));
-      tagCache.delete(key);
+      tagCache.delete(`${projectId}:${key}`);
       return;
     }
 
     await db.insert(tagsTable).values({ projectId, key, amount });
-    tagCache.delete(key);
+    tagCache.delete(`${projectId}:${key}`);
   } catch (e) {
     throw StorageError.insertFailed(
       `Failed to upsert tag '${key}'`,
@@ -85,7 +85,7 @@ export async function deleteTag(
       );
 
     if ((result.count ?? 0) > 0) {
-      tagCache.delete(key);
+      tagCache.delete(`${projectId}:${key}`);
       return true;
     }
     return false;
