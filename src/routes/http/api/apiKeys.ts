@@ -23,6 +23,7 @@ import {
 import { eq, and, isNull, ne, sql } from "drizzle-orm";
 import type { ApiKeyRole } from "../../../utils/keyFormat";
 import { invalidateWebhookEndpointCache } from "../../../interceptors/auth";
+import { apiKeyCache } from "../../../utils/apiKeyCache";
 
 const createApiKeySchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
@@ -219,6 +220,20 @@ export async function handleRevokeApiKey(
       });
       reply.code(404);
       return { error: "API key not found or already revoked" };
+    }
+
+    const [keyRow] = await db
+      .select({ key: apiKeysTable.key })
+      .from(apiKeysTable)
+      .where(
+        and(
+          eq(apiKeysTable.projectId, auth.projectId),
+          eq(apiKeysTable.id, params.id)
+        )
+      )
+      .limit(1);
+    if (keyRow) {
+      apiKeyCache.delete(keyRow.key);
     }
 
     builder.setSuccess(200);

@@ -66,12 +66,15 @@ export async function handleOnboarding(
 
     let liveSecret: string;
     let testSecret: string;
+    let liveWebhookId: string | undefined;
+    let testWebhookId: string | undefined;
     try {
       const liveWebhook = await liveClient.webhooks.create({
         url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&projectId=${projectId}`,
         description: "Scrawn live payment webhook",
         filter_types: ["payment.succeeded", "payment.failed"],
       });
+      liveWebhookId = liveWebhook.id;
       liveSecret = (await liveClient.webhooks.retrieveSecret(liveWebhook.id))
         .secret;
 
@@ -80,9 +83,24 @@ export async function handleOnboarding(
         description: "Scrawn test payment webhook",
         filter_types: ["payment.succeeded", "payment.failed"],
       });
+      testWebhookId = testWebhook.id;
       testSecret = (await testClient.webhooks.retrieveSecret(testWebhook.id))
         .secret;
     } catch (error) {
+      if (liveWebhookId) {
+        liveClient.webhooks.delete(liveWebhookId).catch((e) =>
+          Sentry.captureException(e, {
+            extra: { context: "rollback: failed to delete live webhook" },
+          })
+        );
+      }
+      if (testWebhookId) {
+        testClient.webhooks.delete(testWebhookId).catch((e) =>
+          Sentry.captureException(e, {
+            extra: { context: "rollback: failed to delete test webhook" },
+          })
+        );
+      }
       const errMsg = error instanceof Error ? error.message : String(error);
       Sentry.captureException(error, {
         extra: { context: "dodo webhook registration during onboarding" },
@@ -100,32 +118,56 @@ export async function handleOnboarding(
     const expiresAt = DateTime.utc().plus({ years: 10 }).toISO();
 
     const db = getPostgresDB();
-    await executeInTransaction(db, "create project", async (txn) => {
-      await txn.insert(projectsTable).values({
-        id: projectId,
-        name: validated.name,
-      });
+    try {
+      await executeInTransaction(db, "create project", async (txn) => {
+        await txn.insert(projectsTable).values({
+          id: projectId,
+          name: validated.name,
+        });
 
-      await txn.insert(metadataTable).values({
-        projectId,
-        dodo_live_api_key: encrypt(validated.dodoLiveApiKey),
-        dodo_test_api_key: encrypt(validated.dodoTestApiKey),
-        dodo_live_product_id: validated.dodoLiveProductId,
-        dodo_test_product_id: validated.dodoTestProductId,
-        dodo_live_webhook_secret: encrypt(liveSecret),
-        dodo_test_webhook_secret: encrypt(testSecret),
-        currency: validated.currency,
-        redirect_url: validated.redirectUrl,
-      });
+        await txn.insert(metadataTable).values({
+          projectId,
+          dodo_live_api_key: encrypt(validated.dodoLiveApiKey),
+          dodo_test_api_key: encrypt(validated.dodoTestApiKey),
+          dodo_live_product_id: validated.dodoLiveProductId,
+          dodo_test_product_id: validated.dodoTestProductId,
+          dodo_live_webhook_secret: encrypt(liveSecret),
+          dodo_test_webhook_secret: encrypt(testSecret),
+          currency: validated.currency,
+          redirect_url: validated.redirectUrl,
+        });
 
-      await txn.insert(apiKeysTable).values({
-        projectId,
-        name: "Default dashboard key",
-        key: dashboardKeyHash,
-        role: "dashboard",
-        expiresAt,
+        await txn.insert(apiKeysTable).values({
+          projectId,
+          name: "Default dashboard key",
+          key: dashboardKeyHash,
+          role: "dashboard",
+          expiresAt,
+        });
       });
-    });
+    } catch (txnError) {
+      if (liveWebhookId) {
+        liveClient.webhooks.delete(liveWebhookId).catch((e) =>
+          Sentry.captureException(e, {
+            extra: {
+              context:
+                "rollback: failed to delete live webhook after DB failure",
+            },
+          })
+        );
+      }
+      if (testWebhookId) {
+        testClient.webhooks.delete(testWebhookId).catch((e) =>
+          Sentry.captureException(e, {
+            extra: {
+              context:
+                "rollback: failed to delete test webhook after DB failure",
+            },
+          })
+        );
+      }
+      throw txnError;
+    }
 
     clearClients();
 
