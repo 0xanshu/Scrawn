@@ -73,12 +73,12 @@ function createAITokenUsageDataSchema(
 ): z.ZodType<AITokenUsageEventData> {
   return z
     .object({
-      model: z.string(),
-      provider: z.string(),
-      inputTokens: z.number().int().nonnegative(),
-      inputCacheTokens: z.number().int().nonnegative(),
-      outputTokens: z.number().int().nonnegative(),
-      outputCacheTokens: z.number().int().nonnegative(),
+      model: z.string().min(1),
+      provider: z.string().optional().default("unknown"),
+      inputTokens: z.number().int().min(0),
+      inputCacheTokens: z.number().int().min(0),
+      outputTokens: z.number().int().min(0),
+      outputCacheTokens: z.number().int().min(0),
       inputTag: z.string().optional(),
       inputExpr: z.string().optional(),
       inputAmount: z.number().optional(),
