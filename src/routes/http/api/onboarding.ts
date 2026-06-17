@@ -22,7 +22,7 @@ import {
   metadataTable,
 } from "../../../storage/db/postgres/schema";
 import { getMetadata } from "../../../storage/db/postgres/helpers/metadata";
-import { clearClients } from "../../gRPC/payment/paymentProvider.ts";
+import { removeClient } from "../../gRPC/payment/paymentProvider.ts";
 import { DateTime } from "luxon";
 import { executeInTransaction } from "../../../storage/adapter/postgres/handlers/addEventUtils";
 
@@ -169,7 +169,7 @@ export async function handleOnboarding(
       throw txnError;
     }
 
-    clearClients();
+    removeClient(projectId);
 
     builder.setSuccess(201);
 

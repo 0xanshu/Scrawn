@@ -13,6 +13,11 @@ export function clearClients(): void {
   clients.clear();
 }
 
+export function removeClient(projectId: string): void {
+  clients.delete(clientKey(projectId, "test"));
+  clients.delete(clientKey(projectId, "production"));
+}
+
 export async function getDodoClient(
   projectId: string,
   mode?: "test" | "production"
