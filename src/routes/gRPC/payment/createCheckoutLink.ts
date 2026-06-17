@@ -32,7 +32,7 @@ import { getPostgresDB } from "../../../storage/db/postgres/db";
 import { checkIfExistingCheckoutLink } from "../../../storage/db/postgres/helpers/sessions";
 import { ensureUserExists } from "../../../storage/db/postgres/helpers/users";
 import { usersTable } from "../../../storage/db/postgres/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function createCheckoutLink(
   call: ContextUnaryCall<CreateCheckoutLinkRequest, CreateCheckoutLinkResponse>,
@@ -98,7 +98,12 @@ export async function createCheckoutLink(
         await txn
           .select({ id: usersTable.id })
           .from(usersTable)
-          .where(eq(usersTable.id, validatedData.userId))
+          .where(
+            and(
+              eq(usersTable.projectId, auth.projectId),
+              eq(usersTable.id, validatedData.userId)
+            )
+          )
           .for("update");
 
         const existingId = await checkIfExistingCheckoutLink(

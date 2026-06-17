@@ -10,7 +10,6 @@ import {
   sessionsTable,
   tagsTable,
   expressionsTable,
-  metadataTable,
 } from "../../../storage/db/postgres/schema";
 import {
   eq,
@@ -44,8 +43,7 @@ interface TableDef {
     | typeof usersTable
     | typeof sessionsTable
     | typeof tagsTable
-    | typeof expressionsTable
-    | typeof metadataTable;
+    | typeof expressionsTable;
   fields: Record<string, FieldDef>;
 }
 
@@ -95,13 +93,6 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
       id: { col: expressionsTable.id, cast: "uuid" },
       key: { col: expressionsTable.key, cast: "text" },
       expr: { col: expressionsTable.expr, cast: "text" },
-    },
-  },
-  metadata: {
-    tableName: "metadata",
-    table: metadataTable,
-    fields: {
-      id: { col: metadataTable.id, cast: "uuid" },
     },
   },
 };

@@ -240,7 +240,7 @@ export async function handleDeleteWebhookEndpoint(
     const auth = await authenticateHttpApiKey(request.headers.authorization);
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
-    const deleted = await deleteWebhookEndpoint(auth.apiKeyId);
+    const deleted = await deleteWebhookEndpoint(auth.projectId, auth.apiKeyId);
 
     if (!deleted) {
       builder.setError(404, {

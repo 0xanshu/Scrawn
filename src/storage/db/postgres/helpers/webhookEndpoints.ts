@@ -89,6 +89,7 @@ export async function upsertWebhookEndpoint(
 }
 
 export async function deleteWebhookEndpoint(
+  projectId: string,
   apiKeyId: string
 ): Promise<boolean> {
   const db = getPostgresDB();
@@ -101,6 +102,7 @@ export async function deleteWebhookEndpoint(
       .set({ deletedAt: now })
       .where(
         and(
+          eq(webhookEndpointsTable.projectId, projectId),
           eq(webhookEndpointsTable.apiKeyId, apiKeyId),
           isNull(webhookEndpointsTable.deletedAt)
         )
