@@ -16,6 +16,7 @@ import { createApiKey } from "../../../storage/db/postgres/helpers/apiKeys";
 import { upsertWebhookEndpoint } from "../../../storage/db/postgres/helpers/webhookEndpoints";
 import { generateWebhookKeyPair } from "../../../utils/generateWebhookKeyPair";
 import { getPostgresDB } from "../../../storage/db/postgres/db";
+import { executeInTransaction } from "../../../storage/adapter/postgres/handlers/addEventUtils";
 import {
   apiKeysTable,
   webhookEndpointsTable,
@@ -48,31 +49,61 @@ export async function handleCreateApiKey(
 
   try {
     const auth = await authenticateHttpApiKey(request.headers.authorization);
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage API keys"
+      );
+    }
     builder.setApiKeyContext({ name: `create-key:${auth.apiKeyId}` });
 
     const body = await request.body;
     const validated = createApiKeySchema.parse(body);
+
+    if (
+      validated.role === "production" &&
+      !validated.webhookUrl.startsWith("https://")
+    ) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Production webhook URLs must use HTTPS",
+      });
+      reply.code(400);
+      return { error: "Production webhook URLs must use HTTPS" };
+    }
 
     const apiKey = generateAPIKey(validated.role as ApiKeyRole);
     const apiKeyHash = hashAPIKey(apiKey);
     const now = DateTime.utc();
     const expiresAt = now.plus({ seconds: validated.expiresIn });
 
-    const keyRecord = await createApiKey({
-      name: validated.name,
-      key: apiKeyHash,
-      role: validated.role,
-      expiresAt: expiresAt.toISO(),
-      projectId: auth.projectId,
-    });
+    const db = getPostgresDB();
+    const { keyRecord, endpoint } = await executeInTransaction(
+      db,
+      "create API key",
+      async (txn) => {
+        const rec = await createApiKey(
+          {
+            name: validated.name,
+            key: apiKeyHash,
+            role: validated.role,
+            expiresAt: expiresAt.toISO(),
+            projectId: auth.projectId,
+          },
+          txn
+        );
 
-    const keyPair = generateWebhookKeyPair();
-    const endpoint = await upsertWebhookEndpoint(
-      auth.projectId,
-      keyRecord.id,
-      validated.webhookUrl,
-      keyPair.privateKeyPem,
-      keyPair.publicKeyPrefixed
+        const keyPair = generateWebhookKeyPair();
+        const ep = await upsertWebhookEndpoint(
+          auth.projectId,
+          rec.id,
+          validated.webhookUrl,
+          keyPair.privateKeyPem,
+          keyPair.publicKeyPrefixed,
+          txn
+        );
+
+        return { keyRecord: rec, endpoint: ep };
+      }
     );
     invalidateWebhookEndpointCache(keyRecord.id);
 
@@ -131,6 +162,11 @@ export async function handleListApiKeys(
 
   try {
     const auth = await authenticateHttpApiKey(request.headers.authorization);
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage API keys"
+      );
+    }
 
     const db = getPostgresDB();
     const keys = await db
@@ -197,12 +233,17 @@ export async function handleRevokeApiKey(
 
   try {
     const auth = await authenticateHttpApiKey(request.headers.authorization);
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage API keys"
+      );
+    }
 
     const params = request.params as { id: string };
     const db = getPostgresDB();
     const now = DateTime.utc().toISO();
 
-    const result = await db
+    const [revokedRow] = await db
       .update(apiKeysTable)
       .set({ revoked: true, revokedAt: now })
       .where(
@@ -211,9 +252,10 @@ export async function handleRevokeApiKey(
           eq(apiKeysTable.id, params.id),
           eq(apiKeysTable.revoked, false)
         )
-      );
+      )
+      .returning({ key: apiKeysTable.key });
 
-    if ((result.count ?? 0) === 0) {
+    if (!revokedRow) {
       builder.setError(404, {
         type: "NotFoundError",
         message: "API key not found or already revoked",
@@ -222,19 +264,7 @@ export async function handleRevokeApiKey(
       return { error: "API key not found or already revoked" };
     }
 
-    const [keyRow] = await db
-      .select({ key: apiKeysTable.key })
-      .from(apiKeysTable)
-      .where(
-        and(
-          eq(apiKeysTable.projectId, auth.projectId),
-          eq(apiKeysTable.id, params.id)
-        )
-      )
-      .limit(1);
-    if (keyRow) {
-      apiKeyCache.delete(keyRow.key);
-    }
+    apiKeyCache.delete(revokedRow.key);
 
     builder.setSuccess(200);
     reply.code(200);

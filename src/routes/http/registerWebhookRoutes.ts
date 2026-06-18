@@ -59,6 +59,19 @@ export async function registerWebhookRoutes(
           return { error: "Missing projectId query parameter" };
         }
 
+        if (
+          !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            projectId
+          )
+        ) {
+          builder.setError(400, {
+            type: "ValidationError",
+            message: "Invalid 'projectId' query parameter.",
+          });
+          reply.code(400);
+          return { error: "Invalid projectId query parameter" };
+        }
+
         const signatureHeader = request.headers["webhook-signature"];
         const timestampHeader = request.headers["webhook-timestamp"];
         const webhookIdHeader = request.headers["webhook-id"];

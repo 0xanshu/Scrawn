@@ -1,6 +1,7 @@
 import { getPostgresDB } from "../db";
 import { webhookEndpointsTable } from "../schema";
 import { eq, and, isNull } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 import { StorageError } from "../../../../errors/storage";
 import { DateTime } from "luxon";
 
@@ -39,9 +40,10 @@ export async function upsertWebhookEndpoint(
   apiKeyId: string,
   url: string,
   privateKey: string,
-  publicKey: string
+  publicKey: string,
+  txn?: PgTransaction<any, any, any>
 ): Promise<WebhookEndpoint> {
-  const db = getPostgresDB();
+  const db = txn ?? getPostgresDB();
 
   try {
     const now = DateTime.utc().toISO();

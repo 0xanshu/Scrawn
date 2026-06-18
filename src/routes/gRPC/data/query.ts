@@ -223,7 +223,13 @@ export async function queryData(
     const db = getPostgresDB();
     const userWhere = buildWhere(validated.where, tableDef);
     const projectFilter = eq(
-      (tableDef.table as any).projectId,
+      (
+        tableDef.table as
+          | typeof usersTable
+          | typeof sessionsTable
+          | typeof tagsTable
+          | typeof expressionsTable
+      ).projectId,
       auth.projectId
     ) as SQL;
     const whereClause = userWhere

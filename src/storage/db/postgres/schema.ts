@@ -106,8 +106,8 @@ export const sessionRelations = relations(sessionsTable, ({ one, many }) => ({
     references: [projectsTable.id],
   }),
   user: one(usersTable, {
-    fields: [sessionsTable.userId],
-    references: [usersTable.id],
+    fields: [sessionsTable.projectId, sessionsTable.userId],
+    references: [usersTable.projectId, usersTable.id],
   }),
   apiKey: one(apiKeysTable, {
     fields: [sessionsTable.apiKeyId],
@@ -206,8 +206,8 @@ export const basicUsageEventsRelation = relations(
       references: [projectsTable.id],
     }),
     user: one(usersTable, {
-      fields: [basicUsageEventsTable.userId],
-      references: [usersTable.id],
+      fields: [basicUsageEventsTable.projectId, basicUsageEventsTable.userId],
+      references: [usersTable.projectId, usersTable.id],
     }),
     apiKey: one(apiKeysTable, {
       fields: [basicUsageEventsTable.apiKeyId],
@@ -259,8 +259,8 @@ export const paymentEventsRelation = relations(
       references: [projectsTable.id],
     }),
     user: one(usersTable, {
-      fields: [paymentEventsTable.userId],
-      references: [usersTable.id],
+      fields: [paymentEventsTable.projectId, paymentEventsTable.userId],
+      references: [usersTable.projectId, usersTable.id],
     }),
     apiKey: one(apiKeysTable, {
       fields: [paymentEventsTable.apiKeyId],
@@ -318,8 +318,11 @@ export const aiTokenUsageEventsRelation = relations(
       references: [projectsTable.id],
     }),
     user: one(usersTable, {
-      fields: [aiTokenUsageEventsTable.userId],
-      references: [usersTable.id],
+      fields: [
+        aiTokenUsageEventsTable.projectId,
+        aiTokenUsageEventsTable.userId,
+      ],
+      references: [usersTable.projectId, usersTable.id],
     }),
     apiKey: one(apiKeysTable, {
       fields: [aiTokenUsageEventsTable.apiKeyId],

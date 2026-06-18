@@ -37,10 +37,10 @@ const ALLOWED_FUNCTIONS = new Set([
   "div",
   "tag",
   "expr",
-  "inputTokens",
-  "outputTokens",
-  "inputCacheTokens",
-  "outputCacheTokens",
+  "inputtokens",
+  "outputtokens",
+  "inputcachetokens",
+  "outputcachetokens",
 ]);
 
 /**

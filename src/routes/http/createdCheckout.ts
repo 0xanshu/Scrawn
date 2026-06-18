@@ -135,6 +135,15 @@ export async function handleDodoWebhook(
       );
     }
 
+    if (session.projectId !== projectId) {
+      return errorResponse(
+        404,
+        "NotFoundError",
+        `Session not found for checkout_session_id: ${checkout_session_id}`,
+        builder
+      );
+    }
+
     if (session.processed !== "pending") {
       Sentry.captureMessage(
         `Webhook received for session ${checkout_session_id} with non-pending status: ${session.processed}`,
@@ -192,7 +201,12 @@ export async function handleDodoWebhook(
           txn
         );
         if (!claimed) return;
-        await updateUserBilledTimestamp(userId, billed_upto, txn);
+        await updateUserBilledTimestamp(
+          session.projectId,
+          userId,
+          billed_upto,
+          txn
+        );
         await handleAddPayment(
           session.projectId,
           userId,

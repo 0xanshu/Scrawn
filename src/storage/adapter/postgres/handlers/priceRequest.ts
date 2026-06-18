@@ -50,7 +50,13 @@ export async function handlePriceRequest(
           price: sum(priceColumn),
         })
         .from(priceTable)
-        .innerJoin(usersTable, eq(priceTable.userId, usersTable.id))
+        .innerJoin(
+          usersTable,
+          and(
+            eq(priceTable.userId, usersTable.id),
+            eq(priceTable.projectId, usersTable.projectId)
+          )
+        )
         .where(whereClause)
         .groupBy(priceTable.userId);
     } catch (e) {
@@ -82,15 +88,7 @@ export async function handlePriceRequest(
       return 0;
     }
 
-    let parsedPrice: number;
-    try {
-      parsedPrice = parseInt(priceValue);
-    } catch (e) {
-      throw StorageError.priceCalculationFailed(
-        userId,
-        new Error(`Failed to parse price value: ${priceValue}`)
-      );
-    }
+    const parsedPrice = parseInt(priceValue, 10);
 
     if (isNaN(parsedPrice)) {
       throw StorageError.priceCalculationFailed(

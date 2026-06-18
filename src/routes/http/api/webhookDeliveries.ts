@@ -71,24 +71,21 @@ export async function handleListDeliveries(
     }
 
     if (query.eventType) {
-      conditions = conditions
-        ? and(conditions, eq(webhookDeliveriesTable.eventType, query.eventType))
-        : eq(webhookDeliveriesTable.eventType, query.eventType);
+      conditions = and(
+        conditions,
+        eq(webhookDeliveriesTable.eventType, query.eventType)
+      );
     }
 
     if (query.status) {
-      conditions = conditions
-        ? and(
-            conditions,
-            sql`${webhookDeliveriesTable.status} = ${query.status}`
-          )
-        : sql`${webhookDeliveriesTable.status} = ${query.status}`;
+      conditions = and(
+        conditions,
+        sql`${webhookDeliveriesTable.status} = ${query.status}`
+      );
     }
 
     if (query.role) {
-      conditions = conditions
-        ? and(conditions, sql`${apiKeysTable.role} = ${query.role}`)
-        : sql`${apiKeysTable.role} = ${query.role}`;
+      conditions = and(conditions, sql`${apiKeysTable.role} = ${query.role}`);
     }
 
     const rows = await db

@@ -5,6 +5,7 @@ import { StorageError } from "../../../../errors/storage";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 export async function updateUserBilledTimestamp(
+  projectId: string,
   userId: string,
   billedUpto: string,
   txn?: PgTransaction<any, any, any>
@@ -15,7 +16,9 @@ export async function updateUserBilledTimestamp(
     await db
       .update(usersTable)
       .set({ last_billed_timestamp: billedUpto })
-      .where(eq(usersTable.id, userId));
+      .where(
+        and(eq(usersTable.projectId, projectId), eq(usersTable.id, userId))
+      );
   } catch (e) {
     throw StorageError.queryFailed(
       "Failed to update user billed timestamp",

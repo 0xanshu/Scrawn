@@ -31,7 +31,8 @@ export async function clearDatabase() {
       users,
       tags,
       metadata,
-      expressions
+      expressions,
+      projects
     RESTART IDENTITY CASCADE
   `);
 

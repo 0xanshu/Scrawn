@@ -24,6 +24,7 @@ import {
 import { getMetadata } from "../../../storage/db/postgres/helpers/metadata";
 import { removeClient } from "../../gRPC/payment/paymentProvider.ts";
 import { DateTime } from "luxon";
+import { eq } from "drizzle-orm";
 import { executeInTransaction } from "../../../storage/adapter/postgres/handlers/addEventUtils";
 
 export async function handleOnboarding(
@@ -54,6 +55,21 @@ export async function handleOnboarding(
     }
 
     const projectId = randomUUID();
+
+    const existing = await getPostgresDB()
+      .select({ id: projectsTable.id })
+      .from(projectsTable)
+      .where(eq(projectsTable.name, validated.name))
+      .limit(1);
+
+    if (existing.length > 0) {
+      builder.setError(409, {
+        type: "ConflictError",
+        message: `Project with name '${validated.name}' already exists`,
+      });
+      reply.code(409);
+      return {};
+    }
 
     const liveClient = new DodoPayments({
       bearerToken: validated.dodoLiveApiKey,
@@ -232,6 +248,9 @@ export async function handleGetConfig(
   try {
     const authHeader = request.headers.authorization;
     const auth = await authenticateHttpApiKey(authHeader);
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied("Only dashboard keys can read config");
+    }
 
     const metadata = await getMetadata(auth.projectId);
 
