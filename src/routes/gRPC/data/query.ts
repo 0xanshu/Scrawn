@@ -37,13 +37,15 @@ interface FieldDef {
   cast: "text" | "integer" | "uuid" | "timestamptz" | "boolean";
 }
 
+type ScopedTable =
+  | typeof usersTable
+  | typeof sessionsTable
+  | typeof tagsTable
+  | typeof expressionsTable;
+
 interface TableDef {
   tableName: string;
-  table:
-    | typeof usersTable
-    | typeof sessionsTable
-    | typeof tagsTable
-    | typeof expressionsTable;
+  table: ScopedTable;
   fields: Record<string, FieldDef>;
 }
 
@@ -222,16 +224,7 @@ export async function queryData(
 
     const db = getPostgresDB();
     const userWhere = buildWhere(validated.where, tableDef);
-    const projectFilter = eq(
-      (
-        tableDef.table as
-          | typeof usersTable
-          | typeof sessionsTable
-          | typeof tagsTable
-          | typeof expressionsTable
-      ).projectId,
-      auth.projectId
-    ) as SQL;
+    const projectFilter = eq(tableDef.table.projectId, auth.projectId) as SQL;
     const whereClause = userWhere
       ? and(projectFilter, userWhere)
       : projectFilter;

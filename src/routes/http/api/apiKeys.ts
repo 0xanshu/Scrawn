@@ -250,7 +250,8 @@ export async function handleRevokeApiKey(
         and(
           eq(apiKeysTable.projectId, auth.projectId),
           eq(apiKeysTable.id, params.id),
-          eq(apiKeysTable.revoked, false)
+          eq(apiKeysTable.revoked, false),
+          ne(apiKeysTable.role, "dashboard")
         )
       )
       .returning({ key: apiKeysTable.key });
