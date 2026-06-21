@@ -5,6 +5,7 @@ import { innerProduct } from "drizzle-orm";
 const BASIC_USAGE_EVENTS_TABLE = `
 CREATE TABLE IF NOT EXISTS basic_usage_events (
   id UUID DEFAULT generateUUIDv4(),
+  project_id String,
   event_id String,
   idempotency_key String,
   user_id String,
@@ -22,6 +23,7 @@ ORDER BY (idempotency_key, user_id)
 const AI_TOKEN_USAGE_EVENTS_TABLE = `
 CREATE TABLE IF NOT EXISTS ai_token_usage_events (
   id UUID DEFAULT generateUUIDv4(),
+  project_id String,
   event_id String,
   idempotency_key String,
   user_id String,
