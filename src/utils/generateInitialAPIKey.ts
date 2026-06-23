@@ -1,6 +1,8 @@
 import { createHmac, randomUUID } from "crypto";
 import { generateAPIKey } from "./generateAPIKey";
 import { DateTime } from "luxon";
+import { getPostgresDB } from "../storage/db/postgres/db";
+import { projectsTable, apiKeysTable } from "../storage/db/postgres/schema";
 
 const HMAC_SECRET = process.env.HMAC_SECRET;
 
@@ -17,18 +19,19 @@ function hashAPIKey(apiKey: string): string {
 }
 
 export type InitialApiKeyData = {
+  projectId: string;
   apiKeyId: string;
   apiKey: string;
   apiKeyHash: string;
   name: string;
-  role: string;
+  role: "dashboard" | "production" | "test";
   createdAt: string;
   expiresAt: string;
-  insertSql: string;
   authorizationHeader: string;
 };
 
 export function generateInitialApiKeyData(): InitialApiKeyData {
+  const projectId = randomUUID();
   const apiKeyId = randomUUID();
   const apiKey = generateAPIKey("dashboard");
   const apiKeyHash = hashAPIKey(apiKey);
@@ -37,20 +40,8 @@ export function generateInitialApiKeyData(): InitialApiKeyData {
   const createdAt = DateTime.utc().toISO();
   const expiresAt = DateTime.utc().plus({ days: 365 }).toISO();
 
-  const insertSql =
-    "INSERT INTO api_keys (id, name, key, role, created_at, expires_at, revoked, revoked_at)\n" +
-    "VALUES (\n" +
-    `  '${apiKeyId}',\n` +
-    `  '${name}',\n` +
-    `  '${apiKeyHash}',\n` +
-    `  '${role}',\n` +
-    `  '${createdAt}',\n` +
-    `  '${expiresAt}',\n` +
-    "  false,\n" +
-    "  NULL\n" +
-    ");";
-
   return {
+    projectId,
     apiKeyId,
     apiKey,
     apiKeyHash,
@@ -58,9 +49,36 @@ export function generateInitialApiKeyData(): InitialApiKeyData {
     role,
     createdAt,
     expiresAt,
-    insertSql,
     authorizationHeader: `Authorization: Bearer ${apiKey}`,
   };
 }
 
-console.log(generateInitialApiKeyData());
+async function insertInitialData(data: InitialApiKeyData) {
+  const db = getPostgresDB(process.env.DATABASE_URL);
+
+  await db.insert(projectsTable).values({
+    id: data.projectId,
+    name: "Default Project",
+    createdAt: data.createdAt,
+  });
+
+  await db.insert(apiKeysTable).values({
+    id: data.apiKeyId,
+    projectId: data.projectId,
+    name: data.name,
+    key: data.apiKeyHash,
+    role: data.role,
+    createdAt: data.createdAt,
+    expiresAt: data.expiresAt,
+    revoked: false,
+    revokedAt: null,
+  });
+}
+
+const data = generateInitialApiKeyData();
+
+await insertInitialData(data);
+
+console.log("Initial API key generation was successful..");
+console.log(data);
+process.exit(0);
