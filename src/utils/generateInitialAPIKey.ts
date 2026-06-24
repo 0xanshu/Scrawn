@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { createHmac, randomUUID } from "crypto";
 import { generateAPIKey } from "./generateAPIKey";
 import { DateTime } from "luxon";
@@ -55,6 +56,19 @@ export function generateInitialApiKeyData(): InitialApiKeyData {
 
 async function insertInitialData(data: InitialApiKeyData) {
   const db = getPostgresDB(process.env.DATABASE_URL);
+
+  const existing = await db
+    .select({ id: projectsTable.id })
+    .from(projectsTable)
+    .where(sql`name = 'Default Project'`)
+    .limit(1);
+
+  if (existing.length > 0) {
+    console.log(
+      `Default Project already exists (id=${existing[0]!.id}). Skipping seed.`
+    );
+    return;
+  }
 
   await db.insert(projectsTable).values({
     id: data.projectId,
