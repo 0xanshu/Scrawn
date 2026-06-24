@@ -2,7 +2,7 @@ import type { DateTime } from "luxon";
 import { DateTime as LuxonDateTime } from "luxon";
 import { getPostgresDB } from "../../db/postgres/db";
 import { usersTable } from "../../db/postgres/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { StorageError } from "../../../errors/storage";
 import { getClickHouseDB } from "../../db/clickhouse";
 import type { UserId } from "../../../config/identifiers";
@@ -12,13 +12,18 @@ export function toClickHouseDateTime(dt: DateTime): string {
   return dt.toUTC().toFormat("yyyy-MM-dd HH:mm:ss.SSS");
 }
 
-async function fetchLastBilled(userId: string): Promise<string | null> {
+async function fetchLastBilled(
+  userId: string,
+  projectId: string
+): Promise<string | null> {
   const pgDb = getPostgresDB();
   try {
     const [user] = await pgDb
       .select({ lastBilled: usersTable.last_billed_timestamp })
       .from(usersTable)
-      .where(eq(usersTable.id, userId))
+      .where(
+        and(eq(usersTable.id, userId), eq(usersTable.projectId, projectId))
+      )
       .limit(1);
     return user?.lastBilled ?? null;
   } catch {
@@ -49,7 +54,7 @@ export async function runClickHousePriceQuery(
   }
   const beforeTs = toClickHouseDateTime(beforeTimestamp);
 
-  const lastBilled = await fetchLastBilled(userId);
+  const lastBilled = await fetchLastBilled(userId, auth.projectId);
 
   try {
     let query: string;

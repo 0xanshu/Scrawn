@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS basic_usage_events (
   debit_amount Int64,
   metadata JSON
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (idempotency_key, user_id)
+ORDER BY (project_id, idempotency_key, user_id)
 `;
 
 const AI_TOKEN_USAGE_EVENTS_TABLE = `
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS ai_token_usage_events (
   metrics String,
   metadata JSON
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (idempotency_key, user_id)
+ORDER BY (project_id, idempotency_key, user_id)
 `;
 
 export async function runClickHouseMigrations(): Promise<void> {

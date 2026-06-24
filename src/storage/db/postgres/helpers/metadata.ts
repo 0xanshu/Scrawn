@@ -14,3 +14,11 @@ export async function getMetadata(
     .limit(1);
   return metadata;
 }
+
+export async function getAnyMetadata(): Promise<
+  typeof metadataTable.$inferSelect | undefined
+> {
+  const db = getPostgresDB();
+  const [metadata] = await db.select().from(metadataTable).limit(1);
+  return metadata;
+}

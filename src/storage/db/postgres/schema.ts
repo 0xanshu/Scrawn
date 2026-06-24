@@ -344,6 +344,13 @@ export const tagsTable = pgTable("tags", {
   }),
 });
 
+export const tagsRelation = relations(tagsTable, ({ one }) => ({
+  project: one(projectsTable, {
+    fields: [tagsTable.projectId],
+    references: [projectsTable.id],
+  }),
+}));
+
 export const metadataTable = pgTable(
   "metadata",
   {
@@ -369,6 +376,13 @@ export const metadataTable = pgTable(
   })
 );
 
+export const metadataRelation = relations(metadataTable, ({ one }) => ({
+  project: one(projectsTable, {
+    fields: [metadataTable.projectId],
+    references: [projectsTable.id],
+  }),
+}));
+
 export const expressionsTable = pgTable("expressions", {
   id: uuid("id").primaryKey().defaultRandom(),
   projectId: uuid("project_id")
@@ -381,6 +395,13 @@ export const expressionsTable = pgTable("expressions", {
     mode: "string",
   }),
 });
+
+export const expressionsRelation = relations(expressionsTable, ({ one }) => ({
+  project: one(projectsTable, {
+    fields: [expressionsTable.projectId],
+    references: [projectsTable.id],
+  }),
+}));
 
 export const webhookEndpointsTable = pgTable(
   "webhook_endpoints",

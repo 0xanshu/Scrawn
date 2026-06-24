@@ -21,7 +21,10 @@ import {
   apiKeysTable,
   metadataTable,
 } from "../../../storage/db/postgres/schema";
-import { getMetadata } from "../../../storage/db/postgres/helpers/metadata";
+import {
+  getMetadata,
+  getAnyMetadata,
+} from "../../../storage/db/postgres/helpers/metadata";
 import { removeClient } from "../../gRPC/payment/paymentProvider.ts";
 import { DateTime } from "luxon";
 import { eq } from "drizzle-orm";
@@ -247,12 +250,27 @@ export async function handleGetConfig(
 
   try {
     const authHeader = request.headers.authorization;
-    const auth = await authenticateHttpApiKey(authHeader);
-    if (auth.role !== "dashboard") {
-      throw AuthError.permissionDenied("Only dashboard keys can read config");
+
+    let projectId: string | undefined;
+    let isMasterKey = false;
+    try {
+      authenticateMasterApiKey(authHeader);
+      isMasterKey = true;
+    } catch (masterErr) {
+      if (!(masterErr instanceof AuthError)) {
+        throw masterErr;
+      }
+
+      const auth = await authenticateHttpApiKey(authHeader);
+      if (auth.role !== "dashboard") {
+        throw AuthError.permissionDenied("Only dashboard keys can read config");
+      }
+      projectId = auth.projectId;
     }
 
-    const metadata = await getMetadata(auth.projectId);
+    const metadata = isMasterKey
+      ? await getAnyMetadata()
+      : await getMetadata(projectId!);
 
     if (!metadata) {
       builder.setSuccess(200);
