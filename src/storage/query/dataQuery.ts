@@ -23,6 +23,7 @@ import {
   metadataTable,
 } from "../db/postgres/schema";
 import type { DataQueryRequest } from "../../zod/data";
+import { EventError } from "../../errors/event";
 
 interface FieldDef {
   col: AnyPgColumn;
@@ -107,6 +108,11 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
   },
 };
 
+export const DATA_TABLE_NAMES = Object.keys(TABLE_REGISTRY) as [
+  string,
+  ...string[],
+];
+
 function castValue(
   value: string,
   fieldDef: FieldDef,
@@ -114,7 +120,7 @@ function castValue(
 ): boolean | number | string {
   if (fieldDef.cast === "boolean") {
     if (value !== "true" && value !== "false") {
-      throw new Error(
+      throw EventError.validationFailed(
         `Invalid boolean value '${value}' for field '${fieldName}': must be "true" or "false"`
       );
     }
@@ -123,7 +129,7 @@ function castValue(
   if (fieldDef.cast === "integer") {
     const n = Number(value);
     if (!Number.isFinite(n) || !Number.isInteger(n)) {
-      throw new Error(
+      throw EventError.validationFailed(
         `Invalid integer value '${value}' for field '${fieldName}': must be a finite integer`
       );
     }
@@ -169,7 +175,7 @@ function buildWhere(
   for (const condition of group.conditions) {
     const fieldDef = tableDef.fields[condition.field];
     if (!fieldDef) {
-      throw new Error(
+      throw EventError.validationFailed(
         `Unknown field '${condition.field}' in table '${tableDef.tableName}'`
       );
     }
@@ -223,7 +229,7 @@ export async function executeDataQuery(
   const orderClauses = config.orderBy.map((o) => {
     const fieldDef = tableDef.fields[o.field];
     if (!fieldDef) {
-      throw new Error(
+      throw EventError.validationFailed(
         `Unknown field '${o.field}' for table '${tableDef.tableName}' in order_by`
       );
     }

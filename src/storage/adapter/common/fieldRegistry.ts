@@ -358,6 +358,7 @@ export const FIELD_REGISTRY: Record<
       chParamType: "String",
     },
   },
+  // payment_events only exists in Postgres, not ClickHouse
   payment_events: {
     eventId: {
       pgSelect: null,
@@ -522,4 +523,25 @@ export const FIELD_REGISTRY: Record<
   },
 };
 
-export const OUTPUT_FIELDS = Object.keys(FIELD_REGISTRY.basic_usage_events!);
+export const OUTPUT_FIELDS = [
+  "eventId",
+  "idempotencyKey",
+  "mode",
+  "eventType",
+  "userId",
+  "apiKeyId",
+  "reportedTimestamp",
+  "ingestedTimestamp",
+  "basicUsageType",
+  "debitAmount",
+  "model",
+  "inputTokens",
+  "outputTokens",
+  "inputDebitAmount",
+  "outputDebitAmount",
+  "inputCacheTokens",
+  "inputCacheDebitAmount",
+  "creditAmount",
+  "provider",
+  "metadata",
+];
