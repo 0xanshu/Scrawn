@@ -306,7 +306,6 @@ export async function handleCreateDashboardKey(
     const authHeader = request.headers.authorization;
     authenticateMasterApiKey(authHeader);
 
-    const body = await request.body;
     const params = request.params as { projectId: string };
 
     const appUrl = process.env.APP_URL;
@@ -319,22 +318,22 @@ export async function handleCreateDashboardKey(
       return { error: "APP_URL environment variable is not set" };
     }
 
-    const projectId = params.project_id;
+    const project_id = params.projectId;
 
     const existing = await getPostgresDB()
       .select({ id: projectsTable.id })
       .from(projectsTable)
-      .where(eq(projectsTable.id, projectId))
+      .where(eq(projectsTable.id, project_id))
       .limit(1);
 
     if (existing.length === 0) {
       builder.setError(404, {
         type: "NotFound",
-        message: `Project with name '${projectId}' doesn't exist`,
+        message: `Project with name '${project_id}' doesn't exist`,
       });
       reply.code(404);
       return {
-        error: `Project with name '${projectId}' doesn't exist`,
+        error: `Project with name '${project_id}' doesn't exist`,
       };
     }
 
@@ -344,7 +343,7 @@ export async function handleCreateDashboardKey(
     const db = getPostgresDB();
 
     await db.insert(apiKeysTable).values({
-      projectId,
+      projectId: project_id,
       name: "Default dashboard key",
       key: dashboardKeyHash,
       role: "dashboard",
@@ -353,7 +352,7 @@ export async function handleCreateDashboardKey(
 
     builder.setSuccess(201);
     reply.code(201);
-    return { projectId, apiKey: dashboardKey };
+    return { project_id, apiKey: dashboardKey };
   } catch (error) {
     if (error instanceof AuthError) {
       builder.setError(401, { type: error.type, message: error.message });
