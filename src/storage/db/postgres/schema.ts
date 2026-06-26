@@ -8,6 +8,7 @@ import {
   text,
   boolean,
   jsonb,
+  unique,
   uniqueIndex,
   primaryKey,
   foreignKey,
@@ -18,7 +19,7 @@ import { type Metrics } from "../../../zod/metrics";
 
 export const projectsTable = pgTable("projects", {
   id: uuid("id").primaryKey().defaultRandom(),
-  name: text("name").notNull(),
+  name: text("name").notNull().unique(),
   createdAt: timestamp("created_at", {
     withTimezone: true,
     mode: "string",
@@ -170,7 +171,7 @@ export const basicUsageEventsTable = pgTable(
       .references(() => projectsTable.id)
       .notNull(),
     eventId: uuid("event_id").notNull(),
-    idempotencyKey: text("idempotency_key").notNull().unique(),
+    idempotencyKey: text("idempotency_key").notNull(),
     reportedTimestamp: timestamp("reported_timestamp", {
       withTimezone: true,
       mode: "string",
@@ -195,6 +196,10 @@ export const basicUsageEventsTable = pgTable(
       columns: [table.projectId, table.userId],
       foreignColumns: [usersTable.projectId, usersTable.id],
     }),
+    uniqueIdempotency: unique("basic_usage_events_idempotency_key_idx").on(
+      table.projectId,
+      table.idempotencyKey
+    ),
   })
 );
 
@@ -281,7 +286,7 @@ export const aiTokenUsageEventsTable = pgTable(
       .references(() => projectsTable.id)
       .notNull(),
     eventId: uuid("event_id").notNull(),
-    idempotencyKey: text("idempotency_key").notNull().unique(),
+    idempotencyKey: text("idempotency_key").notNull(),
     reportedTimestamp: timestamp("reported_timestamp", {
       withTimezone: true,
       mode: "string",
@@ -307,6 +312,10 @@ export const aiTokenUsageEventsTable = pgTable(
       columns: [table.projectId, table.userId],
       foreignColumns: [usersTable.projectId, usersTable.id],
     }),
+    uniqueIdempotency: unique("ai_token_usage_events_idempotency_key_idx").on(
+      table.projectId,
+      table.idempotencyKey
+    ),
   })
 );
 

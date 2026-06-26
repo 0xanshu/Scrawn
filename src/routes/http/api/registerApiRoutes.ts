@@ -15,6 +15,7 @@ import {
 } from "./webhookEndpoints.ts";
 import {
   handleCreateApiKey,
+  handleCreateDashboardKey,
   handleListApiKeys,
   handleRevokeApiKey,
 } from "./apiKeys.ts";
@@ -101,6 +102,13 @@ export async function registerApiRoutes(
     "/api/v1/api-keys/:id",
     async (request: FastifyRequest, reply: FastifyReply) => {
       return handleRevokeApiKey(request, reply);
+    }
+  );
+
+  server.post(
+    "/api/v1/create-dashboard-key/:project-id",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleCreateDashboardKey(request, reply);
     }
   );
 

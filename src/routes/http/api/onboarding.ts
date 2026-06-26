@@ -10,6 +10,7 @@ import {
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
 import { AuthError } from "../../../errors/auth";
+import { StorageError } from "../../../errors/storage";
 import { authenticateMasterApiKey } from "../../../utils/authenticateMasterApiKey.ts";
 import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
 import { generateAPIKey } from "../../../utils/generateAPIKey";
@@ -21,10 +22,7 @@ import {
   apiKeysTable,
   metadataTable,
 } from "../../../storage/db/postgres/schema";
-import {
-  getMetadata,
-  getAnyMetadata,
-} from "../../../storage/db/postgres/helpers/metadata";
+import { getMetadata } from "../../../storage/db/postgres/helpers/metadata";
 import { removeClient } from "../../gRPC/payment/paymentProvider.ts";
 import { DateTime } from "luxon";
 import { eq } from "drizzle-orm";
@@ -199,6 +197,18 @@ export async function handleOnboarding(
       extra: { context: "onboarding route handler" },
     });
 
+    if (
+      error instanceof StorageError &&
+      error.type === "CONSTRAINT_VIOLATION"
+    ) {
+      builder.setError(409, {
+        type: "ConflictError",
+        message: "A project with this name already exists",
+      });
+      reply.code(409);
+      return {};
+    }
+
     if (error instanceof AuthError) {
       builder.setError(401, {
         type: error.type,
@@ -268,9 +278,17 @@ export async function handleGetConfig(
       projectId = auth.projectId;
     }
 
-    const metadata = isMasterKey
-      ? await getAnyMetadata()
-      : await getMetadata(projectId!);
+    if (isMasterKey) {
+      const query = request.query as Record<string, string>;
+      if (!query.projectId) {
+        throw AuthError.permissionDenied(
+          "projectId is required when using master key"
+        );
+      }
+      projectId = query.projectId;
+    }
+
+    const metadata = await getMetadata(projectId!);
 
     if (!metadata) {
       builder.setSuccess(200);

@@ -28,7 +28,7 @@ export async function handleAddBasicUsage(
     connectionObject,
     "storing BASIC_USAGE event",
     async (txn) => {
-      const ensurePromise = ensureUserExists(
+      const ensurePromise = await ensureUserExists(
         auth.projectId,
         event_data.userId,
         txn
