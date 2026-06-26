@@ -106,7 +106,7 @@ export async function registerApiRoutes(
   );
 
   server.post(
-    "/api/v1/create-dashboard-key/:project-id",
+    "/api/v1/create-dashboard-key/:projectId",
     async (request: FastifyRequest, reply: FastifyReply) => {
       return handleCreateDashboardKey(request, reply);
     }

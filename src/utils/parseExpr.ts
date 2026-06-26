@@ -292,10 +292,10 @@ function resolveTokenPlaceholders(
   context: EvalTokenContext
 ): string {
   return exprString
-    .replace(/inputTokens\(\)/g, String(context.inputTokens ?? 0))
-    .replace(/outputTokens\(\)/g, String(context.outputTokens ?? 0))
-    .replace(/inputCacheTokens\(\)/g, String(context.inputCacheTokens ?? 0))
-    .replace(/outputCacheTokens\(\)/g, String(context.outputCacheTokens ?? 0));
+    .replace(/inputTokens\(\)/gi, String(context.inputTokens ?? 0))
+    .replace(/outputTokens\(\)/gi, String(context.outputTokens ?? 0))
+    .replace(/inputCacheTokens\(\)/gi, String(context.inputCacheTokens ?? 0))
+    .replace(/outputCacheTokens\(\)/gi, String(context.outputCacheTokens ?? 0));
 }
 
 /**

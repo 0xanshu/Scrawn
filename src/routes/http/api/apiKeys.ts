@@ -307,7 +307,7 @@ export async function handleCreateDashboardKey(
     authenticateMasterApiKey(authHeader);
 
     const body = await request.body;
-    const params = request.params as { project_id: string };
+    const params = request.params as { projectId: string };
 
     const appUrl = process.env.APP_URL;
     if (!appUrl) {
