@@ -69,6 +69,8 @@ const PG_FIELDS: PGFieldRegistry = {
     outputDebitAmount: { select: null, whereCol: null, whereCast: "" },
     inputCacheTokens: { select: null, whereCol: null, whereCast: "" },
     inputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    outputCacheTokens: { select: null, whereCol: null, whereCast: "" },
+    outputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
     creditAmount: { select: null, whereCol: null, whereCast: "" },
     provider: { select: null, whereCol: null, whereCast: "" },
     metadata: { select: "metadata::text", whereCol: null, whereCast: "" },
@@ -194,6 +196,8 @@ const PG_FIELDS: PGFieldRegistry = {
     outputDebitAmount: { select: null, whereCol: null, whereCast: "" },
     inputCacheTokens: { select: null, whereCol: null, whereCast: "" },
     inputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    outputCacheTokens: { select: null, whereCol: null, whereCast: "" },
+    outputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
     creditAmount: {
       select: "credit_amount::text",
       whereCol: "credit_amount",

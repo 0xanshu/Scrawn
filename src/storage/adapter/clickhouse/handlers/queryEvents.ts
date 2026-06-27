@@ -52,6 +52,8 @@ const CH_FIELDS: Partial<
     outputDebitAmount: { select: null, where: null },
     inputCacheTokens: { select: null, where: null },
     inputCacheDebitAmount: { select: null, where: null },
+    outputCacheTokens: { select: null, where: null },
+    outputCacheDebitAmount: { select: null, where: null },
     creditAmount: { select: null, where: null },
     provider: { select: null, where: null },
     metadata: { select: null, where: null },
