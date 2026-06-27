@@ -105,11 +105,11 @@ const PG_FIELDS: PGFieldRegistry = {
     basicUsageType: { select: null, whereCol: null, whereCast: "" },
     debitAmount: {
       select:
-        "(COALESCE((metrics->'debit_amount'->>'input')::integer,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output')::integer,0))::text",
+        "(COALESCE((metrics->'debit_amount'->>'input')::integer,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output')::integer,0))::text",
       whereCol: null,
       whereCast: "",
       aggExpr:
-        "(COALESCE((metrics->'debit_amount'->>'input')::bigint,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output')::bigint,0))",
+        "(COALESCE((metrics->'debit_amount'->>'input')::bigint,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output')::bigint,0))",
     },
     model: { select: "model", whereCol: "model", whereCast: "" },
     inputTokens: {
@@ -147,6 +147,18 @@ const PG_FIELDS: PGFieldRegistry = {
       whereCol: null,
       whereCast: "",
       aggExpr: "(metrics->'debit_amount'->>'input_cache')::bigint",
+    },
+    outputCacheTokens: {
+      select: "(metrics->'tokens'->>'output_cache')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'tokens'->>'output_cache')::bigint",
+    },
+    outputCacheDebitAmount: {
+      select: "(metrics->'debit_amount'->>'output_cache')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'debit_amount'->>'output_cache')::bigint",
     },
     creditAmount: { select: null, whereCol: null, whereCast: "" },
     provider: { select: "provider", whereCol: "provider", whereCast: "" },

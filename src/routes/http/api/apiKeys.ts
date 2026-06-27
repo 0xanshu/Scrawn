@@ -308,16 +308,6 @@ export async function handleCreateDashboardKey(
 
     const params = request.params as { projectId: string };
 
-    const appUrl = process.env.APP_URL;
-    if (!appUrl) {
-      builder.setError(500, {
-        type: "ConfigError",
-        message: "APP_URL environment variable is not set",
-      });
-      reply.code(500);
-      return { error: "APP_URL environment variable is not set" };
-    }
-
     const project_id = params.projectId;
 
     const existing = await getPostgresDB()
@@ -339,16 +329,41 @@ export async function handleCreateDashboardKey(
 
     const dashboardKey = generateAPIKey("dashboard");
     const dashboardKeyHash = hashAPIKey(dashboardKey);
-    const expiresAt = DateTime.utc().plus({ years: 10 }).toISO();
+    const expiresAt = DateTime.utc().plus({ years: 10 }).toISO()!;
     const db = getPostgresDB();
 
-    await db.insert(apiKeysTable).values({
-      projectId: project_id,
-      name: "Default dashboard key",
-      key: dashboardKeyHash,
-      role: "dashboard",
-      expiresAt,
-    });
+    const existingKey = await db
+      .select({ id: apiKeysTable.id, key: apiKeysTable.key })
+      .from(apiKeysTable)
+      .where(
+        and(
+          eq(apiKeysTable.projectId, project_id),
+          eq(apiKeysTable.name, "Default dashboard key"),
+          eq(apiKeysTable.revoked, false)
+        )
+      )
+      .limit(1);
+
+    const existingDashboardKey = existingKey[0];
+    if (existingDashboardKey) {
+      await db
+        .update(apiKeysTable)
+        .set({
+          key: dashboardKeyHash,
+          expiresAt,
+        })
+        .where(eq(apiKeysTable.id, existingDashboardKey.id));
+
+      apiKeyCache.delete(existingDashboardKey.key);
+    } else {
+      await db.insert(apiKeysTable).values({
+        projectId: project_id,
+        name: "Default dashboard key",
+        key: dashboardKeyHash,
+        role: "dashboard",
+        expiresAt,
+      });
+    }
 
     builder.setSuccess(201);
     reply.code(201);

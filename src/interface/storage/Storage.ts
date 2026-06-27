@@ -20,6 +20,8 @@ export const QUERY_FIELD_NAMES = [
   "outputDebitAmount",
   "inputCacheTokens",
   "inputCacheDebitAmount",
+  "outputCacheTokens",
+  "outputCacheDebitAmount",
   "creditAmount",
   "provider",
   "metadata",

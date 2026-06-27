@@ -74,10 +74,10 @@ const CH_FIELDS: Partial<
     basicUsageType: { select: null, where: null },
     debitAmount: {
       select:
-        "toString(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output'))",
+        "toString(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output_cache') + JSONExtractInt(metrics, 'debit_amount', 'output'))",
       where: null,
       aggExpr:
-        "JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')",
+        "JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')",
     },
     model: { select: "model", where: "model" },
     inputTokens: {
@@ -111,6 +111,17 @@ const CH_FIELDS: Partial<
       where: null,
       aggExpr: "JSONExtractInt(metrics, 'debit_amount', 'input_cache')",
     },
+    outputCacheTokens: {
+      select: "toString(JSONExtractInt(metrics, 'tokens', 'output_cache'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'tokens', 'output_cache')",
+    },
+    outputCacheDebitAmount: {
+      select:
+        "toString(JSONExtractInt(metrics, 'debit_amount', 'output_cache'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'debit_amount', 'output_cache')",
+    },
     creditAmount: { select: null, where: null },
     provider: { select: "provider", where: "provider" },
     metadata: { select: "toString(metadata)", where: null },
@@ -133,6 +144,8 @@ const CH_PARAM_TYPE: Record<string, string> = {
   outputDebitAmount: "Int64",
   inputCacheTokens: "Int64",
   inputCacheDebitAmount: "Int64",
+  outputCacheTokens: "Int64",
+  outputCacheDebitAmount: "Int64",
   creditAmount: "Int64",
   provider: "String",
   metadata: "String",
