@@ -160,14 +160,16 @@ export async function handleAddAiTokenUsage(
   }
 
   const aggregatedEvents = await aggregateAiTokenEvents(events);
-  const firstEvent = events[0];
 
   return await executeInTransaction(
     connectionObject,
     `storing ${events.length} AI_TOKEN_USAGE event(s)`,
     async (txn) => {
-      if (firstEvent) {
-        await ensureUserExists(auth.projectId, firstEvent.userId, txn);
+      const distinctUserIds = Array.from(
+        new Set(aggregatedEvents.map((e) => e.userId))
+      );
+      for (const userId of distinctUserIds) {
+        await ensureUserExists(auth.projectId, userId, txn);
       }
 
       try {

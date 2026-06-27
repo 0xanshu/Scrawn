@@ -34,28 +34,15 @@ export async function createTag(
   const db = getPostgresDB();
 
   try {
-    const existing = await db
-      .select({ id: tagsTable.id })
-      .from(tagsTable)
-      .where(
-        and(
-          eq(tagsTable.projectId, projectId),
-          eq(tagsTable.key, key),
-          isNull(tagsTable.deletedAt)
-        )
-      )
-      .limit(1);
+    await db
+      .insert(tagsTable)
+      .values({ projectId, key, amount })
+      .onConflictDoUpdate({
+        target: [tagsTable.projectId, tagsTable.key],
+        targetWhere: isNull(tagsTable.deletedAt),
+        set: { amount },
+      });
 
-    if (existing[0]) {
-      await db
-        .update(tagsTable)
-        .set({ amount })
-        .where(eq(tagsTable.id, existing[0].id));
-      tagCache.delete(`${projectId}:${key}`);
-      return;
-    }
-
-    await db.insert(tagsTable).values({ projectId, key, amount });
     tagCache.delete(`${projectId}:${key}`);
   } catch (e) {
     throw StorageError.insertFailed(

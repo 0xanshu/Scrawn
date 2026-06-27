@@ -340,18 +340,26 @@ export const aiTokenUsageEventsRelation = relations(
   })
 );
 
-export const tagsTable = pgTable("tags", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  projectId: uuid("project_id")
-    .references(() => projectsTable.id)
-    .notNull(),
-  key: text("key").notNull(),
-  amount: integer("amount").notNull(),
-  deletedAt: timestamp("deleted_at", {
-    withTimezone: true,
-    mode: "string",
-  }),
-});
+export const tagsTable = pgTable(
+  "tags",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .references(() => projectsTable.id)
+      .notNull(),
+    key: text("key").notNull(),
+    amount: integer("amount").notNull(),
+    deletedAt: timestamp("deleted_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+  },
+  (table) => ({
+    uniqueActiveTag: uniqueIndex("unique_active_tag")
+      .on(table.projectId, table.key)
+      .where(sql`${table.deletedAt} IS NULL`),
+  })
+);
 
 export const tagsRelation = relations(tagsTable, ({ one }) => ({
   project: one(projectsTable, {
@@ -392,18 +400,26 @@ export const metadataRelation = relations(metadataTable, ({ one }) => ({
   }),
 }));
 
-export const expressionsTable = pgTable("expressions", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  projectId: uuid("project_id")
-    .references(() => projectsTable.id)
-    .notNull(),
-  key: text("key").notNull(),
-  expr: text("expr").notNull(),
-  deletedAt: timestamp("deleted_at", {
-    withTimezone: true,
-    mode: "string",
-  }),
-});
+export const expressionsTable = pgTable(
+  "expressions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .references(() => projectsTable.id)
+      .notNull(),
+    key: text("key").notNull(),
+    expr: text("expr").notNull(),
+    deletedAt: timestamp("deleted_at", {
+      withTimezone: true,
+      mode: "string",
+    }),
+  },
+  (table) => ({
+    uniqueActiveExpr: uniqueIndex("unique_active_expr")
+      .on(table.projectId, table.key)
+      .where(sql`${table.deletedAt} IS NULL`),
+  })
+);
 
 export const expressionsRelation = relations(expressionsTable, ({ one }) => ({
   project: one(projectsTable, {

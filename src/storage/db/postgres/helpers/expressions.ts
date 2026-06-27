@@ -62,27 +62,14 @@ export async function createExpression(
   const db = getPostgresDB();
 
   try {
-    const existing = await db
-      .select({ id: expressionsTable.id })
-      .from(expressionsTable)
-      .where(
-        and(
-          eq(expressionsTable.projectId, projectId),
-          eq(expressionsTable.key, key),
-          isNull(expressionsTable.deletedAt)
-        )
-      )
-      .limit(1);
-
-    if (existing[0]) {
-      await db
-        .update(expressionsTable)
-        .set({ expr })
-        .where(eq(expressionsTable.id, existing[0].id));
-      return;
-    }
-
-    await db.insert(expressionsTable).values({ projectId, key, expr });
+    await db
+      .insert(expressionsTable)
+      .values({ projectId, key, expr })
+      .onConflictDoUpdate({
+        target: [expressionsTable.projectId, expressionsTable.key],
+        targetWhere: isNull(expressionsTable.deletedAt),
+        set: { expr },
+      });
   } catch (e) {
     throw StorageError.insertFailed(
       `Failed to upsert expression '${key}'`,

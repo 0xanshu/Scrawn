@@ -40,6 +40,12 @@ export async function handleListDeliveries(
   try {
     const auth = await authenticateHttpApiKey(request.headers.authorization);
 
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can read webhook deliveries"
+      );
+    }
+
     const query = listDeliveriesQuerySchema.parse(request.query);
     const db = getPostgresDB();
 
