@@ -9,6 +9,7 @@ import {
 import { logger } from "../../../errors/logger.ts";
 import { AuthError } from "../../../errors/auth";
 import { authenticateMasterApiKey } from "../../../utils/authenticateMasterApiKey.ts";
+import { apiKeyCache } from "../../../utils/apiKeyCache.ts";
 import { getPostgresDB } from "../../../storage/db/postgres/db";
 import {
   projectsTable,
@@ -138,16 +139,6 @@ export async function handleUpdateProject(
 
     const db = getPostgresDB();
 
-    const appUrl = process.env.APP_URL;
-    if (!appUrl) {
-      builder.setError(500, {
-        type: "InternalError",
-        message: "APP_URL environment variable is not set",
-      });
-      reply.code(500);
-      return {};
-    }
-
     const metaUpdates: any = {};
     if (body.dodoLiveProductId)
       metaUpdates.dodo_live_product_id = body.dodoLiveProductId;
@@ -163,6 +154,16 @@ export async function handleUpdateProject(
         bearerToken: body.dodoLiveApiKey,
         environment: "live_mode",
       });
+
+      const appUrl = process.env.APP_URL;
+      if (!appUrl) {
+        builder.setError(500, {
+          type: "InternalError",
+          message: "APP_URL environment variable is not set",
+        });
+        reply.code(500);
+        return {};
+      }
 
       try {
         const liveWebhook = await liveClient.webhooks.create({
@@ -198,6 +199,16 @@ export async function handleUpdateProject(
         bearerToken: body.dodoTestApiKey,
         environment: "test_mode",
       });
+
+      const appUrl = process.env.APP_URL;
+      if (!appUrl) {
+        builder.setError(500, {
+          type: "InternalError",
+          message: "APP_URL environment variable is not set",
+        });
+        reply.code(500);
+        return {};
+      }
 
       try {
         const testWebhook = await testClient.webhooks.create({
@@ -285,6 +296,17 @@ export async function handleUpdateProject(
       reply.code(404);
       return {};
     }
+    if (
+      err.name === "StorageError" &&
+      (err as any).originalError?.code === "23505"
+    ) {
+      builder.setError(409, {
+        type: "ConflictError",
+        message: "A project with this name already exists",
+      });
+      reply.code(409);
+      return {};
+    }
     builder.setError(500, { type: "InternalError", message: err.message });
     reply.code(500);
     return {};
@@ -329,9 +351,14 @@ export async function handleDeleteProject(
         .delete(sessionsTable)
         .where(eq(sessionsTable.projectId, projectId));
       await txn.delete(usersTable).where(eq(usersTable.projectId, projectId));
-      await txn
+      const deletedKeys = await txn
         .delete(apiKeysTable)
-        .where(eq(apiKeysTable.projectId, projectId));
+        .where(eq(apiKeysTable.projectId, projectId))
+        .returning({ key: apiKeysTable.key });
+
+      for (const k of deletedKeys) {
+        apiKeyCache.delete(k.key);
+      }
       await txn
         .delete(metadataTable)
         .where(eq(metadataTable.projectId, projectId));
