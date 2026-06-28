@@ -263,7 +263,7 @@ async function handleListQuery(
     );
     let q = `SELECT ${buildSelectColumns(t)} FROM ${t}`;
     q += ` WHERE project_id = {projectId:String}`;
-    if (whereClause) q += ` AND ${whereClause}`;
+    if (whereClause) q += ` AND (${whereClause})`;
     return q;
   });
 
@@ -344,7 +344,7 @@ async function handleAggregationQuery(
     );
     let q = `SELECT ${cols.join(", ")} FROM ${t}`;
     q += ` WHERE project_id = {projectId:String}`;
-    if (whereClause) q += ` AND ${whereClause}`;
+    if (whereClause) q += ` AND (${whereClause})`;
     return q;
   });
 
@@ -399,7 +399,7 @@ async function getTotalCount(
     );
     let q = `SELECT count() as cnt FROM ${t}`;
     q += ` WHERE project_id = {projectId:String}`;
-    if (whereClause) q += ` AND ${whereClause}`;
+    if (whereClause) q += ` AND (${whereClause})`;
     return q;
   });
 

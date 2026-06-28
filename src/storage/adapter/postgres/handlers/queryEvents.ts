@@ -304,7 +304,7 @@ async function handleListQuery(
   const subqueries = tables.map((t, i) => {
     const base = sql`SELECT ${selectExpr[i]} FROM ${sql.raw(t)}`;
     const fullWhere = whereExpr[i]
-      ? sql`${whereExpr[i]} AND ${projectFilter}`
+      ? sql`(${whereExpr[i]}) AND ${projectFilter}`
       : projectFilter;
     return sql`${base} WHERE ${fullWhere}`;
   });
@@ -373,7 +373,7 @@ async function handleAggregationQuery(
     const whereClause = buildWhereClause(request.where, t);
     const base = sql`SELECT ${sql.join(cols, sql`, `)} FROM ${sql.raw(t)}`;
     const fullWhere = whereClause
-      ? sql`${whereClause} AND ${projectFilter}`
+      ? sql`(${whereClause}) AND ${projectFilter}`
       : projectFilter;
     return sql`${base} WHERE ${fullWhere}`;
   });
@@ -431,7 +431,7 @@ async function getTotalCount(
     const whereClause = buildWhereClause(request.where, t);
     const base = sql`SELECT count(*)::int as cnt FROM ${sql.raw(t)}`;
     const fullWhere = whereClause
-      ? sql`${whereClause} AND ${projectFilter}`
+      ? sql`(${whereClause}) AND ${projectFilter}`
       : projectFilter;
     return sql`${base} WHERE ${fullWhere}`;
   });
