@@ -1,5 +1,7 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import * as Sentry from "@sentry/bun";
+import DodoPayments from "dodopayments";
+import { removeClient } from "../../gRPC/payment/paymentProvider.ts";
 import {
   createWideEventBuilder,
   generateRequestId,
@@ -126,12 +128,19 @@ export async function handleUpdateProject(
     };
 
     const db = getPostgresDB();
+
+    const appUrl = process.env.SCRAWN_HTTP_URL || "http://localhost:8070";
+
     await executeInTransaction(db, "update project", async (txn) => {
+      let rowsAffected = 0;
+
       if (body.name) {
-        await txn
+        const updated = await txn
           .update(projectsTable)
           .set({ name: body.name })
-          .where(eq(projectsTable.id, projectId));
+          .where(eq(projectsTable.id, projectId))
+          .returning({ id: projectsTable.id });
+        rowsAffected += updated.length;
       }
 
       const metaUpdates: any = {};
@@ -144,18 +153,73 @@ export async function handleUpdateProject(
 
       if (body.dodoLiveApiKey && !body.dodoLiveApiKey.includes("****")) {
         metaUpdates.dodo_live_api_key = encrypt(body.dodoLiveApiKey);
+
+        const liveClient = new DodoPayments({
+          bearerToken: body.dodoLiveApiKey,
+          environment: "live_mode",
+        });
+
+        try {
+          const liveWebhook = await liveClient.webhooks.create({
+            url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&projectId=${projectId}`,
+            description: "Scrawn live payment webhook",
+            filter_types: ["payment.succeeded", "payment.failed"],
+          });
+          const liveSecret = (
+            await liveClient.webhooks.retrieveSecret(liveWebhook.id)
+          ).secret;
+          metaUpdates.dodo_live_webhook_secret = encrypt(liveSecret);
+        } catch (error) {
+          Sentry.captureException(error, {
+            extra: { context: "failed to register live webhook on update" },
+          });
+        }
       }
+
       if (body.dodoTestApiKey && !body.dodoTestApiKey.includes("****")) {
         metaUpdates.dodo_test_api_key = encrypt(body.dodoTestApiKey);
+
+        const testClient = new DodoPayments({
+          bearerToken: body.dodoTestApiKey,
+          environment: "test_mode",
+        });
+
+        try {
+          const testWebhook = await testClient.webhooks.create({
+            url: `${appUrl}/webhooks/payment/createdCheckout?mode=test&projectId=${projectId}`,
+            description: "Scrawn test payment webhook",
+            filter_types: ["payment.succeeded", "payment.failed"],
+          });
+          const testSecret = (
+            await testClient.webhooks.retrieveSecret(testWebhook.id)
+          ).secret;
+          metaUpdates.dodo_test_webhook_secret = encrypt(testSecret);
+        } catch (error) {
+          Sentry.captureException(error, {
+            extra: { context: "failed to register test webhook on update" },
+          });
+        }
       }
 
       if (Object.keys(metaUpdates).length > 0) {
-        await txn
+        const updated = await txn
           .update(metadataTable)
           .set(metaUpdates)
-          .where(eq(metadataTable.projectId, projectId));
+          .where(eq(metadataTable.projectId, projectId))
+          .returning({ projectId: metadataTable.projectId });
+        rowsAffected += updated.length;
+      }
+
+      if (
+        rowsAffected === 0 &&
+        (body.name || Object.keys(metaUpdates).length > 0)
+      ) {
+        throw new Error("PROJECT_NOT_FOUND");
       }
     });
+
+    // Invalidate cached clients
+    removeClient(projectId);
 
     builder.setSuccess(200);
     reply.code(200);
@@ -170,6 +234,17 @@ export async function handleUpdateProject(
       return {};
     }
     const err = error instanceof Error ? error : new Error(String(error));
+    if (
+      err.name === "StorageError" &&
+      (err as any).originalError?.message === "PROJECT_NOT_FOUND"
+    ) {
+      builder.setError(404, {
+        type: "NotFoundError",
+        message: "Project not found",
+      });
+      reply.code(404);
+      return {};
+    }
     builder.setError(500, { type: "InternalError", message: err.message });
     reply.code(500);
     return {};
@@ -194,16 +269,37 @@ export async function handleDeleteProject(
     const { projectId } = request.params as { projectId: string };
     const db = getPostgresDB();
 
-    // Manual cascading deletes
     await executeInTransaction(db, "delete project", async (txn) => {
+      await txn
+        .delete(basicUsageEventsTable)
+        .where(eq(basicUsageEventsTable.projectId, projectId));
+      await txn
+        .delete(paymentEventsTable)
+        .where(eq(paymentEventsTable.projectId, projectId));
+      await txn
+        .delete(aiTokenUsageEventsTable)
+        .where(eq(aiTokenUsageEventsTable.projectId, projectId));
+      await txn
+        .delete(sessionsTable)
+        .where(eq(sessionsTable.projectId, projectId));
+      await txn.delete(usersTable).where(eq(usersTable.projectId, projectId));
       await txn
         .delete(apiKeysTable)
         .where(eq(apiKeysTable.projectId, projectId));
       await txn
         .delete(metadataTable)
         .where(eq(metadataTable.projectId, projectId));
-      await txn.delete(projectsTable).where(eq(projectsTable.id, projectId));
+      const deletedProject = await txn
+        .delete(projectsTable)
+        .where(eq(projectsTable.id, projectId))
+        .returning({ id: projectsTable.id });
+
+      if (deletedProject.length === 0) {
+        throw new Error("PROJECT_NOT_FOUND");
+      }
     });
+
+    removeClient(projectId);
 
     builder.setSuccess(200);
     reply.code(200);
@@ -218,6 +314,17 @@ export async function handleDeleteProject(
       return {};
     }
     const err = error instanceof Error ? error : new Error(String(error));
+    if (
+      err.name === "StorageError" &&
+      (err as any).originalError?.message === "PROJECT_NOT_FOUND"
+    ) {
+      builder.setError(404, {
+        type: "NotFoundError",
+        message: "Project not found",
+      });
+      reply.code(404);
+      return {};
+    }
     builder.setError(500, { type: "InternalError", message: err.message });
     reply.code(500);
     return {};
