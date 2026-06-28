@@ -88,6 +88,10 @@ export async function handleCreateTag(
     const authHeader = request.headers.authorization;
     const auth = await authenticateHttpApiKey(authHeader);
 
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied("Only dashboard keys can manage tags");
+    }
+
     const body = await request.body;
     const validated = createTagSchema.parse(body);
 
@@ -138,6 +142,10 @@ export async function handleDeleteTag(
   try {
     const authHeader = request.headers.authorization;
     const auth = await authenticateHttpApiKey(authHeader);
+
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied("Only dashboard keys can manage tags");
+    }
 
     const params = tagParamsSchema.parse(request.params);
     const deleted = await deleteTag(auth.projectId, params.key);

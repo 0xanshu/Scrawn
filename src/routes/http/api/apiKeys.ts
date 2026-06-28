@@ -332,38 +332,43 @@ export async function handleCreateDashboardKey(
     const expiresAt = DateTime.utc().plus({ years: 10 }).toISO()!;
     const db = getPostgresDB();
 
-    const existingKey = await db
-      .select({ id: apiKeysTable.id, key: apiKeysTable.key })
-      .from(apiKeysTable)
-      .where(
-        and(
-          eq(apiKeysTable.projectId, project_id),
-          eq(apiKeysTable.name, "Default dashboard key"),
-          eq(apiKeysTable.revoked, false)
+    await executeInTransaction(db, "rotate dashboard key", async (txn) => {
+      const existingKey = await txn
+        .select({ id: apiKeysTable.id, key: apiKeysTable.key })
+        .from(apiKeysTable)
+        .where(
+          and(
+            eq(apiKeysTable.projectId, project_id),
+            eq(apiKeysTable.name, "Default dashboard key"),
+            eq(apiKeysTable.role, "dashboard"),
+            eq(apiKeysTable.revoked, false)
+          )
         )
-      )
-      .limit(1);
+        .for("update")
+        .limit(1);
 
-    const existingDashboardKey = existingKey[0];
-    if (existingDashboardKey) {
-      await db
-        .update(apiKeysTable)
-        .set({
+      const existingDashboardKey = existingKey[0];
+      if (existingDashboardKey) {
+        await txn
+          .update(apiKeysTable)
+          .set({
+            key: dashboardKeyHash,
+            role: "dashboard",
+            expiresAt,
+          })
+          .where(eq(apiKeysTable.id, existingDashboardKey.id));
+
+        apiKeyCache.delete(existingDashboardKey.key);
+      } else {
+        await txn.insert(apiKeysTable).values({
+          projectId: project_id,
+          name: "Default dashboard key",
           key: dashboardKeyHash,
+          role: "dashboard",
           expiresAt,
-        })
-        .where(eq(apiKeysTable.id, existingDashboardKey.id));
-
-      apiKeyCache.delete(existingDashboardKey.key);
-    } else {
-      await db.insert(apiKeysTable).values({
-        projectId: project_id,
-        name: "Default dashboard key",
-        key: dashboardKeyHash,
-        role: "dashboard",
-        expiresAt,
-      });
-    }
+        });
+      }
+    });
 
     builder.setSuccess(201);
     reply.code(201);

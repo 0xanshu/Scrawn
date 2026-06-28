@@ -86,6 +86,12 @@ export async function handleCreateExpression(
     const authHeader = request.headers.authorization;
     const auth = await authenticateHttpApiKey(authHeader);
 
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage expressions"
+      );
+    }
+
     const body = await request.body;
     const validated = createExpressionSchema.parse(body);
 
@@ -148,6 +154,12 @@ export async function handleDeleteExpression(
   try {
     const authHeader = request.headers.authorization;
     const auth = await authenticateHttpApiKey(authHeader);
+
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage expressions"
+      );
+    }
 
     const params = request.params as { key: string };
     const deleted = await deleteExpression(auth.projectId, params.key);

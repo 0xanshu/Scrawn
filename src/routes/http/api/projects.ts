@@ -19,6 +19,8 @@ import {
   basicUsageEventsTable,
   aiTokenUsageEventsTable,
   paymentEventsTable,
+  webhookDeliveriesTable,
+  webhookEndpointsTable,
 } from "../../../storage/db/postgres/schema";
 import { eq, inArray } from "drizzle-orm";
 import { encrypt, decrypt } from "../../../utils/encryptMetadata.ts";
@@ -44,11 +46,16 @@ export async function handleListProjects(
     authenticateMasterApiKey(request.headers.authorization);
 
     const body = (await request.body) as { projectIds: string[] };
-    if (
-      !body ||
-      !Array.isArray(body.projectIds) ||
-      body.projectIds.length === 0
-    ) {
+    if (!body || !Array.isArray(body.projectIds)) {
+      builder.setError(400, {
+        type: "BadRequestError",
+        message: "Missing projectIds array",
+      });
+      reply.code(400);
+      return {};
+    }
+
+    if (body.projectIds.length === 0) {
       builder.setSuccess(200);
       reply.code(200);
       return { projects: [] };
@@ -129,20 +136,17 @@ export async function handleUpdateProject(
 
     const db = getPostgresDB();
 
-    const appUrl = process.env.SCRAWN_HTTP_URL || "http://localhost:8070";
+    const appUrl = process.env.APP_URL;
+    if (!appUrl) {
+      builder.setError(500, {
+        type: "InternalError",
+        message: "APP_URL environment variable is not set",
+      });
+      reply.code(500);
+      return {};
+    }
 
     await executeInTransaction(db, "update project", async (txn) => {
-      let rowsAffected = 0;
-
-      if (body.name) {
-        const updated = await txn
-          .update(projectsTable)
-          .set({ name: body.name })
-          .where(eq(projectsTable.id, projectId))
-          .returning({ id: projectsTable.id });
-        rowsAffected += updated.length;
-      }
-
       const metaUpdates: any = {};
       if (body.dodoLiveProductId)
         metaUpdates.dodo_live_product_id = body.dodoLiveProductId;
@@ -173,6 +177,7 @@ export async function handleUpdateProject(
           Sentry.captureException(error, {
             extra: { context: "failed to register live webhook on update" },
           });
+          throw new Error("FAILED_TO_REGISTER_LIVE_WEBHOOK");
         }
       }
 
@@ -198,7 +203,19 @@ export async function handleUpdateProject(
           Sentry.captureException(error, {
             extra: { context: "failed to register test webhook on update" },
           });
+          throw new Error("FAILED_TO_REGISTER_TEST_WEBHOOK");
         }
+      }
+
+      let rowsAffected = 0;
+
+      if (body.name) {
+        const updated = await txn
+          .update(projectsTable)
+          .set({ name: body.name })
+          .where(eq(projectsTable.id, projectId))
+          .returning({ id: projectsTable.id });
+        rowsAffected += updated.length;
       }
 
       if (Object.keys(metaUpdates).length > 0) {
@@ -218,7 +235,6 @@ export async function handleUpdateProject(
       }
     });
 
-    // Invalidate cached clients
     removeClient(projectId);
 
     builder.setSuccess(200);
@@ -270,6 +286,12 @@ export async function handleDeleteProject(
     const db = getPostgresDB();
 
     await executeInTransaction(db, "delete project", async (txn) => {
+      await txn
+        .delete(webhookDeliveriesTable)
+        .where(eq(webhookDeliveriesTable.projectId, projectId));
+      await txn
+        .delete(webhookEndpointsTable)
+        .where(eq(webhookEndpointsTable.projectId, projectId));
       await txn
         .delete(basicUsageEventsTable)
         .where(eq(basicUsageEventsTable.projectId, projectId));

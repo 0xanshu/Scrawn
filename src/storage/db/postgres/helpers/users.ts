@@ -51,7 +51,7 @@ export async function ensureUserExists(
     await db
       .insert(usersTable)
       .values({ id: userId, projectId })
-      .onConflictDoNothing();
+      .onConflictDoNothing({ target: [usersTable.projectId, usersTable.id] });
   } catch (e) {
     throw StorageError.queryFailed(
       "Failed to ensure user exists",
