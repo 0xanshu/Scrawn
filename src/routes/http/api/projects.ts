@@ -243,15 +243,20 @@ export async function handleUpdateProject(
     }
 
     await executeInTransaction(db, "update project", async (txn) => {
-      let rowsAffected = 0;
+      const exists = await txn
+        .select({ id: projectsTable.id })
+        .from(projectsTable)
+        .where(eq(projectsTable.id, projectId))
+        .limit(1);
+      if (exists.length === 0) {
+        throw new Error("PROJECT_NOT_FOUND");
+      }
 
       if (body.name !== undefined) {
-        const updated = await txn
+        await txn
           .update(projectsTable)
           .set({ name: body.name })
-          .where(eq(projectsTable.id, projectId))
-          .returning({ id: projectsTable.id });
-        rowsAffected += updated.length;
+          .where(eq(projectsTable.id, projectId));
       }
 
       if (Object.keys(metaUpdates).length > 0) {
@@ -260,21 +265,12 @@ export async function handleUpdateProject(
           .set(metaUpdates)
           .where(eq(metadataTable.projectId, projectId))
           .returning({ projectId: metadataTable.projectId });
-        rowsAffected += updated.length;
-      }
 
-      if (rowsAffected === 0) {
-        if (body.name !== undefined || Object.keys(metaUpdates).length > 0) {
-          throw new Error("PROJECT_NOT_FOUND");
-        } else {
-          const exists = await txn
-            .select({ id: projectsTable.id })
-            .from(projectsTable)
-            .where(eq(projectsTable.id, projectId))
-            .limit(1);
-          if (exists.length === 0) {
-            throw new Error("PROJECT_NOT_FOUND");
-          }
+        if (updated.length === 0) {
+          await txn.insert(metadataTable).values({
+            projectId,
+            ...metaUpdates,
+          });
         }
       }
     });

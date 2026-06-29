@@ -105,14 +105,14 @@ export async function handleOnboarding(
         .secret;
     } catch (error) {
       if (liveWebhookId) {
-        liveClient.webhooks.delete(liveWebhookId).catch((e) =>
+        await liveClient.webhooks.delete(liveWebhookId).catch((e) =>
           Sentry.captureException(e, {
             extra: { context: "rollback: failed to delete live webhook" },
           })
         );
       }
       if (testWebhookId) {
-        testClient.webhooks.delete(testWebhookId).catch((e) =>
+        await testClient.webhooks.delete(testWebhookId).catch((e) =>
           Sentry.captureException(e, {
             extra: { context: "rollback: failed to delete test webhook" },
           })
@@ -164,7 +164,7 @@ export async function handleOnboarding(
       });
     } catch (txnError) {
       if (liveWebhookId) {
-        liveClient.webhooks.delete(liveWebhookId).catch((e) =>
+        await liveClient.webhooks.delete(liveWebhookId).catch((e) =>
           Sentry.captureException(e, {
             extra: {
               context:
@@ -174,7 +174,7 @@ export async function handleOnboarding(
         );
       }
       if (testWebhookId) {
-        testClient.webhooks.delete(testWebhookId).catch((e) =>
+        await testClient.webhooks.delete(testWebhookId).catch((e) =>
           Sentry.captureException(e, {
             extra: {
               context:
@@ -300,16 +300,20 @@ export async function handleGetConfig(
     reply.code(200);
     return {
       configured: true,
-      dodo_live_api_key: maskApiKey(decrypt(metadata.dodo_live_api_key)),
-      dodo_test_api_key: maskApiKey(decrypt(metadata.dodo_test_api_key)),
+      dodo_live_api_key: metadata.dodo_live_api_key
+        ? maskApiKey(decrypt(metadata.dodo_live_api_key))
+        : null,
+      dodo_test_api_key: metadata.dodo_test_api_key
+        ? maskApiKey(decrypt(metadata.dodo_test_api_key))
+        : null,
       dodo_live_product_id: metadata.dodo_live_product_id,
       dodo_test_product_id: metadata.dodo_test_product_id,
-      dodo_live_webhook_secret: maskApiKey(
-        decrypt(metadata.dodo_live_webhook_secret)
-      ),
-      dodo_test_webhook_secret: maskApiKey(
-        decrypt(metadata.dodo_test_webhook_secret)
-      ),
+      dodo_live_webhook_secret: metadata.dodo_live_webhook_secret
+        ? maskApiKey(decrypt(metadata.dodo_live_webhook_secret))
+        : null,
+      dodo_test_webhook_secret: metadata.dodo_test_webhook_secret
+        ? maskApiKey(decrypt(metadata.dodo_test_webhook_secret))
+        : null,
       currency: metadata.currency,
       redirect_url: metadata.redirect_url,
     };

@@ -8,6 +8,7 @@ import {
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
 import { AuthError } from "../../../errors/auth.ts";
+import { StorageError } from "../../../errors/storage.ts";
 import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
 import { generateAPIKey } from "../../../utils/generateAPIKey";
 import { hashAPIKey } from "../../../utils/hashAPIKey";
@@ -138,6 +139,18 @@ export async function handleCreateApiKey(
     Sentry.captureException(error, {
       extra: { context: "create API key handler" },
     });
+
+    if (
+      error instanceof StorageError &&
+      error.type === "CONSTRAINT_VIOLATION"
+    ) {
+      builder.setError(409, {
+        type: "ConflictError",
+        message: "An API key with this name already exists",
+      });
+      reply.code(409);
+      return { error: "An API key with this name already exists" };
+    }
 
     if (error instanceof AuthError) {
       builder.setError(401, { type: error.type, message: error.message });
