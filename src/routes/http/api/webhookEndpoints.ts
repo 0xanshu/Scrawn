@@ -106,6 +106,15 @@ export async function handleCreateWebhookEndpoint(
       return { error: "Target API key not found" };
     }
 
+    if (targetKey.revoked) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Cannot set webhook for a revoked API key",
+      });
+      reply.code(400);
+      return { error: "Cannot set webhook for a revoked API key" };
+    }
+
     if (targetKey.projectId !== auth.projectId) {
       builder.setError(403, {
         type: "PermissionDenied",
@@ -212,6 +221,14 @@ export async function handleGetWebhookEndpoint(
           error: "Target API key not found or belongs to another project",
         };
       }
+      if (targetKey.revoked) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key is revoked",
+        });
+        reply.code(403);
+        return { error: "Target API key is revoked" };
+      }
     }
 
     const endpoint = await getWebhookEndpointByApiKeyId(
@@ -277,6 +294,14 @@ export async function handleDeleteWebhookEndpoint(
         return {
           error: "Target API key not found or belongs to another project",
         };
+      }
+      if (targetKey.revoked) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key is revoked",
+        });
+        reply.code(403);
+        return { error: "Target API key is revoked" };
       }
     }
 
@@ -350,6 +375,15 @@ export async function handleSendTestWebhook(
       });
       reply.code(404);
       return { error: "API key not found" };
+    }
+
+    if (targetKey.revoked) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Cannot send test webhook to a revoked API key",
+      });
+      reply.code(400);
+      return { error: "Cannot send test webhook to a revoked API key" };
     }
 
     if (targetKey.projectId !== auth.projectId) {
@@ -456,6 +490,14 @@ export async function handleGetPublicKey(
         return {
           error: "Target API key not found or belongs to another project",
         };
+      }
+      if (targetKey.revoked) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key is revoked",
+        });
+        reply.code(403);
+        return { error: "Target API key is revoked" };
       }
     }
 

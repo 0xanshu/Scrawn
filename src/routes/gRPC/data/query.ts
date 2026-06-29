@@ -100,14 +100,15 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
 };
 
 function castValue(
-  value: string,
+  value: string | number | boolean,
   fieldDef: FieldDef,
   fieldName: string
 ): boolean | number | string {
   if (fieldDef.cast === "boolean") {
+    if (typeof value === "boolean") return value;
     if (value !== "true" && value !== "false") {
       throw EventError.validationFailed(
-        `Invalid boolean value '${value}' for field '${fieldName}': must be "true" or "false"`
+        `Invalid boolean value '${String(value)}' for field '${fieldName}': must be "true" or "false"`
       );
     }
     return value === "true";
@@ -116,18 +117,18 @@ function castValue(
     const n = Number(value);
     if (!Number.isFinite(n) || !Number.isInteger(n)) {
       throw EventError.validationFailed(
-        `Invalid integer value '${value}' for field '${fieldName}': must be a finite integer`
+        `Invalid integer value '${String(value)}' for field '${fieldName}': must be a finite integer`
       );
     }
     return n;
   }
-  return value;
+  return typeof value === "string" ? value : String(value);
 }
 
 function applyOp(
   col: AnyPgColumn,
   op: string,
-  value: string,
+  value: string | number | boolean,
   fieldDef: FieldDef,
   fieldName: string
 ): SQL {

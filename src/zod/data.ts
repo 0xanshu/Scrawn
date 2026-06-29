@@ -33,7 +33,7 @@ const filterConditionSchema = z.object({
     .min(1)
     .max(7)
     .transform((v) => OPERATOR_MAP[v as keyof typeof OPERATOR_MAP]),
-  value: z.string(),
+  value: z.union([z.string(), z.number(), z.boolean()]),
 });
 
 const filterGroupSchema = createFilterGroupSchema(

@@ -79,16 +79,6 @@ export async function createCheckoutLink(
     );
     wideEventBuilder?.setPaymentContext({ priceAmount: custom_price });
 
-    const checkoutResult = await createCheckoutSession(
-      auth.projectId,
-      config,
-      custom_price,
-      validatedData.userId,
-      auth.apiKeyId,
-      beforeTimestamp,
-      mode
-    );
-
     const checkoutLink = await executeInTransaction(
       db,
       "create checkout link",
@@ -117,6 +107,16 @@ export async function createCheckoutLink(
           const proxyUrl = `${process.env.APP_URL}/checkout/${existingId}`;
           return proxyUrl;
         }
+
+        const checkoutResult = await createCheckoutSession(
+          auth.projectId,
+          config,
+          custom_price,
+          validatedData.userId,
+          auth.apiKeyId,
+          beforeTimestamp,
+          mode
+        );
 
         const sessionResult = await handleAddSession(
           auth.projectId,
