@@ -41,6 +41,14 @@ export async function createAPIKey(
       string | undefined;
     const validatedData = validateRequest(req, roleFromMeta);
 
+    if (validatedData.role === "dashboard") {
+      return callback?.(
+        AuthError.permissionDenied(
+          "Dashboard role creation is reserved for master keys"
+        )
+      );
+    }
+
     wideEventBuilder?.setApiKeyContext({ name: validatedData.name });
 
     const apiKey = generateAPIKey(validatedData.role as ApiKeyRole);

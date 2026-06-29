@@ -205,6 +205,12 @@ export async function queryData(
       return callback?.(AuthError.invalidAPIKey("API key context not found"));
     }
 
+    if (auth.role !== "dashboard") {
+      return callback?.(
+        AuthError.permissionDenied("Only dashboard keys can query data")
+      );
+    }
+
     const req = { ...call.request } as Record<string, unknown>;
 
     const validated = dataQuerySchema.parse(req);
@@ -225,9 +231,10 @@ export async function queryData(
     const userWhere = buildWhere(validated.where, tableDef);
     const projectFilter = eq(tableDef.table.projectId, auth.projectId) as SQL;
 
-    const modeFilter = tableDef.fields.mode
-      ? eq(tableDef.fields.mode.col, auth.mode)
-      : undefined;
+    const modeFilter =
+      tableDef.fields.mode && auth.mode
+        ? eq(tableDef.fields.mode.col, auth.mode)
+        : undefined;
 
     const baseFilter = modeFilter
       ? and(projectFilter, modeFilter)

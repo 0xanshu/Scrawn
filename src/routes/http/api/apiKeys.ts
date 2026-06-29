@@ -59,6 +59,17 @@ export async function handleCreateApiKey(
     builder.setApiKeyContext({ name: `create-key:${auth.apiKeyId}` });
 
     const body = await request.body;
+
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      (body as Record<string, unknown>).role === "dashboard"
+    ) {
+      throw AuthError.permissionDenied(
+        "Dashboard role creation is reserved for master keys"
+      );
+    }
+
     const validated = createApiKeySchema.parse(body);
 
     if (

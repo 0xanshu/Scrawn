@@ -144,12 +144,13 @@ export async function handleUpdateProject(
     const db = getPostgresDB();
 
     const metaUpdates: any = {};
-    if (body.dodoLiveProductId)
+    if (body.dodoLiveProductId !== undefined)
       metaUpdates.dodo_live_product_id = body.dodoLiveProductId;
-    if (body.dodoTestProductId)
+    if (body.dodoTestProductId !== undefined)
       metaUpdates.dodo_test_product_id = body.dodoTestProductId;
-    if (body.currency) metaUpdates.currency = body.currency;
-    if (body.redirectUrl) metaUpdates.redirect_url = body.redirectUrl;
+    if (body.currency !== undefined) metaUpdates.currency = body.currency;
+    if (body.redirectUrl !== undefined)
+      metaUpdates.redirect_url = body.redirectUrl;
 
     if (body.dodoLiveApiKey && !body.dodoLiveApiKey.includes("****")) {
       metaUpdates.dodo_live_api_key = encrypt(body.dodoLiveApiKey);
@@ -244,7 +245,7 @@ export async function handleUpdateProject(
     await executeInTransaction(db, "update project", async (txn) => {
       let rowsAffected = 0;
 
-      if (body.name) {
+      if (body.name !== undefined) {
         const updated = await txn
           .update(projectsTable)
           .set({ name: body.name })
@@ -262,11 +263,19 @@ export async function handleUpdateProject(
         rowsAffected += updated.length;
       }
 
-      if (
-        rowsAffected === 0 &&
-        (body.name || Object.keys(metaUpdates).length > 0)
-      ) {
-        throw new Error("PROJECT_NOT_FOUND");
+      if (rowsAffected === 0) {
+        if (body.name !== undefined || Object.keys(metaUpdates).length > 0) {
+          throw new Error("PROJECT_NOT_FOUND");
+        } else {
+          const exists = await txn
+            .select({ id: projectsTable.id })
+            .from(projectsTable)
+            .where(eq(projectsTable.id, projectId))
+            .limit(1);
+          if (exists.length === 0) {
+            throw new Error("PROJECT_NOT_FOUND");
+          }
+        }
       }
     });
 
