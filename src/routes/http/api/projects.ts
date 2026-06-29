@@ -75,7 +75,7 @@ export async function handleListProjects(
         redirect_url: metadataTable.redirect_url,
       })
       .from(projectsTable)
-      .innerJoin(metadataTable, eq(projectsTable.id, metadataTable.projectId))
+      .leftJoin(metadataTable, eq(projectsTable.id, metadataTable.projectId))
       .where(inArray(projectsTable.id, body.projectIds));
 
     builder.setSuccess(200);
@@ -85,8 +85,12 @@ export async function handleListProjects(
       projects: projects.map((p) => ({
         id: p.id,
         name: p.name,
-        dodoLiveApiKey: maskApiKey(decrypt(p.dodo_live_api_key)),
-        dodoTestApiKey: maskApiKey(decrypt(p.dodo_test_api_key)),
+        dodoLiveApiKey: p.dodo_live_api_key
+          ? maskApiKey(decrypt(p.dodo_live_api_key))
+          : null,
+        dodoTestApiKey: p.dodo_test_api_key
+          ? maskApiKey(decrypt(p.dodo_test_api_key))
+          : null,
         dodoLiveProductId: p.dodo_live_product_id,
         dodoTestProductId: p.dodo_test_product_id,
         currency: p.currency,
