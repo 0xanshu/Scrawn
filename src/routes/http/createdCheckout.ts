@@ -108,7 +108,7 @@ export async function handleDodoWebhook(
       return ignoredResponse(builder);
     }
 
-    const { payment_id, checkout_session_id } = webhookPayload.data;
+    const { payment_id, checkout_session_id, currency } = webhookPayload.data;
 
     builder.setWebhookContext({
       webhookEvent: webhookPayload.type,
@@ -238,7 +238,7 @@ export async function handleDodoWebhook(
           checkoutSessionId: checkout_session_id,
           userId,
           amount: creditAmount,
-          currency: "usd",
+          currency: currency,
           mode,
           billed_upto,
           createdAt: session.createdAt,
