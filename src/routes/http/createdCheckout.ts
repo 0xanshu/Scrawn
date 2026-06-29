@@ -124,18 +124,12 @@ export async function handleDodoWebhook(
       );
     }
 
-    const session = await getSessionByCheckoutId(checkout_session_id);
+    const session = await getSessionByCheckoutId(
+      projectId,
+      checkout_session_id
+    );
 
     if (!session) {
-      return errorResponse(
-        404,
-        "NotFoundError",
-        `Session not found for checkout_session_id: ${checkout_session_id}`,
-        builder
-      );
-    }
-
-    if (session.projectId !== projectId) {
       return errorResponse(
         404,
         "NotFoundError",
@@ -157,7 +151,12 @@ export async function handleDodoWebhook(
     if (webhookPayload.type === "payment.failed") {
       let claimed: boolean = false;
       await executeInTransaction(db, "process failed", async (txn) => {
-        claimed = await updateSessionStatus(checkout_session_id, "failed", txn);
+        claimed = await updateSessionStatus(
+          projectId,
+          checkout_session_id,
+          "failed",
+          txn
+        );
         if (!claimed) return;
       });
       if (!claimed) {
@@ -169,7 +168,7 @@ export async function handleDodoWebhook(
       }
 
       builder.setSuccess(200);
-      forwardWebhook(session.projectId, session.apiKeyId, {
+      await forwardWebhook(session.projectId, session.apiKeyId, {
         eventType: "payment.failed",
         resource: "payment",
         action: "failed",
@@ -196,6 +195,7 @@ export async function handleDodoWebhook(
 
       await executeInTransaction(db, "process checkout", async (txn) => {
         claimed = await updateSessionStatus(
+          projectId,
           checkout_session_id,
           "succeeded",
           txn
@@ -229,7 +229,7 @@ export async function handleDodoWebhook(
       builder.setPaymentContext({ creditAmount });
       builder.setSuccess(200);
 
-      forwardWebhook(session.projectId, apiKeyId, {
+      await forwardWebhook(session.projectId, apiKeyId, {
         eventType: "payment.succeeded",
         resource: "payment",
         action: "succeeded",

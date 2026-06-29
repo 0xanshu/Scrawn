@@ -69,7 +69,7 @@ export const sessionsTable = pgTable(
     projectId: uuid("project_id")
       .references(() => projectsTable.id)
       .notNull(),
-    sessionId: text("session_id").notNull().unique(),
+    sessionId: text("session_id").notNull(),
     processed: text("processed", { enum: ["pending", "failed", "succeeded"] })
       .default("pending")
       .notNull(),
@@ -93,7 +93,10 @@ export const sessionsTable = pgTable(
       .default("production"),
   },
   (table) => ({
-    uniqueSessionId: uniqueIndex("unique_session_id").on(table.sessionId),
+    uniqueSessionId: uniqueIndex("unique_session_id").on(
+      table.projectId,
+      table.sessionId
+    ),
     userFk: foreignKey({
       columns: [table.projectId, table.userId],
       foreignColumns: [usersTable.projectId, usersTable.id],

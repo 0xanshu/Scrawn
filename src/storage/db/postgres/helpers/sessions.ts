@@ -7,6 +7,7 @@ import type { UserId } from "../../../../config/identifiers";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 export async function updateSessionStatus(
+  projectId: string,
   checkoutSessionId: string,
   status: "failed" | "succeeded",
   txn: PgTransaction<any, any, any>
@@ -17,6 +18,7 @@ export async function updateSessionStatus(
       .set({ processed: status })
       .where(
         and(
+          eq(sessionsTable.projectId, projectId),
           eq(sessionsTable.sessionId, checkoutSessionId),
           eq(sessionsTable.processed, "pending")
         )
@@ -139,6 +141,7 @@ export async function handleAddSession(
 }
 
 export async function getSessionByCheckoutId(
+  projectId: string,
   checkoutSessionId: string
 ): Promise<typeof sessionsTable.$inferSelect | undefined> {
   const db = getPostgresDB();
@@ -147,7 +150,12 @@ export async function getSessionByCheckoutId(
     const [session] = await db
       .select()
       .from(sessionsTable)
-      .where(eq(sessionsTable.sessionId, checkoutSessionId))
+      .where(
+        and(
+          eq(sessionsTable.projectId, projectId),
+          eq(sessionsTable.sessionId, checkoutSessionId)
+        )
+      )
       .limit(1);
 
     return session ?? undefined;
