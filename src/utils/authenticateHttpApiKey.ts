@@ -39,6 +39,12 @@ export async function authenticateHttpApiKey(
 
   const cached = apiKeyCache.get(apiKeyHash);
   if (cached) {
+    if (
+      cached.expiresAt &&
+      DateTime.utc() > DateTime.fromISO(cached.expiresAt, { zone: "utc" })
+    ) {
+      throw AuthError.expiredAPIKey();
+    }
     if (cached.role !== role) {
       throw AuthError.roleMismatch(
         `Key prefix ${role} doesn't match stored role ${cached.role}`
@@ -63,6 +69,7 @@ export async function authenticateHttpApiKey(
   }
 
   if (
+    apiKeyRecord.expiresAt &&
     DateTime.utc() > DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })
   ) {
     throw AuthError.expiredAPIKey();

@@ -372,7 +372,7 @@ export async function handleCreateDashboardKey(
 
     builder.setSuccess(201);
     reply.code(201);
-    return { project_id, apiKey: dashboardKey };
+    return { projectId: project_id, apiKey: dashboardKey };
   } catch (error) {
     if (error instanceof AuthError) {
       builder.setError(401, { type: error.type, message: error.message });

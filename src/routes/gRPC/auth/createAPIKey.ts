@@ -3,7 +3,6 @@ import {
   CreateAPIKeyRequest,
   CreateAPIKeyResponse,
 } from "../../../gen/auth/v1/auth";
-import type { WideEventBuilder } from "../../../context/requestContext";
 import { apiKeyContextKey } from "../../../context/auth";
 import { createAPIKeySchema } from "../../../zod/apikey";
 import { APIKeyError } from "../../../errors/apikey";
@@ -39,17 +38,8 @@ export async function createAPIKey(
 
     // Read role from gRPC metadata (not in proto message yet)
     const roleFromMeta = call.metadata.get("x-scrawn-role")?.[0] as
-      | string
-      | undefined;
+      string | undefined;
     const validatedData = validateRequest(req, roleFromMeta);
-
-    if (validatedData.role === "dashboard" && auth.role !== "dashboard") {
-      return callback?.(
-        AuthError.permissionDenied(
-          "Only dashboard keys can create dashboard keys"
-        )
-      );
-    }
 
     wideEventBuilder?.setApiKeyContext({ name: validatedData.name });
 

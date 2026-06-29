@@ -197,8 +197,7 @@ export async function queryData(
   callback?: sendUnaryData<QueryResponse>
 ): Promise<void> {
   const wideEventBuilder = call[wideEventContextKey] as
-    | WideEventBuilder
-    | undefined;
+    WideEventBuilder | undefined;
 
   try {
     const auth = call[apiKeyContextKey];
@@ -225,9 +224,16 @@ export async function queryData(
     const db = getPostgresDB();
     const userWhere = buildWhere(validated.where, tableDef);
     const projectFilter = eq(tableDef.table.projectId, auth.projectId) as SQL;
-    const whereClause = userWhere
-      ? and(projectFilter, userWhere)
+
+    const modeFilter = tableDef.fields.mode
+      ? eq(tableDef.fields.mode.col, auth.mode)
+      : undefined;
+
+    const baseFilter = modeFilter
+      ? and(projectFilter, modeFilter)
       : projectFilter;
+
+    const whereClause = userWhere ? and(baseFilter, userWhere) : baseFilter;
     const selectCols = buildSelect(tableDef);
     const columns = Object.keys(tableDef.fields);
 

@@ -122,8 +122,7 @@ export function authInterceptor<Req, Res>(
     const wideEventBuilder = call[wideEventContextKey];
 
     const authHeader = call.metadata.get("authorization")?.[0] as
-      | string
-      | undefined;
+      string | undefined;
 
     if (!authHeader) {
       return callback?.(AuthError.missingHeader());
@@ -156,6 +155,12 @@ export function authInterceptor<Req, Res>(
 
     const cached = apiKeyCache.get(apiKeyHash);
     if (cached) {
+      if (
+        cached.expiresAt &&
+        DateTime.utc() > DateTime.fromISO(cached.expiresAt, { zone: "utc" })
+      ) {
+        return callback?.(AuthError.expiredAPIKey());
+      }
       if (cached.role !== role) {
         return callback?.(
           AuthError.roleMismatch(
@@ -201,8 +206,9 @@ export function authInterceptor<Req, Res>(
         }
 
         if (
+          apiKeyRecord.expiresAt &&
           DateTime.utc() >
-          DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })
+            DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })
         ) {
           return callback?.(AuthError.expiredAPIKey());
         }
