@@ -1,6 +1,5 @@
 import { getClickHouseDB } from "../../db/clickhouse";
 import { logger } from "../../../errors/logger";
-import { innerProduct } from "drizzle-orm";
 
 const BASIC_USAGE_EVENTS_TABLE = `
 CREATE TABLE IF NOT EXISTS basic_usage_events (

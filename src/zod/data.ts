@@ -2,13 +2,7 @@ import { z } from "zod";
 import { Operator, LogicalOperator } from "../gen/data/v1/data";
 import { createFilterGroupSchema } from "./internals";
 
-const DATA_TABLE_NAMES = [
-  "users",
-  "sessions",
-  "tags",
-  "expressions",
-  "metadata",
-] as const;
+const DATA_TABLE_NAMES = ["users", "sessions", "tags", "expressions"] as const;
 
 const OPERATOR_MAP = {
   [Operator.EQ]: "EQ",
