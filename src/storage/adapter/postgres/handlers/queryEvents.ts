@@ -69,6 +69,8 @@ const PG_FIELDS: PGFieldRegistry = {
     outputDebitAmount: { select: null, whereCol: null, whereCast: "" },
     inputCacheTokens: { select: null, whereCol: null, whereCast: "" },
     inputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    outputCacheTokens: { select: null, whereCol: null, whereCast: "" },
+    outputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
     creditAmount: { select: null, whereCol: null, whereCast: "" },
     provider: { select: null, whereCol: null, whereCast: "" },
     metadata: { select: "metadata::text", whereCol: null, whereCast: "" },
@@ -105,11 +107,11 @@ const PG_FIELDS: PGFieldRegistry = {
     basicUsageType: { select: null, whereCol: null, whereCast: "" },
     debitAmount: {
       select:
-        "(COALESCE((metrics->'debit_amount'->>'input')::integer,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output')::integer,0))::text",
+        "(COALESCE((metrics->'debit_amount'->>'input')::integer,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output')::integer,0))::text",
       whereCol: null,
       whereCast: "",
       aggExpr:
-        "(COALESCE((metrics->'debit_amount'->>'input')::bigint,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output')::bigint,0))",
+        "(COALESCE((metrics->'debit_amount'->>'input')::bigint,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output')::bigint,0))",
     },
     model: { select: "model", whereCol: "model", whereCast: "" },
     inputTokens: {
@@ -148,6 +150,18 @@ const PG_FIELDS: PGFieldRegistry = {
       whereCast: "",
       aggExpr: "(metrics->'debit_amount'->>'input_cache')::bigint",
     },
+    outputCacheTokens: {
+      select: "(metrics->'tokens'->>'output_cache')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'tokens'->>'output_cache')::bigint",
+    },
+    outputCacheDebitAmount: {
+      select: "(metrics->'debit_amount'->>'output_cache')::text",
+      whereCol: null,
+      whereCast: "",
+      aggExpr: "(metrics->'debit_amount'->>'output_cache')::bigint",
+    },
     creditAmount: { select: null, whereCol: null, whereCast: "" },
     provider: { select: "provider", whereCol: "provider", whereCast: "" },
     metadata: { select: "metadata::text", whereCol: null, whereCast: "" },
@@ -182,6 +196,8 @@ const PG_FIELDS: PGFieldRegistry = {
     outputDebitAmount: { select: null, whereCol: null, whereCast: "" },
     inputCacheTokens: { select: null, whereCol: null, whereCast: "" },
     inputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
+    outputCacheTokens: { select: null, whereCol: null, whereCast: "" },
+    outputCacheDebitAmount: { select: null, whereCol: null, whereCast: "" },
     creditAmount: {
       select: "credit_amount::text",
       whereCol: "credit_amount",
@@ -255,9 +271,9 @@ export async function handleQueryEvents(
 
   try {
     if (request.aggregation) {
-      return await handleAggregationQuery(request, tables);
+      return await handleAggregationQuery(request, tables, auth);
     }
-    return await handleListQuery(request, tables);
+    return await handleListQuery(request, tables, auth);
   } catch (e) {
     if (
       e &&
@@ -276,16 +292,21 @@ export async function handleQueryEvents(
 
 async function handleListQuery(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<QueryResponse> {
   const db = getPostgresDB();
 
   const selectExpr = tables.map((t) => buildSelectColumns(t));
   const whereExpr = tables.map((t) => buildWhereClause(request.where, t));
+  const projectFilter = sql`project_id = ${auth.projectId}`;
 
   const subqueries = tables.map((t, i) => {
     const base = sql`SELECT ${selectExpr[i]} FROM ${sql.raw(t)}`;
-    return whereExpr[i] ? sql`${base} WHERE ${whereExpr[i]}` : base;
+    const fullWhere = whereExpr[i]
+      ? sql`(${whereExpr[i]}) AND ${projectFilter}`
+      : projectFilter;
+    return sql`${base} WHERE ${fullWhere}`;
   });
 
   const unionQuery = sql.join(subqueries, sql` UNION ALL `);
@@ -301,18 +322,20 @@ async function handleListQuery(
   const data = result as unknown as Record<string, unknown>[];
   const rows: QueryResultRow[] = data.map(normalizeRow);
 
-  const total = await getTotalCount(request, tables);
+  const total = await getTotalCount(request, tables, auth);
 
   return { rows, total };
 }
 
 async function handleAggregationQuery(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<QueryResponse> {
   const db = getPostgresDB();
   const agg = request.aggregation!;
   const isSum = agg.type === "SUM";
+  const projectFilter = sql`project_id = ${auth.projectId}`;
 
   const subqueries = tables.map((t) => {
     const cols: SQL[] = [];
@@ -349,7 +372,10 @@ async function handleAggregationQuery(
 
     const whereClause = buildWhereClause(request.where, t);
     const base = sql`SELECT ${sql.join(cols, sql`, `)} FROM ${sql.raw(t)}`;
-    return whereClause ? sql`${base} WHERE ${whereClause}` : base;
+    const fullWhere = whereClause
+      ? sql`(${whereClause}) AND ${projectFilter}`
+      : projectFilter;
+    return sql`${base} WHERE ${fullWhere}`;
   });
 
   const unionQuery = sql.join(subqueries, sql` UNION ALL `);
@@ -395,14 +421,19 @@ async function handleAggregationQuery(
 
 async function getTotalCount(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<number> {
   const db = getPostgresDB();
+  const projectFilter = sql`project_id = ${auth.projectId}`;
 
   const subqueries = tables.map((t) => {
     const whereClause = buildWhereClause(request.where, t);
     const base = sql`SELECT count(*)::int as cnt FROM ${sql.raw(t)}`;
-    return whereClause ? sql`${base} WHERE ${whereClause}` : base;
+    const fullWhere = whereClause
+      ? sql`(${whereClause}) AND ${projectFilter}`
+      : projectFilter;
+    return sql`${base} WHERE ${fullWhere}`;
   });
 
   const countQuery = sql`

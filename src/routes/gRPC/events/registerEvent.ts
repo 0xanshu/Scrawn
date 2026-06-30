@@ -5,7 +5,7 @@ import {
 import type { WideEventBuilder } from "../../../context/requestContext";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
-import { registerEventSchema } from "../../../zod/event";
+import { createRegisterEventSchema } from "../../../zod/event";
 import { EventError } from "../../../errors/event";
 import { AuthError } from "../../../errors/auth";
 import { createEventInstance, storeEvent } from "../../../utils/eventHelpers";
@@ -33,7 +33,9 @@ export async function registerEvent(
       );
     }
 
-    const eventSkeleton = await registerEventSchema.parseAsync({ ...req });
+    const eventSkeleton = await createRegisterEventSchema(
+      auth.projectId
+    ).parseAsync({ ...req });
 
     wideEventBuilder?.setUser(eventSkeleton.userId);
     wideEventBuilder?.setEventContext({ eventType: eventSkeleton.type });

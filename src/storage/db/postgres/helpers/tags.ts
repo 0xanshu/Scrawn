@@ -5,14 +5,18 @@ import { StorageError } from "../../../../errors/storage";
 import { DateTime } from "luxon";
 import { tagCache } from "../../../../utils/tagCache";
 
-export async function listTags(): Promise<{ key: string; amount: number }[]> {
+export async function listTags(
+  projectId: string
+): Promise<{ key: string; amount: number }[]> {
   const db = getPostgresDB();
 
   try {
     const rows = await db
       .select({ key: tagsTable.key, amount: tagsTable.amount })
       .from(tagsTable)
-      .where(isNull(tagsTable.deletedAt));
+      .where(
+        and(eq(tagsTable.projectId, projectId), isNull(tagsTable.deletedAt))
+      );
     return rows;
   } catch (e) {
     throw StorageError.queryFailed(
@@ -22,27 +26,24 @@ export async function listTags(): Promise<{ key: string; amount: number }[]> {
   }
 }
 
-export async function createTag(key: string, amount: number): Promise<void> {
+export async function createTag(
+  projectId: string,
+  key: string,
+  amount: number
+): Promise<void> {
   const db = getPostgresDB();
 
   try {
-    const existing = await db
-      .select({ id: tagsTable.id })
-      .from(tagsTable)
-      .where(and(eq(tagsTable.key, key), isNull(tagsTable.deletedAt)))
-      .limit(1);
+    await db
+      .insert(tagsTable)
+      .values({ projectId, key, amount })
+      .onConflictDoUpdate({
+        target: [tagsTable.projectId, tagsTable.key],
+        targetWhere: isNull(tagsTable.deletedAt),
+        set: { amount },
+      });
 
-    if (existing[0]) {
-      await db
-        .update(tagsTable)
-        .set({ amount })
-        .where(eq(tagsTable.id, existing[0].id));
-      tagCache.delete(key);
-      return;
-    }
-
-    await db.insert(tagsTable).values({ key, amount });
-    tagCache.delete(key);
+    tagCache.delete(`${projectId}:${key}`);
   } catch (e) {
     throw StorageError.insertFailed(
       `Failed to upsert tag '${key}'`,
@@ -51,7 +52,10 @@ export async function createTag(key: string, amount: number): Promise<void> {
   }
 }
 
-export async function deleteTag(key: string): Promise<boolean> {
+export async function deleteTag(
+  projectId: string,
+  key: string
+): Promise<boolean> {
   const db = getPostgresDB();
 
   try {
@@ -59,10 +63,16 @@ export async function deleteTag(key: string): Promise<boolean> {
     const result = await db
       .update(tagsTable)
       .set({ deletedAt: now })
-      .where(and(eq(tagsTable.key, key), isNull(tagsTable.deletedAt)));
+      .where(
+        and(
+          eq(tagsTable.projectId, projectId),
+          eq(tagsTable.key, key),
+          isNull(tagsTable.deletedAt)
+        )
+      );
 
     if ((result.count ?? 0) > 0) {
-      tagCache.delete(key);
+      tagCache.delete(`${projectId}:${key}`);
       return true;
     }
     return false;

@@ -3,60 +3,63 @@ import { PaymentError } from "../../../errors/payment";
 import { getMetadata } from "../../../storage/db/postgres/helpers/metadata";
 import { decrypt } from "../../../utils/encryptMetadata.ts";
 
-let liveClient: DodoPayments | null = null;
-let testClient: DodoPayments | null = null;
+const clients = new Map<string, DodoPayments>();
 
-function clearClients(): void {
-  liveClient = null;
-  testClient = null;
+function clientKey(projectId: string, mode: string): string {
+  return `${projectId}:${mode}`;
+}
+
+export function clearClients(): void {
+  clients.clear();
+}
+
+export function removeClient(projectId: string): void {
+  clients.delete(clientKey(projectId, "test"));
+  clients.delete(clientKey(projectId, "production"));
 }
 
 export async function getDodoClient(
+  projectId: string,
   mode?: "test" | "production"
 ): Promise<DodoPayments> {
   if (!mode) {
     mode = process.env.NODE_ENV === "production" ? "production" : "test";
   }
 
-  if (mode === "production") {
-    if (liveClient) return liveClient;
+  const key = clientKey(projectId, mode);
+  const cached = clients.get(key);
+  if (cached) return cached;
 
-    const metadata = await getMetadata();
-    const apiKey = metadata?.dodo_live_api_key;
-    if (!apiKey) {
-      throw PaymentError.missingApiKey();
-    }
+  const metadata = await getMetadata(projectId);
 
-    liveClient = new DodoPayments({
-      bearerToken: decrypt(apiKey),
-      environment: "live_mode",
-      webhookKey: metadata?.dodo_live_webhook_secret
-        ? decrypt(metadata.dodo_live_webhook_secret)
-        : undefined,
-    });
-    return liveClient;
+  if (!metadata) {
+    throw PaymentError.missingMetadata();
   }
 
-  if (testClient) return testClient;
+  const encryptedApiKey =
+    mode === "production"
+      ? metadata.dodo_live_api_key
+      : metadata.dodo_test_api_key;
+  const encryptedWebhookSecret =
+    mode === "production"
+      ? metadata.dodo_live_webhook_secret
+      : metadata.dodo_test_webhook_secret;
 
-  const metadata = await getMetadata();
-  const apiKey = metadata?.dodo_test_api_key;
-  if (!apiKey) {
+  if (!encryptedApiKey) {
     throw PaymentError.missingApiKey();
   }
 
-  testClient = new DodoPayments({
-    bearerToken: decrypt(apiKey),
-    environment: "test_mode",
-    webhookKey: metadata?.dodo_test_webhook_secret
-      ? decrypt(metadata.dodo_test_webhook_secret)
+  const client = new DodoPayments({
+    bearerToken: decrypt(encryptedApiKey),
+    environment: mode === "production" ? "live_mode" : "test_mode",
+    webhookKey: encryptedWebhookSecret
+      ? decrypt(encryptedWebhookSecret)
       : undefined,
   });
-  return testClient;
-}
 
-// Re-export for callers who need to invalidate cached clients after onboarding updates
-export { clearClients };
+  clients.set(key, client);
+  return client;
+}
 
 export interface PaymentProviderConfig {
   productId: string;
@@ -76,13 +79,14 @@ export interface CheckoutResult {
 }
 
 export async function getPaymentProviderConfig(
+  projectId: string,
   mode: "test" | "production"
 ): Promise<PaymentProviderConfig> {
   if (!mode) {
     mode = process.env.NODE_ENV === "production" ? "production" : "test";
   }
 
-  const metadata = await getMetadata();
+  const metadata = await getMetadata(projectId);
 
   if (!metadata) {
     throw PaymentError.missingMetadata();
@@ -90,9 +94,9 @@ export async function getPaymentProviderConfig(
 
   const productId =
     mode === "production"
-      ? metadata?.dodo_live_product_id
-      : metadata?.dodo_test_product_id;
-  const returnUrl = metadata?.redirect_url ?? null;
+      ? metadata.dodo_live_product_id
+      : metadata.dodo_test_product_id;
+  const returnUrl = metadata.redirect_url ?? null;
 
   if (!productId) {
     throw PaymentError.missingProductId();
@@ -102,11 +106,12 @@ export async function getPaymentProviderConfig(
 }
 
 export async function createProviderCheckout(
+  projectId: string,
   config: PaymentProviderConfig,
   params: CheckoutParams,
   mode: "test" | "production"
 ): Promise<CheckoutResult> {
-  const client = await getDodoClient(mode);
+  const client = await getDodoClient(projectId, mode);
 
   const session = await client.checkoutSessions.create({
     product_cart: [

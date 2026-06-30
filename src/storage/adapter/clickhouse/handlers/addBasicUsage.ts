@@ -27,7 +27,7 @@ export async function handleAddBasicUsage(
   }
   const reportedTimestamp = toClickHouseDateTime(event_data.reported_timestamp);
 
-  await ensureUserExists(event_data.userId);
+  await ensureUserExists(auth.projectId, event_data.userId);
 
   const id = crypto.randomUUID();
 
@@ -37,6 +37,7 @@ export async function handleAddBasicUsage(
       values: [
         {
           id,
+          project_id: auth.projectId,
           event_id: event_data.eventId,
           idempotency_key: event_data.idempotencyKey,
           user_id: event_data.userId,

@@ -1,5 +1,10 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { handleOnboarding, handleGetConfig } from "./onboarding.ts";
+import {
+  handleListProjects,
+  handleUpdateProject,
+  handleDeleteProject,
+} from "./projects.ts";
 import { handleListTags, handleCreateTag, handleDeleteTag } from "./tags.ts";
 import {
   handleListExpressions,
@@ -15,6 +20,7 @@ import {
 } from "./webhookEndpoints.ts";
 import {
   handleCreateApiKey,
+  handleCreateDashboardKey,
   handleListApiKeys,
   handleRevokeApiKey,
 } from "./apiKeys.ts";
@@ -35,6 +41,28 @@ export async function registerApiRoutes(
     "/api/v1/internals/config",
     async (request: FastifyRequest, reply: FastifyReply) => {
       return handleGetConfig(request, reply);
+    }
+  );
+
+  // Projects
+  server.post(
+    "/api/v1/internals/projects/list",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleListProjects(request, reply);
+    }
+  );
+
+  server.put(
+    "/api/v1/internals/projects/:projectId",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleUpdateProject(request, reply);
+    }
+  );
+
+  server.delete(
+    "/api/v1/internals/projects/:projectId",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleDeleteProject(request, reply);
     }
   );
 
@@ -101,6 +129,13 @@ export async function registerApiRoutes(
     "/api/v1/api-keys/:id",
     async (request: FastifyRequest, reply: FastifyReply) => {
       return handleRevokeApiKey(request, reply);
+    }
+  );
+
+  server.post(
+    "/api/v1/create-dashboard-key/:projectId",
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      return handleCreateDashboardKey(request, reply);
     }
   );
 

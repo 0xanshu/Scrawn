@@ -7,6 +7,7 @@ import type { UserId } from "../../../../config/identifiers";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 export async function updateSessionStatus(
+  projectId: string,
   checkoutSessionId: string,
   status: "failed" | "succeeded",
   txn: PgTransaction<any, any, any>
@@ -17,6 +18,7 @@ export async function updateSessionStatus(
       .set({ processed: status })
       .where(
         and(
+          eq(sessionsTable.projectId, projectId),
           eq(sessionsTable.sessionId, checkoutSessionId),
           eq(sessionsTable.processed, "pending")
         )
@@ -32,6 +34,7 @@ export async function updateSessionStatus(
 
 export async function checkIfExistingCheckoutLink(
   txn: PgTransaction<any, any, any>,
+  projectId: string,
   userId: UserId,
   mode: "test" | "production"
 ): Promise<string | undefined> {
@@ -45,6 +48,7 @@ export async function checkIfExistingCheckoutLink(
       .from(sessionsTable)
       .where(
         and(
+          eq(sessionsTable.projectId, projectId),
           eq(sessionsTable.userId, userId),
           eq(sessionsTable.processed, "pending"),
           eq(sessionsTable.mode, mode),
@@ -68,6 +72,7 @@ export async function checkIfExistingCheckoutLink(
 }
 
 export async function handleAddSession(
+  projectId: string,
   userId: UserId,
   sessionId: string,
   billedUpto: DateTime,
@@ -91,6 +96,7 @@ export async function handleAddSession(
     const insertResult = await connectionObject
       .insert(sessionsTable)
       .values({
+        projectId,
         userId: userId,
         sessionId: sessionId,
         billed_upto: billedUptoStr,
@@ -135,6 +141,7 @@ export async function handleAddSession(
 }
 
 export async function getSessionByCheckoutId(
+  projectId: string,
   checkoutSessionId: string
 ): Promise<typeof sessionsTable.$inferSelect | undefined> {
   const db = getPostgresDB();
@@ -143,7 +150,12 @@ export async function getSessionByCheckoutId(
     const [session] = await db
       .select()
       .from(sessionsTable)
-      .where(eq(sessionsTable.sessionId, checkoutSessionId))
+      .where(
+        and(
+          eq(sessionsTable.projectId, projectId),
+          eq(sessionsTable.sessionId, checkoutSessionId)
+        )
+      )
       .limit(1);
 
     return session ?? undefined;

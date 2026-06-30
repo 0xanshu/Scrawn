@@ -52,6 +52,8 @@ const CH_FIELDS: Partial<
     outputDebitAmount: { select: null, where: null },
     inputCacheTokens: { select: null, where: null },
     inputCacheDebitAmount: { select: null, where: null },
+    outputCacheTokens: { select: null, where: null },
+    outputCacheDebitAmount: { select: null, where: null },
     creditAmount: { select: null, where: null },
     provider: { select: null, where: null },
     metadata: { select: null, where: null },
@@ -74,10 +76,10 @@ const CH_FIELDS: Partial<
     basicUsageType: { select: null, where: null },
     debitAmount: {
       select:
-        "toString(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output'))",
+        "toString(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output_cache') + JSONExtractInt(metrics, 'debit_amount', 'output'))",
       where: null,
       aggExpr:
-        "JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')",
+        "JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')",
     },
     model: { select: "model", where: "model" },
     inputTokens: {
@@ -111,6 +113,17 @@ const CH_FIELDS: Partial<
       where: null,
       aggExpr: "JSONExtractInt(metrics, 'debit_amount', 'input_cache')",
     },
+    outputCacheTokens: {
+      select: "toString(JSONExtractInt(metrics, 'tokens', 'output_cache'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'tokens', 'output_cache')",
+    },
+    outputCacheDebitAmount: {
+      select:
+        "toString(JSONExtractInt(metrics, 'debit_amount', 'output_cache'))",
+      where: null,
+      aggExpr: "JSONExtractInt(metrics, 'debit_amount', 'output_cache')",
+    },
     creditAmount: { select: null, where: null },
     provider: { select: "provider", where: "provider" },
     metadata: { select: "toString(metadata)", where: null },
@@ -133,6 +146,8 @@ const CH_PARAM_TYPE: Record<string, string> = {
   outputDebitAmount: "Int64",
   inputCacheTokens: "Int64",
   inputCacheDebitAmount: "Int64",
+  outputCacheTokens: "Int64",
+  outputCacheDebitAmount: "Int64",
   creditAmount: "Int64",
   provider: "String",
   metadata: "String",
@@ -211,9 +226,9 @@ export async function handleQueryEvents(
 
   try {
     if (request.aggregation) {
-      return await handleAggregationQuery(request, tables);
+      return await handleAggregationQuery(request, tables, auth);
     }
-    return await handleListQuery(request, tables);
+    return await handleListQuery(request, tables, auth);
   } catch (e) {
     if (
       e &&
@@ -232,11 +247,12 @@ export async function handleQueryEvents(
 
 async function handleListQuery(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<QueryResponse> {
   const client = getClickHouseDB();
   const paramIndex = { value: 0 };
-  const params: Record<string, unknown> = {};
+  const params: Record<string, unknown> = { projectId: auth.projectId };
 
   const queries = tables.map((t) => {
     const whereClause = buildWhereFromGroup(
@@ -246,7 +262,8 @@ async function handleListQuery(
       paramIndex
     );
     let q = `SELECT ${buildSelectColumns(t)} FROM ${t}`;
-    if (whereClause) q += ` WHERE ${whereClause}`;
+    q += ` WHERE project_id = {projectId:String}`;
+    if (whereClause) q += ` AND (${whereClause})`;
     return q;
   });
 
@@ -276,20 +293,21 @@ async function handleListQuery(
     data as unknown as Record<string, string>[]
   ).map(normalizeRow);
 
-  const total = await getTotalCount(request, tables);
+  const total = await getTotalCount(request, tables, auth);
 
   return { rows, total };
 }
 
 async function handleAggregationQuery(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<QueryResponse> {
   const client = getClickHouseDB();
   const agg = request.aggregation!;
   const isSum = agg.type === "SUM";
   const paramIndex = { value: 0 };
-  const params: Record<string, unknown> = {};
+  const params: Record<string, unknown> = { projectId: auth.projectId };
 
   const subQueries = tables.map((t) => {
     const cols: string[] = [];
@@ -325,7 +343,8 @@ async function handleAggregationQuery(
       paramIndex
     );
     let q = `SELECT ${cols.join(", ")} FROM ${t}`;
-    if (whereClause) q += ` WHERE ${whereClause}`;
+    q += ` WHERE project_id = {projectId:String}`;
+    if (whereClause) q += ` AND (${whereClause})`;
     return q;
   });
 
@@ -364,11 +383,12 @@ async function handleAggregationQuery(
 
 async function getTotalCount(
   request: QueryRequest,
-  tables: EventTableName[]
+  tables: EventTableName[],
+  auth: AuthContext
 ): Promise<number> {
   const client = getClickHouseDB();
   const paramIndex = { value: 0 };
-  const params: Record<string, unknown> = {};
+  const params: Record<string, unknown> = { projectId: auth.projectId };
 
   const subQueries = tables.map((t) => {
     const whereClause = buildWhereFromGroup(
@@ -378,7 +398,8 @@ async function getTotalCount(
       paramIndex
     );
     let q = `SELECT count() as cnt FROM ${t}`;
-    if (whereClause) q += ` WHERE ${whereClause}`;
+    q += ` WHERE project_id = {projectId:String}`;
+    if (whereClause) q += ` AND (${whereClause})`;
     return q;
   });
 

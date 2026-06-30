@@ -5,10 +5,12 @@ import { tagsTable } from "../storage/db/postgres/schema";
 import { tagCache } from "./tagCache";
 
 export async function fetchTagAmount(
+  projectId: string,
   tag: string,
   notFoundMessage: string
 ): Promise<number> {
-  const cachedAmount = tagCache.get(tag);
+  const cacheKey = `${projectId}:${tag}`;
+  const cachedAmount = tagCache.get(cacheKey);
   if (cachedAmount !== undefined) {
     return cachedAmount;
   }
@@ -17,13 +19,19 @@ export async function fetchTagAmount(
   const [tagRow] = await db
     .select()
     .from(tagsTable)
-    .where(and(eq(tagsTable.key, tag), isNull(tagsTable.deletedAt)))
+    .where(
+      and(
+        eq(tagsTable.projectId, projectId),
+        eq(tagsTable.key, tag),
+        isNull(tagsTable.deletedAt)
+      )
+    )
     .limit(1);
 
   if (!tagRow) {
     throw EventError.validationFailed(notFoundMessage);
   }
 
-  tagCache.set(tag, tagRow.amount);
+  tagCache.set(cacheKey, tagRow.amount);
   return tagRow.amount;
 }

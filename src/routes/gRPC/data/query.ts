@@ -2,6 +2,7 @@ import type { sendUnaryData } from "@grpc/grpc-js";
 import { QueryRequest, QueryResponse, Row } from "../../../gen/data/v1/data";
 import { dataQuerySchema, type DataQueryRequest } from "../../../zod/data";
 import { EventError } from "../../../errors/event";
+import { AuthError } from "../../../errors/auth";
 import { formatZodError } from "../../../utils/formatZodError";
 import { getPostgresDB } from "../../../storage/db/postgres/db";
 import {
@@ -9,7 +10,6 @@ import {
   sessionsTable,
   tagsTable,
   expressionsTable,
-  metadataTable,
 } from "../../../storage/db/postgres/schema";
 import {
   eq,
@@ -29,6 +29,7 @@ import type { SQL } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
 import type { WideEventBuilder } from "../../../context/requestContext";
 import { wideEventContextKey } from "../../../context/requestContext";
+import { apiKeyContextKey } from "../../../context/auth";
 import type { ContextUnaryCall } from "../../../interface/types/context.js";
 
 interface FieldDef {
@@ -36,14 +37,15 @@ interface FieldDef {
   cast: "text" | "integer" | "uuid" | "timestamptz" | "boolean";
 }
 
+type ScopedTable =
+  | typeof usersTable
+  | typeof sessionsTable
+  | typeof tagsTable
+  | typeof expressionsTable;
+
 interface TableDef {
   tableName: string;
-  table:
-    | typeof usersTable
-    | typeof sessionsTable
-    | typeof tagsTable
-    | typeof expressionsTable
-    | typeof metadataTable;
+  table: ScopedTable;
   fields: Record<string, FieldDef>;
 }
 
@@ -95,24 +97,18 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
       expr: { col: expressionsTable.expr, cast: "text" },
     },
   },
-  metadata: {
-    tableName: "metadata",
-    table: metadataTable,
-    fields: {
-      id: { col: metadataTable.id, cast: "uuid" },
-    },
-  },
 };
 
 function castValue(
-  value: string,
+  value: string | number | boolean,
   fieldDef: FieldDef,
   fieldName: string
 ): boolean | number | string {
   if (fieldDef.cast === "boolean") {
+    if (typeof value === "boolean") return value;
     if (value !== "true" && value !== "false") {
       throw EventError.validationFailed(
-        `Invalid boolean value '${value}' for field '${fieldName}': must be "true" or "false"`
+        `Invalid boolean value '${String(value)}' for field '${fieldName}': must be "true" or "false"`
       );
     }
     return value === "true";
@@ -121,18 +117,18 @@ function castValue(
     const n = Number(value);
     if (!Number.isFinite(n) || !Number.isInteger(n)) {
       throw EventError.validationFailed(
-        `Invalid integer value '${value}' for field '${fieldName}': must be a finite integer`
+        `Invalid integer value '${String(value)}' for field '${fieldName}': must be a finite integer`
       );
     }
     return n;
   }
-  return value;
+  return typeof value === "string" ? value : String(value);
 }
 
 function applyOp(
   col: AnyPgColumn,
   op: string,
-  value: string,
+  value: string | number | boolean,
   fieldDef: FieldDef,
   fieldName: string
 ): SQL {
@@ -202,10 +198,20 @@ export async function queryData(
   callback?: sendUnaryData<QueryResponse>
 ): Promise<void> {
   const wideEventBuilder = call[wideEventContextKey] as
-    | WideEventBuilder
-    | undefined;
+    WideEventBuilder | undefined;
 
   try {
+    const auth = call[apiKeyContextKey];
+    if (!auth) {
+      return callback?.(AuthError.invalidAPIKey("API key context not found"));
+    }
+
+    if (auth.role !== "dashboard") {
+      return callback?.(
+        AuthError.permissionDenied("Only dashboard keys can query data")
+      );
+    }
+
     const req = { ...call.request } as Record<string, unknown>;
 
     const validated = dataQuerySchema.parse(req);
@@ -223,7 +229,19 @@ export async function queryData(
     }
 
     const db = getPostgresDB();
-    const whereClause = buildWhere(validated.where, tableDef);
+    const userWhere = buildWhere(validated.where, tableDef);
+    const projectFilter = eq(tableDef.table.projectId, auth.projectId) as SQL;
+
+    const modeFilter =
+      tableDef.fields.mode && auth.mode
+        ? eq(tableDef.fields.mode.col, auth.mode)
+        : undefined;
+
+    const baseFilter = modeFilter
+      ? and(projectFilter, modeFilter)
+      : projectFilter;
+
+    const whereClause = userWhere ? and(baseFilter, userWhere) : baseFilter;
     const selectCols = buildSelect(tableDef);
     const columns = Object.keys(tableDef.fields);
 

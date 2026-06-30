@@ -122,8 +122,7 @@ export function authInterceptor<Req, Res>(
     const wideEventBuilder = call[wideEventContextKey];
 
     const authHeader = call.metadata.get("authorization")?.[0] as
-      | string
-      | undefined;
+      string | undefined;
 
     if (!authHeader) {
       return callback?.(AuthError.missingHeader());
@@ -156,6 +155,12 @@ export function authInterceptor<Req, Res>(
 
     const cached = apiKeyCache.get(apiKeyHash);
     if (cached) {
+      if (
+        cached.expiresAt &&
+        DateTime.utc() > DateTime.fromISO(cached.expiresAt, { zone: "utc" })
+      ) {
+        return callback?.(AuthError.expiredAPIKey());
+      }
       if (cached.role !== role) {
         return callback?.(
           AuthError.roleMismatch(
@@ -167,6 +172,7 @@ export function authInterceptor<Req, Res>(
         apiKeyId: cached.id,
         role: cached.role,
         mode: cached.mode,
+        projectId: cached.projectId,
       };
       wideEventBuilder?.setAuth(cached.id, true);
 
@@ -200,8 +206,9 @@ export function authInterceptor<Req, Res>(
         }
 
         if (
+          apiKeyRecord.expiresAt &&
           DateTime.utc() >
-          DateTime.fromSQL(apiKeyRecord.expiresAt, { zone: "utc" })
+            DateTime.fromISO(apiKeyRecord.expiresAt, { zone: "utc" })
         ) {
           return callback?.(AuthError.expiredAPIKey());
         }
@@ -220,6 +227,7 @@ export function authInterceptor<Req, Res>(
           id: apiKeyRecord.id,
           role: apiKeyRecord.role as ApiKeyRole,
           mode: recordMode,
+          projectId: apiKeyRecord.projectId,
           expiresAt: apiKeyRecord.expiresAt,
         });
 
@@ -227,6 +235,7 @@ export function authInterceptor<Req, Res>(
           apiKeyId: apiKeyRecord.id,
           role: apiKeyRecord.role as ApiKeyRole,
           mode: recordMode,
+          projectId: apiKeyRecord.projectId,
         };
         wideEventBuilder?.setAuth(apiKeyRecord.id, false);
 
@@ -270,6 +279,7 @@ async function lookupApiKey(apiKeyHash: string) {
       role: apiKeysTable.role,
       expiresAt: apiKeysTable.expiresAt,
       revoked: apiKeysTable.revoked,
+      projectId: apiKeysTable.projectId,
     })
     .from(apiKeysTable)
     .where(eq(apiKeysTable.key, apiKeyHash))

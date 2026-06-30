@@ -14,7 +14,7 @@ import {
   registerEvent,
 } from "./fixtures/grpc";
 import { verifyApiKeyCreated } from "./assertions/events";
-import { createTestApiKey } from "./fixtures/apiKey";
+import { createTestApiKey, TEST_PROJECT_ID } from "./fixtures/apiKey";
 import { getPostgresDB } from "../storage/db/postgres/db";
 import { hashAPIKey } from "../utils/hashAPIKey";
 import {
@@ -44,6 +44,7 @@ async function createDashboardApiKey(): Promise<{
       key: hashAPIKey(rawKey),
       role: "dashboard",
       expiresAt: DateTime.utc().plus({ years: 1 }).toISO(),
+      projectId: TEST_PROJECT_ID,
     })
     .returning({ id: apiKeysTable.id });
   return { rawKey, id: key!.id };
@@ -149,6 +150,7 @@ describe("AuthService", () => {
 
       const db = getPostgresDB();
       await db.insert(webhookEndpointsTable).values({
+        projectId: TEST_PROJECT_ID,
         apiKeyId: res.apiKeyId,
         url: "https://example.com/webhook",
         privateKey: "test-private-key",

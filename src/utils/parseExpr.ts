@@ -37,10 +37,10 @@ const ALLOWED_FUNCTIONS = new Set([
   "div",
   "tag",
   "expr",
-  "inputTokens",
-  "outputTokens",
-  "inputCacheTokens",
-  "outputCacheTokens",
+  "inputtokens",
+  "outputtokens",
+  "inputcachetokens",
+  "outputcachetokens",
 ]);
 
 /**
@@ -184,6 +184,7 @@ export function validateExprSyntax(exprString: string): void {
  */
 export async function resolveExprRefsInExpression(
   exprString: string,
+  projectId: string,
   resolving: Set<string> = new Set()
 ): Promise<string> {
   const refs = extractExprRefs(exprString);
@@ -201,14 +202,18 @@ export async function resolveExprRefsInExpression(
       );
     }
 
-    const storedExpr = await findExpressionByKey(refName);
+    const storedExpr = await findExpressionByKey(projectId, refName);
     if (!storedExpr) {
       throw EventError.validationFailed(`Expression not found: ${refName}`);
     }
 
     resolving.add(refName);
 
-    const expanded = await resolveExprRefsInExpression(storedExpr, resolving);
+    const expanded = await resolveExprRefsInExpression(
+      storedExpr,
+      projectId,
+      resolving
+    );
 
     const refPattern = new RegExp(`expr\\(${refName}\\)`, "g");
     resolved = resolved.replace(refPattern, `(${expanded})`);
@@ -242,7 +247,10 @@ function extractExprRefs(exprString: string): string[] {
  * @returns The expression string with tags replaced by their numeric values
  * @throws EventError if any tag is not found
  */
-async function resolveTagsInExpression(exprString: string): Promise<string> {
+async function resolveTagsInExpression(
+  exprString: string,
+  projectId: string
+): Promise<string> {
   const tagNames = extractTagNames(exprString);
 
   if (tagNames.length === 0) {
@@ -253,7 +261,11 @@ async function resolveTagsInExpression(exprString: string): Promise<string> {
   const tagValues = new Map<string, number>();
 
   for (const tagName of tagNames) {
-    const value = await fetchTagAmount(tagName, `Tag not found: ${tagName}`);
+    const value = await fetchTagAmount(
+      projectId,
+      tagName,
+      `Tag not found: ${tagName}`
+    );
     tagValues.set(tagName, value);
   }
 
@@ -280,10 +292,10 @@ function resolveTokenPlaceholders(
   context: EvalTokenContext
 ): string {
   return exprString
-    .replace(/inputTokens\(\)/g, String(context.inputTokens ?? 0))
-    .replace(/outputTokens\(\)/g, String(context.outputTokens ?? 0))
-    .replace(/inputCacheTokens\(\)/g, String(context.inputCacheTokens ?? 0))
-    .replace(/outputCacheTokens\(\)/g, String(context.outputCacheTokens ?? 0));
+    .replace(/inputTokens\(\)/gi, String(context.inputTokens ?? 0))
+    .replace(/outputTokens\(\)/gi, String(context.outputTokens ?? 0))
+    .replace(/inputCacheTokens\(\)/gi, String(context.inputCacheTokens ?? 0))
+    .replace(/outputCacheTokens\(\)/gi, String(context.outputCacheTokens ?? 0));
 }
 
 /**
@@ -323,16 +335,20 @@ function resolveTokenPlaceholders(
  */
 export async function parseAndEvaluateExpr(
   exprString: string,
+  projectId: string,
   tokenContext?: EvalTokenContext
 ): Promise<number> {
   // Step 1: Validate syntax
   validateExprSyntax(exprString);
 
   // Step 2: Resolve all expr(NAME) references (recursive, from DB)
-  const expandedExpr = await resolveExprRefsInExpression(exprString);
+  const expandedExpr = await resolveExprRefsInExpression(exprString, projectId);
 
   // Step 3: Resolve all tags to their values
-  const tagResolvedExpr = await resolveTagsInExpression(expandedExpr);
+  const tagResolvedExpr = await resolveTagsInExpression(
+    expandedExpr,
+    projectId
+  );
 
   // Step 4: Resolve token placeholders if context provided
   const finalExpr = tokenContext

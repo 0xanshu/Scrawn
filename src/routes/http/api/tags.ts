@@ -47,9 +47,9 @@ export async function handleListTags(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const auth = await authenticateHttpApiKey(authHeader);
 
-    const tags = await listTags();
+    const tags = await listTags(auth.projectId);
 
     builder.setSuccess(200).addContext({ tagCount: tags.length });
     reply.code(200);
@@ -86,12 +86,16 @@ export async function handleCreateTag(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const auth = await authenticateHttpApiKey(authHeader);
+
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied("Only dashboard keys can manage tags");
+    }
 
     const body = await request.body;
     const validated = createTagSchema.parse(body);
 
-    await createTag(validated.key, validated.amount);
+    await createTag(auth.projectId, validated.key, validated.amount);
 
     builder.setSuccess(200);
     reply.code(200);
@@ -137,10 +141,14 @@ export async function handleDeleteTag(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const auth = await authenticateHttpApiKey(authHeader);
+
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied("Only dashboard keys can manage tags");
+    }
 
     const params = tagParamsSchema.parse(request.params);
-    const deleted = await deleteTag(params.key);
+    const deleted = await deleteTag(auth.projectId, params.key);
 
     if (!deleted) {
       builder.setError(404, {

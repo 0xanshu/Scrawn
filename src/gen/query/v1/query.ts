@@ -457,6 +457,8 @@ export interface EventRow {
   inputCacheTokens?: number | undefined;
   inputCacheDebitAmount?: number | undefined;
   metadata?: string | undefined;
+  outputCacheTokens?: number | undefined;
+  outputCacheDebitAmount?: number | undefined;
 }
 
 export interface AggregationRow {
@@ -1000,6 +1002,8 @@ function createBaseEventRow(): EventRow {
     inputCacheTokens: undefined,
     inputCacheDebitAmount: undefined,
     metadata: undefined,
+    outputCacheTokens: undefined,
+    outputCacheDebitAmount: undefined,
   };
 }
 
@@ -1055,6 +1059,12 @@ export const EventRow: MessageFns<EventRow> = {
     }
     if (message.metadata !== undefined) {
       writer.uint32(138).string(message.metadata);
+    }
+    if (message.outputCacheTokens !== undefined) {
+      writer.uint32(144).int32(message.outputCacheTokens);
+    }
+    if (message.outputCacheDebitAmount !== undefined) {
+      writer.uint32(152).int64(message.outputCacheDebitAmount);
     }
     return writer;
   },
@@ -1195,6 +1205,22 @@ export const EventRow: MessageFns<EventRow> = {
           message.metadata = reader.string();
           continue;
         }
+        case 18: {
+          if (tag !== 144) {
+            break;
+          }
+
+          message.outputCacheTokens = reader.int32();
+          continue;
+        }
+        case 19: {
+          if (tag !== 152) {
+            break;
+          }
+
+          message.outputCacheDebitAmount = longToNumber(reader.int64());
+          continue;
+        }
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -1278,6 +1304,16 @@ export const EventRow: MessageFns<EventRow> = {
       metadata: isSet(object.metadata)
         ? globalThis.String(object.metadata)
         : undefined,
+      outputCacheTokens: isSet(object.outputCacheTokens)
+        ? globalThis.Number(object.outputCacheTokens)
+        : isSet(object.output_cache_tokens)
+          ? globalThis.Number(object.output_cache_tokens)
+          : undefined,
+      outputCacheDebitAmount: isSet(object.outputCacheDebitAmount)
+        ? globalThis.Number(object.outputCacheDebitAmount)
+        : isSet(object.output_cache_debit_amount)
+          ? globalThis.Number(object.output_cache_debit_amount)
+          : undefined,
     };
   },
 
@@ -1331,6 +1367,12 @@ export const EventRow: MessageFns<EventRow> = {
     if (message.metadata !== undefined) {
       obj.metadata = message.metadata;
     }
+    if (message.outputCacheTokens !== undefined) {
+      obj.outputCacheTokens = Math.round(message.outputCacheTokens);
+    }
+    if (message.outputCacheDebitAmount !== undefined) {
+      obj.outputCacheDebitAmount = Math.round(message.outputCacheDebitAmount);
+    }
     return obj;
   },
 
@@ -1355,6 +1397,8 @@ export const EventRow: MessageFns<EventRow> = {
     message.inputCacheTokens = object.inputCacheTokens ?? undefined;
     message.inputCacheDebitAmount = object.inputCacheDebitAmount ?? undefined;
     message.metadata = object.metadata ?? undefined;
+    message.outputCacheTokens = object.outputCacheTokens ?? undefined;
+    message.outputCacheDebitAmount = object.outputCacheDebitAmount ?? undefined;
     return message;
   },
 };
@@ -1623,13 +1667,7 @@ export const QueryServiceClient = makeGenericClientConstructor(
 };
 
 type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+  Date | Function | Uint8Array | string | number | boolean | undefined;
 
 export type DeepPartial<T> = T extends Builtin
   ? T

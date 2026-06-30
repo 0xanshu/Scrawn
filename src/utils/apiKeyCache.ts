@@ -6,6 +6,7 @@ interface CachedAPIKey {
   id: string;
   role: ApiKeyRole;
   mode: "production" | "test" | null;
+  projectId: string;
   expiresAt: string;
 }
 
@@ -13,7 +14,7 @@ const store = Cache.getStore<string, CachedAPIKey>("api-keys", {
   max: 1000,
   ttlMs: 5 * 60 * 1000,
   validate: (value) =>
-    DateTime.utc() <= DateTime.fromSQL(value.expiresAt, { zone: "utc" }),
+    DateTime.utc() <= DateTime.fromISO(value.expiresAt, { zone: "utc" }),
 });
 
 export const apiKeyCache = {

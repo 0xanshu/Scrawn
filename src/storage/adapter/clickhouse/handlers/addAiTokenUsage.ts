@@ -135,6 +135,7 @@ function buildAiTokenInsertRows(
 
     return {
       id: index === 0 ? firstId : crypto.randomUUID(),
+      project_id: auth.projectId,
       event_id: aggEvent.eventId,
       idempotency_key: aggEvent.idempotencyKey,
       user_id: aggEvent.userId,
@@ -164,12 +165,14 @@ export async function handleAddAiTokenUsage(
     validateAiTokenEvent(event_data);
   }
 
-  const firstEvent = events[0];
-  if (firstEvent) {
-    await ensureUserExists(firstEvent.userId);
-  }
-
   const aggregatedEvents = aggregateAiTokenEvents(events);
+
+  const distinctUserIds = Array.from(
+    new Set(aggregatedEvents.map((e) => e.userId))
+  );
+  for (const userId of distinctUserIds) {
+    await ensureUserExists(auth.projectId, userId);
+  }
 
   const firstId = crypto.randomUUID();
   const now = toClickHouseDateTime(DateTime.utc());

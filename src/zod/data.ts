@@ -2,13 +2,7 @@ import { z } from "zod";
 import { Operator, LogicalOperator } from "../gen/data/v1/data";
 import { createFilterGroupSchema } from "./internals";
 
-const DATA_TABLE_NAMES = [
-  "users",
-  "sessions",
-  "tags",
-  "expressions",
-  "metadata",
-] as const;
+const DATA_TABLE_NAMES = ["users", "sessions", "tags", "expressions"] as const;
 
 const OPERATOR_MAP = {
   [Operator.EQ]: "EQ",
@@ -33,7 +27,7 @@ const filterConditionSchema = z.object({
     .min(1)
     .max(7)
     .transform((v) => OPERATOR_MAP[v as keyof typeof OPERATOR_MAP]),
-  value: z.string(),
+  value: z.union([z.string(), z.number(), z.boolean()]),
 });
 
 const filterGroupSchema = createFilterGroupSchema(

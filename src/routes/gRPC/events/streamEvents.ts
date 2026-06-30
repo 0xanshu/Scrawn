@@ -8,7 +8,7 @@ import {
 import { EventError } from "../../../errors/event";
 import { AuthError } from "../../../errors/auth";
 import { StorageError } from "../../../errors/storage";
-import { streamEventSchema } from "../../../zod/event";
+import { createStreamEventSchema } from "../../../zod/event";
 import { createEventInstance, storeEvent } from "../../../utils/eventHelpers";
 import { apiKeyContextKey } from "../../../context/auth";
 import { wideEventContextKey } from "../../../context/requestContext";
@@ -88,7 +88,9 @@ export async function streamEvents(
 
     for await (const req of call) {
       try {
-        const eventSkeleton = await streamEventSchema.parseAsync({ ...req });
+        const eventSkeleton = await createStreamEventSchema(
+          auth.projectId
+        ).parseAsync({ ...req });
 
         wideEventBuilder?.setUser(eventSkeleton.userId);
         wideEventBuilder?.setEventContext({ eventType: "AI_TOKEN_USAGE" });
