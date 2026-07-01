@@ -60,6 +60,7 @@ services:
       NODE_ENV: production
       HMAC_SECRET: ${HMAC_SECRET}
       APP_URL: ${APP_URL}
+      MASTER_API_KEY_HASH: ${MASTER_API_KEY_HASH}
 
   dashboard:
     profiles:
@@ -77,6 +78,6 @@ services:
       BETTER_AUTH_URL: http://localhost:3000
       SCRAWN_BASE_URL: http://server:8060
       SCRAWN_HTTP_URL: http://server:8060
-      SCRAWN_KEY: ${SCRAWN_KEY}
+      MASTER_API_KEY: ${MASTER_API_KEY}
 
 
