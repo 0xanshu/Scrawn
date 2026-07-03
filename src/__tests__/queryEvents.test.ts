@@ -480,10 +480,9 @@ describe("QueryEvents", () => {
         grpcMetadata(`Bearer ${rawKey}`)
       );
 
-      // NOTE: debitAmount filter is silently dropped for AI_TOKEN_USAGE events
-      // (whereCol is null in PG_FIELDS), so all AI events pass through
       const basicMatch = seededBasic.filter((e) => e.debitAmount > 60);
-      expect(res.rows.length).toBe(basicMatch.length + seededAi.length);
+      const aiMatch = seededAi.filter((e) => e.debitAmount > 60);
+      expect(res.rows.length).toBe(basicMatch.length + aiMatch.length);
     });
 
     it("filters by debitAmount GTE", async () => {
@@ -499,7 +498,8 @@ describe("QueryEvents", () => {
       );
 
       const basicMatch = seededBasic.filter((e) => e.debitAmount >= 50);
-      expect(res.rows.length).toBe(basicMatch.length + seededAi.length);
+      const aiMatch = seededAi.filter((e) => e.debitAmount >= 50);
+      expect(res.rows.length).toBe(basicMatch.length + aiMatch.length);
     });
 
     it("filters by debitAmount LT", async () => {
@@ -515,7 +515,8 @@ describe("QueryEvents", () => {
       );
 
       const basicMatch = seededBasic.filter((e) => e.debitAmount < 100);
-      expect(res.rows.length).toBe(basicMatch.length + seededAi.length);
+      const aiMatch = seededAi.filter((e) => e.debitAmount < 100);
+      expect(res.rows.length).toBe(basicMatch.length + aiMatch.length);
     });
 
     it("filters by debitAmount LTE", async () => {
@@ -531,7 +532,8 @@ describe("QueryEvents", () => {
       );
 
       const basicMatch = seededBasic.filter((e) => e.debitAmount <= 100);
-      expect(res.rows.length).toBe(basicMatch.length + seededAi.length);
+      const aiMatch = seededAi.filter((e) => e.debitAmount <= 100);
+      expect(res.rows.length).toBe(basicMatch.length + aiMatch.length);
     });
 
     it("filters by debitAmount NEQ", async () => {
@@ -547,7 +549,8 @@ describe("QueryEvents", () => {
       );
 
       const basicMatch = seededBasic.filter((e) => e.debitAmount !== 100);
-      expect(res.rows.length).toBe(basicMatch.length + seededAi.length);
+      const aiMatch = seededAi.filter((e) => e.debitAmount !== 100);
+      expect(res.rows.length).toBe(basicMatch.length + aiMatch.length);
     });
 
     it("combines multiple conditions with AND", async () => {
