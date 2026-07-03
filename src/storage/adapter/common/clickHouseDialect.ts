@@ -221,7 +221,17 @@ export class ClickHouseQueryDialect implements QueryDialect {
     const parts: string[] = [];
 
     for (const condition of group.conditions) {
-      if (condition.field === "eventType") continue;
+      if (condition.field === "eventType") {
+        const tableEventType = TABLE_TO_EVENT_TYPE[table];
+        let isTrue = false;
+        if (condition.operator === "EQ")
+          isTrue = condition.value === tableEventType;
+        else if (condition.operator === "NEQ")
+          isTrue = condition.value !== tableEventType;
+        else isTrue = true;
+        parts.push(isTrue ? "1=1" : "1=0");
+        continue;
+      }
       const def = FIELD_REGISTRY[table]?.[condition.field];
 
       const colExpr = def?.chWhere || def?.chAggExpr || def?.chSelect || "NULL";

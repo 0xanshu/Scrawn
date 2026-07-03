@@ -190,7 +190,16 @@ export class PostgresQueryDialect implements QueryDialect {
     const parts: SQL[] = [];
 
     for (const cond of group.conditions) {
-      if (cond.field === "eventType") continue;
+      if (cond.field === "eventType") {
+        const tableEventType = TABLE_TO_EVENT_TYPE[table];
+        let isTrue = false;
+        if (cond.operator === "EQ") isTrue = cond.value === tableEventType;
+        else if (cond.operator === "NEQ")
+          isTrue = cond.value !== tableEventType;
+        else isTrue = true;
+        parts.push(isTrue ? sql`1=1` : sql`1=0`);
+        continue;
+      }
       const def = FIELD_REGISTRY[table]?.[cond.field];
 
       const colExpr =
