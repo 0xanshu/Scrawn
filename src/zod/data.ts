@@ -44,7 +44,7 @@ export const dataQuerySchema = z
   .object({
     table: z.enum(DATA_TABLE_NAMES),
     where: filterGroupSchema.optional(),
-    orderByList: z.array(orderBySchema).default([]),
+    orderBy: z.array(orderBySchema).default([]),
     limit: z.number().int().min(0).max(1000).default(100),
     offset: z.number().int().min(0).default(0),
   })
@@ -55,7 +55,7 @@ export const dataQuerySchema = z
       conditions: [],
       groups: [],
     },
-    orderBy: v.orderByList,
+    orderBy: v.orderBy,
     limit: v.limit,
     offset: v.offset,
   }));
