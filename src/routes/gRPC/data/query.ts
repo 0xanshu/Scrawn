@@ -47,7 +47,7 @@ export async function queryData(
       );
     }
 
-    const result = await executeDataQuery(validated, tableDef);
+    const result = await executeDataQuery(auth, validated, tableDef);
 
     const response = QueryResponse.create();
     response.columns = result.columns;
