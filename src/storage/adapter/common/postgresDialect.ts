@@ -37,10 +37,12 @@ export class PostgresQueryDialect implements QueryDialect {
     });
 
     const unionQuery = sql.join(subqueries, sql` UNION ALL `);
+    const orderByField = request.orderBy?.field ?? "reportedTimestamp";
+    const orderByDir = request.orderBy?.descending ? "DESC" : "ASC";
 
     const finalQuery = sql`
       ${unionQuery}
-      ORDER BY "reportedTimestamp" DESC
+      ORDER BY ${sql.raw(`"${orderByField}" ${orderByDir}`)}
       LIMIT ${request.limit ?? 100}
       OFFSET ${request.offset ?? 0}
     `;

@@ -47,7 +47,10 @@ export class ClickHouseQueryDialect implements QueryDialect {
     });
 
     let unionQuery = queries.join(" UNION ALL ");
-    unionQuery += " ORDER BY reportedTimestamp DESC";
+    const orderByField = request.orderBy?.field ?? "reportedTimestamp";
+    const orderByDir = request.orderBy?.descending ? "DESC" : "ASC";
+
+    unionQuery += ` ORDER BY ${orderByField} ${orderByDir}`;
 
     if (request.limit) {
       const limitParam = `p_${paramIndex.value++}`;

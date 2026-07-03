@@ -34,10 +34,11 @@ const filterGroupSchema = createFilterGroupSchema(
   LOGICAL_MAP
 );
 
-const orderBySchema = z.object({
+export const orderBySchema = z.object({
   field: z.string(),
   descending: z.boolean().default(false),
 });
+export type OrderByRequest = z.output<typeof orderBySchema>;
 
 export const dataQuerySchema = z
   .object({
