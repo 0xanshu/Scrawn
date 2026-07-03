@@ -152,6 +152,22 @@ export const FIELD_REGISTRY: Record<
       chWhere: null,
       chParamType: "Int64",
     },
+    outputCacheTokens: {
+      pgSelect: null,
+      pgWhereCol: null,
+      pgWhereCast: "",
+      chSelect: null,
+      chWhere: null,
+      chParamType: "Int64",
+    },
+    outputCacheDebitAmount: {
+      pgSelect: null,
+      pgWhereCol: null,
+      pgWhereCast: "",
+      chSelect: null,
+      chWhere: null,
+      chParamType: "Int64",
+    },
     creditAmount: {
       pgSelect: null,
       pgWhereCol: null,
@@ -252,16 +268,16 @@ export const FIELD_REGISTRY: Record<
     },
     debitAmount: {
       pgSelect:
-        "(COALESCE((metrics->'debit_amount'->>'input')::integer,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output')::integer,0))::text",
+        "(COALESCE((metrics->'debit_amount'->>'input')::integer,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::integer,0) + COALESCE((metrics->'debit_amount'->>'output')::integer,0) + COALESCE((metrics->'debit_amount'->>'output_cache')::integer,0))::text",
       pgWhereCol: null,
       pgWhereCast: "",
       pgAggExpr:
-        "(COALESCE((metrics->'debit_amount'->>'input')::bigint,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output')::bigint,0))",
+        "(COALESCE((metrics->'debit_amount'->>'input')::bigint,0) + COALESCE((metrics->'debit_amount'->>'input_cache')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output')::bigint,0) + COALESCE((metrics->'debit_amount'->>'output_cache')::bigint,0))",
       chSelect:
-        "toString(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output'))",
+        "toString(JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output') + JSONExtractInt(metrics, 'debit_amount', 'output_cache'))",
       chWhere: null,
       chAggExpr:
-        "JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output')",
+        "JSONExtractInt(metrics, 'debit_amount', 'input') + JSONExtractInt(metrics, 'debit_amount', 'input_cache') + JSONExtractInt(metrics, 'debit_amount', 'output') + JSONExtractInt(metrics, 'debit_amount', 'output_cache')",
       chParamType: "Int64",
     },
     model: {
@@ -331,6 +347,27 @@ export const FIELD_REGISTRY: Record<
         "toString(JSONExtractInt(metrics, 'debit_amount', 'input_cache'))",
       chWhere: null,
       chAggExpr: "JSONExtractInt(metrics, 'debit_amount', 'input_cache')",
+      chParamType: "Int64",
+    },
+    outputCacheTokens: {
+      pgSelect: "(metrics->'tokens'->>'output_cache')::text",
+      pgWhereCol: null,
+      pgWhereCast: "",
+      pgAggExpr: "(metrics->'tokens'->>'output_cache')::bigint",
+      chSelect: "toString(JSONExtractInt(metrics, 'tokens', 'output_cache'))",
+      chWhere: null,
+      chAggExpr: "JSONExtractInt(metrics, 'tokens', 'output_cache')",
+      chParamType: "Int64",
+    },
+    outputCacheDebitAmount: {
+      pgSelect: "(metrics->'debit_amount'->>'output_cache')::text",
+      pgWhereCol: null,
+      pgWhereCast: "",
+      pgAggExpr: "(metrics->'debit_amount'->>'output_cache')::bigint",
+      chSelect:
+        "toString(JSONExtractInt(metrics, 'debit_amount', 'output_cache'))",
+      chWhere: null,
+      chAggExpr: "JSONExtractInt(metrics, 'debit_amount', 'output_cache')",
       chParamType: "Int64",
     },
     creditAmount: {
@@ -496,6 +533,22 @@ export const FIELD_REGISTRY: Record<
       chWhere: null,
       chParamType: "Int64",
     },
+    outputCacheTokens: {
+      pgSelect: null,
+      pgWhereCol: null,
+      pgWhereCast: "",
+      chSelect: null,
+      chWhere: null,
+      chParamType: "Int64",
+    },
+    outputCacheDebitAmount: {
+      pgSelect: null,
+      pgWhereCol: null,
+      pgWhereCast: "",
+      chSelect: null,
+      chWhere: null,
+      chParamType: "Int64",
+    },
     creditAmount: {
       pgSelect: "credit_amount::text",
       pgWhereCol: "credit_amount",
@@ -541,6 +594,8 @@ export const OUTPUT_FIELDS = [
   "outputDebitAmount",
   "inputCacheTokens",
   "inputCacheDebitAmount",
+  "outputCacheTokens",
+  "outputCacheDebitAmount",
   "creditAmount",
   "provider",
   "metadata",
