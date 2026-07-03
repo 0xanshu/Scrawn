@@ -46,26 +46,28 @@ export class ClickHouseQueryDialect implements QueryDialect {
       return q;
     });
 
-    let unionQuery = queries.join(" UNION ALL ");
+    const unionQuery = queries.join(" UNION ALL ");
+    let finalQuery = `SELECT * FROM (${unionQuery})`;
+
     const orderByField = request.orderBy?.field ?? "reportedTimestamp";
     const orderByDir = request.orderBy?.descending ? "DESC" : "ASC";
 
-    unionQuery += ` ORDER BY ${orderByField} ${orderByDir}`;
+    finalQuery += ` ORDER BY ${orderByField} ${orderByDir}`;
 
-    if (request.limit) {
+    if (request.limit !== undefined) {
       const limitParam = `p_${paramIndex.value++}`;
-      unionQuery += ` LIMIT {${limitParam}:Int32}`;
+      finalQuery += ` LIMIT {${limitParam}:Int32}`;
       params[limitParam] = request.limit;
     }
 
-    if (request.offset) {
+    if (request.offset !== undefined) {
       const offsetParam = `p_${paramIndex.value++}`;
-      unionQuery += ` OFFSET {${offsetParam}:Int32}`;
+      finalQuery += ` OFFSET {${offsetParam}:Int32}`;
       params[offsetParam] = request.offset;
     }
 
     const rs = await client.query({
-      query: unionQuery,
+      query: finalQuery,
       query_params: params,
       format: "JSONEachRow",
     });
