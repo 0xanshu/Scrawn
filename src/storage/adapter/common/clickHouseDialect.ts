@@ -89,6 +89,10 @@ export class ClickHouseQueryDialect implements QueryDialect {
     const client = getClickHouseDB();
     const agg = request.aggregation!;
     const isSum = agg.type === "SUM";
+
+    if (isSum && agg.field && !OUTPUT_FIELDS.includes(agg.field)) {
+      throw StorageError.invalidData(`Unknown aggregation field: ${agg.field}`);
+    }
     const paramIndex = { value: 0 };
     const params: Record<string, unknown> = {};
 

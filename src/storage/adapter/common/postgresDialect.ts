@@ -64,6 +64,10 @@ export class PostgresQueryDialect implements QueryDialect {
     const agg = request.aggregation!;
     const isSum = agg.type === "SUM";
 
+    if (isSum && agg.field && !OUTPUT_FIELDS.includes(agg.field)) {
+      throw StorageError.invalidData(`Unknown aggregation field: ${agg.field}`);
+    }
+
     const subqueries = tables.map((t) => {
       const cols: SQL[] = [];
 
