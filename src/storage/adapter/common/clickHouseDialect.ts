@@ -218,12 +218,13 @@ export class ClickHouseQueryDialect implements QueryDialect {
     for (const condition of group.conditions) {
       if (condition.field === "eventType") continue;
       const def = FIELD_REGISTRY[table]?.[condition.field];
-      if (!def?.chWhere) continue;
+
+      const colExpr = def?.chWhere || def?.chAggExpr || def?.chSelect || "NULL";
       const op = OPERATOR_SQL[condition.operator];
       if (!op) continue;
 
       const paramName = `p_${paramIndex.value++}`;
-      const paramType = def.chParamType;
+      const paramType = def?.chParamType || "String";
 
       let value: string | number = condition.value;
       if (
@@ -237,7 +238,7 @@ export class ClickHouseQueryDialect implements QueryDialect {
       }
 
       params[paramName] = value;
-      parts.push(`${def.chWhere} ${op} {${paramName}:${paramType}}`);
+      parts.push(`${colExpr} ${op} {${paramName}:${paramType}}`);
     }
 
     for (const subGroup of group.groups) {

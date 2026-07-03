@@ -190,11 +190,14 @@ export class PostgresQueryDialect implements QueryDialect {
     for (const cond of group.conditions) {
       if (cond.field === "eventType") continue;
       const def = FIELD_REGISTRY[table]?.[cond.field];
-      if (!def?.pgWhereCol) continue;
+
+      const colExpr =
+        def?.pgWhereCol || def?.pgAggExpr || def?.pgSelect || "NULL";
       const op = OPERATOR_SQL[cond.operator];
       if (!op) continue;
+
       parts.push(
-        sql`${sql.raw(def.pgWhereCol)} ${sql.raw(op)} ${cond.value}${sql.raw(def.pgWhereCast)}`
+        sql`${sql.raw(colExpr)} ${sql.raw(op)} ${cond.value}${sql.raw(def?.pgWhereCast || "")}`
       );
     }
 
