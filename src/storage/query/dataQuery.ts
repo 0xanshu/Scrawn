@@ -24,6 +24,7 @@ import {
 } from "../db/postgres/schema";
 import type { DataQueryRequest } from "../../zod/data";
 import { EventError } from "../../errors/event";
+import type { AuthContext } from "../../context/auth";
 
 interface FieldDef {
   col: AnyPgColumn;
@@ -62,6 +63,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     tableName: "users",
     table: usersTable,
     fields: {
+      projectId: fieldDef(usersTable.projectId),
       id: fieldDef(usersTable.id),
       lastBilledTimestamp: fieldDef(usersTable.last_billed_timestamp),
       paymentProviderUserId: fieldDef(usersTable.payment_provider_user_id),
@@ -72,6 +74,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     tableName: "sessions",
     table: sessionsTable,
     fields: {
+      projectId: fieldDef(sessionsTable.projectId),
       proxy_link_id: fieldDef(sessionsTable.proxy_link_id),
       sessionId: fieldDef(sessionsTable.sessionId),
       processed: fieldDef(sessionsTable.processed),
@@ -85,6 +88,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     tableName: "tags",
     table: tagsTable,
     fields: {
+      projectId: fieldDef(tagsTable.projectId),
       id: fieldDef(tagsTable.id),
       key: fieldDef(tagsTable.key),
       amount: fieldDef(tagsTable.amount),
@@ -94,6 +98,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     tableName: "expressions",
     table: expressionsTable,
     fields: {
+      projectId: fieldDef(expressionsTable.projectId),
       id: fieldDef(expressionsTable.id),
       key: fieldDef(expressionsTable.key),
       expr: fieldDef(expressionsTable.expr),
@@ -103,6 +108,7 @@ const TABLE_REGISTRY: Record<string, TableDef> = {
     tableName: "metadata",
     table: metadataTable,
     fields: {
+      projectId: fieldDef(metadataTable.projectId),
       id: fieldDef(metadataTable.id),
     },
   },
@@ -227,11 +233,22 @@ export function getDataTable(table: string): TableDef | undefined {
 }
 
 export async function executeDataQuery(
+  auth: AuthContext,
   config: DataQueryRequest,
   tableDef: TableDef
 ): Promise<DataQueryResult> {
   const db = getPostgresDB();
-  const whereClause = buildWhere(config.where, tableDef);
+  const userWhere = buildWhere(config.where, tableDef);
+
+  const authConditions: SQL[] = [];
+  if (tableDef.fields.projectId) {
+    authConditions.push(eq(tableDef.fields.projectId.col, auth.projectId));
+  }
+  if (tableDef.fields.mode) {
+    authConditions.push(eq(tableDef.fields.mode.col, auth.mode));
+  }
+  const finalWhere = and(userWhere, ...authConditions);
+
   const selectCols = buildSelect(tableDef);
   const columns = Object.keys(tableDef.fields);
 
@@ -251,12 +268,12 @@ export async function executeDataQuery(
     db
       .select({ cnt: count() })
       .from(tableDef.table)
-      .where(whereClause)
+      .where(finalWhere)
       .execute(),
     db
       .select(selectCols)
       .from(tableDef.table)
-      .where(whereClause)
+      .where(finalWhere)
       .orderBy(...orderClauses)
       .limit(fetchLimit)
       .offset(config.offset)
