@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { Operator, LogicalOperator } from "../gen/data/v1/data";
 import { createFilterGroupSchema } from "./internals";
-
-const DATA_TABLE_NAMES = ["users", "sessions", "tags", "expressions"] as const;
+import { DATA_TABLE_NAMES } from "../storage/query/dataQuery";
 
 const OPERATOR_MAP = {
   [Operator.EQ]: "EQ",
@@ -35,16 +34,17 @@ const filterGroupSchema = createFilterGroupSchema(
   LOGICAL_MAP
 );
 
-const orderBySchema = z.object({
+export const orderBySchema = z.object({
   field: z.string(),
   descending: z.boolean().default(false),
 });
+export type OrderByRequest = z.output<typeof orderBySchema>;
 
 export const dataQuerySchema = z
   .object({
     table: z.enum(DATA_TABLE_NAMES),
     where: filterGroupSchema.optional(),
-    orderByList: z.array(orderBySchema).default([]),
+    orderBy: z.array(orderBySchema).default([]),
     limit: z.number().int().min(0).max(1000).default(100),
     offset: z.number().int().min(0).default(0),
   })
@@ -55,7 +55,7 @@ export const dataQuerySchema = z
       conditions: [],
       groups: [],
     },
-    orderBy: v.orderByList,
+    orderBy: v.orderBy,
     limit: v.limit,
     offset: v.offset,
   }));
