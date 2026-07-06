@@ -2,7 +2,11 @@ import { randomUUID } from "crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
 import * as Sentry from "@sentry/bun";
 import { ZodError } from "zod";
-import DodoPayments from "dodopayments";
+import DodoPayments, {
+  AuthenticationError,
+  BadRequestError,
+} from "dodopayments";
+import type { Currency } from "dodopayments/resources/misc";
 import { onboardingSchema } from "../../../zod/internals.ts";
 import {
   createWideEventBuilder,
@@ -85,24 +89,96 @@ export async function handleOnboarding(
     let testSecret: string;
     let liveWebhookId: string | undefined;
     let testWebhookId: string | undefined;
+    let liveProductId: string | undefined;
+    let testProductId: string | undefined;
     try {
-      const liveWebhook = await liveClient.webhooks.create({
-        url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&projectId=${projectId}`,
-        description: "Scrawn live payment webhook",
-        filter_types: ["payment.succeeded", "payment.failed"],
-      });
-      liveWebhookId = liveWebhook.id;
+      const results = await Promise.allSettled([
+        liveClient.webhooks
+          .create({
+            url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&projectId=${projectId}`,
+            description: "Scrawn live payment webhook",
+            filter_types: [
+              "payment.succeeded",
+              "payment.processing",
+              "payment.failed",
+            ],
+          })
+          .then((w) => {
+            liveWebhookId = w.id;
+            return w;
+          }),
+        testClient.webhooks
+          .create({
+            url: `${appUrl}/webhooks/payment/createdCheckout?mode=test&projectId=${projectId}`,
+            description: "Scrawn test payment webhook",
+            filter_types: [
+              "payment.succeeded",
+              "payment.processing",
+              "payment.failed",
+            ],
+          })
+          .then((w) => {
+            testWebhookId = w.id;
+            return w;
+          }),
+        liveClient.products
+          .create({
+            name: "Scrawn Billing",
+            price: {
+              type: "one_time_price",
+              currency: validated.currency as Currency,
+              price: 0,
+              pay_what_you_want: true,
+              purchasing_power_parity: false,
+              discount: 0,
+            },
+            tax_category: "saas",
+          })
+          .then((p) => {
+            liveProductId = p.product_id;
+            return p;
+          }),
+        testClient.products
+          .create({
+            name: "Scrawn Billing",
+            price: {
+              type: "one_time_price",
+              currency: validated.currency as Currency,
+              price: 0,
+              pay_what_you_want: true,
+              purchasing_power_parity: false,
+              discount: 0,
+            },
+            tax_category: "saas",
+          })
+          .then((p) => {
+            testProductId = p.product_id;
+            return p;
+          }),
+      ]);
+
+      if (
+        results[0].status === "rejected" ||
+        results[1].status === "rejected" ||
+        results[2].status === "rejected" ||
+        results[3].status === "rejected"
+      ) {
+        const rejected = results.find((r) => r.status === "rejected");
+        throw rejected!.reason;
+      }
+
+      const liveWebhook = results[0].value;
+      const testWebhook = results[1].value;
+      const liveProduct = results[2].value;
+      const testProduct = results[3].value;
+
       liveSecret = (await liveClient.webhooks.retrieveSecret(liveWebhook.id))
         .secret;
-
-      const testWebhook = await testClient.webhooks.create({
-        url: `${appUrl}/webhooks/payment/createdCheckout?mode=test&projectId=${projectId}`,
-        description: "Scrawn test payment webhook",
-        filter_types: ["payment.succeeded", "payment.failed"],
-      });
-      testWebhookId = testWebhook.id;
       testSecret = (await testClient.webhooks.retrieveSecret(testWebhook.id))
         .secret;
+
+      liveProductId = liveProduct.product_id;
+      testProductId = testProduct.product_id;
     } catch (error) {
       if (liveWebhookId) {
         await liveClient.webhooks.delete(liveWebhookId).catch((e) =>
@@ -118,13 +194,50 @@ export async function handleOnboarding(
           })
         );
       }
-      const errMsg = error instanceof Error ? error.message : String(error);
+      if (liveProductId) {
+        await liveClient.products.archive(liveProductId).catch((e: unknown) =>
+          Sentry.captureException(e, {
+            extra: { context: "rollback: failed to archive live product" },
+          })
+        );
+      }
+      if (testProductId) {
+        await testClient.products.archive(testProductId).catch((e: unknown) =>
+          Sentry.captureException(e, {
+            extra: { context: "rollback: failed to archive test product" },
+          })
+        );
+      }
+
       Sentry.captureException(error, {
-        extra: { context: "dodo webhook registration during onboarding" },
+        extra: {
+          context: "dodo webhook/product registration during onboarding",
+        },
       });
+
+      if (error instanceof AuthenticationError) {
+        builder.setError(400, {
+          type: "DodoAuthError",
+          message:
+            "Invalid Dodo Payments API key(s) provided. Please ensure both live and test keys are correct.",
+        });
+        reply.code(400);
+        return {};
+      }
+
+      if (error instanceof BadRequestError) {
+        builder.setError(400, {
+          type: "DodoConfigError",
+          message: `Invalid configuration for Dodo Payments: ${error.message}`,
+        });
+        reply.code(400);
+        return {};
+      }
+
+      const errMsg = error instanceof Error ? error.message : String(error);
       builder.setError(400, {
         type: "DodoApiError",
-        message: `Failed to register webhook with Dodo: ${errMsg}`,
+        message: `Failed to register with Dodo: ${errMsg}`,
       });
       reply.code(400);
       return {};
@@ -146,8 +259,8 @@ export async function handleOnboarding(
           projectId,
           dodo_live_api_key: encrypt(validated.dodoLiveApiKey),
           dodo_test_api_key: encrypt(validated.dodoTestApiKey),
-          dodo_live_product_id: validated.dodoLiveProductId,
-          dodo_test_product_id: validated.dodoTestProductId,
+          dodo_live_product_id: liveProductId,
+          dodo_test_product_id: testProductId,
           dodo_live_webhook_secret: encrypt(liveSecret),
           dodo_test_webhook_secret: encrypt(testSecret),
           currency: validated.currency,
@@ -179,6 +292,26 @@ export async function handleOnboarding(
             extra: {
               context:
                 "rollback: failed to delete test webhook after DB failure",
+            },
+          })
+        );
+      }
+      if (liveProductId) {
+        await liveClient.products.archive(liveProductId).catch((e: unknown) =>
+          Sentry.captureException(e, {
+            extra: {
+              context:
+                "rollback: failed to archive live product after DB failure",
+            },
+          })
+        );
+      }
+      if (testProductId) {
+        await testClient.products.archive(testProductId).catch((e: unknown) =>
+          Sentry.captureException(e, {
+            extra: {
+              context:
+                "rollback: failed to archive test product after DB failure",
             },
           })
         );
