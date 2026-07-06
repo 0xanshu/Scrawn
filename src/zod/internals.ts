@@ -1,12 +1,5 @@
 import { z } from "zod";
-
-const currencyMap = {
-  usd: "USD",
-  eur: "EUR",
-  gbp: "GBP",
-  inr: "INR",
-  jpy: "JPY",
-} as const;
+import type { Currency } from "dodopayments/resources";
 
 export interface FilterGroupOutput<C> {
   logical: "AND" | "OR";
@@ -46,6 +39,6 @@ export const onboardingSchema = z.object({
   dodoTestApiKey: z.string().min(1, "Dodo test API key is required"),
   currency: z
     .enum(["usd", "eur", "gbp", "inr", "jpy"])
-    .transform((c) => currencyMap[c]),
+    .transform((c) => c.toUpperCase() as Currency),
   redirectUrl: z.url("Redirect URL must be a valid URL"),
 });
