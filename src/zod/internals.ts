@@ -44,8 +44,6 @@ export const onboardingSchema = z.object({
   name: z.string().min(1, "Project name is required").max(255),
   dodoLiveApiKey: z.string().min(1, "Dodo live API key is required"),
   dodoTestApiKey: z.string().min(1, "Dodo test API key is required"),
-  liveProductId: z.string().min(1, "Dodo live product ID is required"),
-  testProductId: z.string().min(1, "Dodo test product ID is required"),
   currency: z
     .enum(["usd", "eur", "gbp", "inr", "jpy"])
     .transform((c) => currencyMap[c]),
