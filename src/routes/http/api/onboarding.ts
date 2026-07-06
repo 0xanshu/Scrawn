@@ -157,17 +157,20 @@ export async function handleOnboarding(
           }),
       ]);
 
-      const rejections = results.filter(
-        (r) => r.status === "rejected"
-      ) as PromiseRejectedResult[];
-      if (rejections.length > 0) {
-        throw rejections[0]!.reason;
+      if (
+        results[0].status === "rejected" ||
+        results[1].status === "rejected" ||
+        results[2].status === "rejected" ||
+        results[3].status === "rejected"
+      ) {
+        const rejected = results.find((r) => r.status === "rejected");
+        throw rejected!.reason;
       }
 
-      const liveWebhook = (results[0] as PromiseFulfilledResult<any>).value;
-      const testWebhook = (results[1] as PromiseFulfilledResult<any>).value;
-      const liveProduct = (results[2] as PromiseFulfilledResult<any>).value;
-      const testProduct = (results[3] as PromiseFulfilledResult<any>).value;
+      const liveWebhook = results[0].value;
+      const testWebhook = results[1].value;
+      const liveProduct = results[2].value;
+      const testProduct = results[3].value;
 
       liveSecret = (await liveClient.webhooks.retrieveSecret(liveWebhook.id))
         .secret;
