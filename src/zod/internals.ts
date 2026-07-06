@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Currency } from "dodopayments/resources";
+import type { Currency } from "dodopayments/resources/misc";
 
 export interface FilterGroupOutput<C> {
   logical: "AND" | "OR";
