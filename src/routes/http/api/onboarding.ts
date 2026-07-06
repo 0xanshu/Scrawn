@@ -89,40 +89,40 @@ export async function handleOnboarding(
     let testSecret: string;
     let liveWebhookId: string | undefined;
     let testWebhookId: string | undefined;
-    let liveProductId: string;
-    let testProductId: string;
+    let liveProductId: string | undefined;
+    let testProductId: string | undefined;
     try {
-      const [liveWebhook, testWebhook, liveProduct, testProduct] =
-        await Promise.all([
-          liveClient.webhooks
-            .create({
-              url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&projectId=${projectId}`,
-              description: "Scrawn live payment webhook",
-              filter_types: [
-                "payment.succeeded",
-                "payment.processing",
-                "payment.failed",
-              ],
-            })
-            .then((w) => {
-              liveWebhookId = w.id;
-              return w;
-            }),
-          testClient.webhooks
-            .create({
-              url: `${appUrl}/webhooks/payment/createdCheckout?mode=test&projectId=${projectId}`,
-              description: "Scrawn test payment webhook",
-              filter_types: [
-                "payment.succeeded",
-                "payment.processing",
-                "payment.failed",
-              ],
-            })
-            .then((w) => {
-              testWebhookId = w.id;
-              return w;
-            }),
-          liveClient.products.create({
+      const results = await Promise.allSettled([
+        liveClient.webhooks
+          .create({
+            url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&projectId=${projectId}`,
+            description: "Scrawn live payment webhook",
+            filter_types: [
+              "payment.succeeded",
+              "payment.processing",
+              "payment.failed",
+            ],
+          })
+          .then((w) => {
+            liveWebhookId = w.id;
+            return w;
+          }),
+        testClient.webhooks
+          .create({
+            url: `${appUrl}/webhooks/payment/createdCheckout?mode=test&projectId=${projectId}`,
+            description: "Scrawn test payment webhook",
+            filter_types: [
+              "payment.succeeded",
+              "payment.processing",
+              "payment.failed",
+            ],
+          })
+          .then((w) => {
+            testWebhookId = w.id;
+            return w;
+          }),
+        liveClient.products
+          .create({
             name: "Scrawn Billing",
             price: {
               type: "one_time_price",
@@ -133,8 +133,13 @@ export async function handleOnboarding(
               discount: 0,
             },
             tax_category: "saas",
+          })
+          .then((p) => {
+            liveProductId = p.product_id;
+            return p;
           }),
-          testClient.products.create({
+        testClient.products
+          .create({
             name: "Scrawn Billing",
             price: {
               type: "one_time_price",
@@ -145,8 +150,24 @@ export async function handleOnboarding(
               discount: 0,
             },
             tax_category: "saas",
+          })
+          .then((p) => {
+            testProductId = p.product_id;
+            return p;
           }),
-        ]);
+      ]);
+
+      const rejections = results.filter(
+        (r) => r.status === "rejected"
+      ) as PromiseRejectedResult[];
+      if (rejections.length > 0) {
+        throw rejections[0]!.reason;
+      }
+
+      const liveWebhook = (results[0] as PromiseFulfilledResult<any>).value;
+      const testWebhook = (results[1] as PromiseFulfilledResult<any>).value;
+      const liveProduct = (results[2] as PromiseFulfilledResult<any>).value;
+      const testProduct = (results[3] as PromiseFulfilledResult<any>).value;
 
       liveSecret = (await liveClient.webhooks.retrieveSecret(liveWebhook.id))
         .secret;
@@ -167,6 +188,20 @@ export async function handleOnboarding(
         await testClient.webhooks.delete(testWebhookId).catch((e) =>
           Sentry.captureException(e, {
             extra: { context: "rollback: failed to delete test webhook" },
+          })
+        );
+      }
+      if (liveProductId) {
+        await liveClient.products.archive(liveProductId).catch((e: unknown) =>
+          Sentry.captureException(e, {
+            extra: { context: "rollback: failed to archive live product" },
+          })
+        );
+      }
+      if (testProductId) {
+        await testClient.products.archive(testProductId).catch((e: unknown) =>
+          Sentry.captureException(e, {
+            extra: { context: "rollback: failed to archive test product" },
           })
         );
       }
@@ -254,6 +289,26 @@ export async function handleOnboarding(
             extra: {
               context:
                 "rollback: failed to delete test webhook after DB failure",
+            },
+          })
+        );
+      }
+      if (liveProductId) {
+        await liveClient.products.archive(liveProductId).catch((e: unknown) =>
+          Sentry.captureException(e, {
+            extra: {
+              context:
+                "rollback: failed to archive live product after DB failure",
+            },
+          })
+        );
+      }
+      if (testProductId) {
+        await testClient.products.archive(testProductId).catch((e: unknown) =>
+          Sentry.captureException(e, {
+            extra: {
+              context:
+                "rollback: failed to archive test product after DB failure",
             },
           })
         );
