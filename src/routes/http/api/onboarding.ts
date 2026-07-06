@@ -96,7 +96,7 @@ export async function handleOnboarding(
         await Promise.all([
           liveClient.webhooks
             .create({
-              url: `${appUrl}/webhooks/payment/createCheckout?mode=production`,
+              url: `${appUrl}/webhooks/payment/createdCheckout?mode=production&projectId=${projectId}`,
               description: "Scrawn live payment webhook",
               filter_types: [
                 "payment.succeeded",
@@ -110,7 +110,7 @@ export async function handleOnboarding(
             }),
           testClient.webhooks
             .create({
-              url: `${appUrl}/webhooks/payment/createCheckout?mode=test`,
+              url: `${appUrl}/webhooks/payment/createdCheckout?mode=test&projectId=${projectId}`,
               description: "Scrawn test payment webhook",
               filter_types: [
                 "payment.succeeded",
