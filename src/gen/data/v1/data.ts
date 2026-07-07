@@ -249,81 +249,6 @@ export function sessionsFieldToJSON(object: SessionsField): string {
   }
 }
 
-export enum PaymentEventsField {
-  PAYMENT_EVENTS_FIELD_UNSPECIFIED = 0,
-  PAYMENT_EVENTS_ID = 1,
-  PAYMENT_EVENTS_USER_ID = 2,
-  PAYMENT_EVENTS_API_KEY_ID = 3,
-  PAYMENT_EVENTS_MODE = 4,
-  PAYMENT_EVENTS_CREDIT_AMOUNT = 5,
-  PAYMENT_EVENTS_SESSION_ID = 6,
-  PAYMENT_EVENTS_REPORTED_TIMESTAMP = 7,
-  PAYMENT_EVENTS_INGESTED_TIMESTAMP = 8,
-  UNRECOGNIZED = -1,
-}
-
-export function paymentEventsFieldFromJSON(object: any): PaymentEventsField {
-  switch (object) {
-    case 0:
-    case "PAYMENT_EVENTS_FIELD_UNSPECIFIED":
-      return PaymentEventsField.PAYMENT_EVENTS_FIELD_UNSPECIFIED;
-    case 1:
-    case "PAYMENT_EVENTS_ID":
-      return PaymentEventsField.PAYMENT_EVENTS_ID;
-    case 2:
-    case "PAYMENT_EVENTS_USER_ID":
-      return PaymentEventsField.PAYMENT_EVENTS_USER_ID;
-    case 3:
-    case "PAYMENT_EVENTS_API_KEY_ID":
-      return PaymentEventsField.PAYMENT_EVENTS_API_KEY_ID;
-    case 4:
-    case "PAYMENT_EVENTS_MODE":
-      return PaymentEventsField.PAYMENT_EVENTS_MODE;
-    case 5:
-    case "PAYMENT_EVENTS_CREDIT_AMOUNT":
-      return PaymentEventsField.PAYMENT_EVENTS_CREDIT_AMOUNT;
-    case 6:
-    case "PAYMENT_EVENTS_SESSION_ID":
-      return PaymentEventsField.PAYMENT_EVENTS_SESSION_ID;
-    case 7:
-    case "PAYMENT_EVENTS_REPORTED_TIMESTAMP":
-      return PaymentEventsField.PAYMENT_EVENTS_REPORTED_TIMESTAMP;
-    case 8:
-    case "PAYMENT_EVENTS_INGESTED_TIMESTAMP":
-      return PaymentEventsField.PAYMENT_EVENTS_INGESTED_TIMESTAMP;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return PaymentEventsField.UNRECOGNIZED;
-  }
-}
-
-export function paymentEventsFieldToJSON(object: PaymentEventsField): string {
-  switch (object) {
-    case PaymentEventsField.PAYMENT_EVENTS_FIELD_UNSPECIFIED:
-      return "PAYMENT_EVENTS_FIELD_UNSPECIFIED";
-    case PaymentEventsField.PAYMENT_EVENTS_ID:
-      return "PAYMENT_EVENTS_ID";
-    case PaymentEventsField.PAYMENT_EVENTS_USER_ID:
-      return "PAYMENT_EVENTS_USER_ID";
-    case PaymentEventsField.PAYMENT_EVENTS_API_KEY_ID:
-      return "PAYMENT_EVENTS_API_KEY_ID";
-    case PaymentEventsField.PAYMENT_EVENTS_MODE:
-      return "PAYMENT_EVENTS_MODE";
-    case PaymentEventsField.PAYMENT_EVENTS_CREDIT_AMOUNT:
-      return "PAYMENT_EVENTS_CREDIT_AMOUNT";
-    case PaymentEventsField.PAYMENT_EVENTS_SESSION_ID:
-      return "PAYMENT_EVENTS_SESSION_ID";
-    case PaymentEventsField.PAYMENT_EVENTS_REPORTED_TIMESTAMP:
-      return "PAYMENT_EVENTS_REPORTED_TIMESTAMP";
-    case PaymentEventsField.PAYMENT_EVENTS_INGESTED_TIMESTAMP:
-      return "PAYMENT_EVENTS_INGESTED_TIMESTAMP";
-    case PaymentEventsField.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
 export enum TagsField {
   TAGS_FIELD_UNSPECIFIED = 0,
   TAGS_ID = 1,
@@ -409,51 +334,6 @@ export function expressionsFieldToJSON(object: ExpressionsField): string {
     case ExpressionsField.EXPRESSIONS_EXPR:
       return "EXPRESSIONS_EXPR";
     case ExpressionsField.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
-export enum MetadataField {
-  METADATA_FIELD_UNSPECIFIED = 0,
-  METADATA_ID = 1,
-  METADATA_PAYMENT_CRON = 2,
-  METADATA_PAYMENT_WEBHOOK = 3,
-  UNRECOGNIZED = -1,
-}
-
-export function metadataFieldFromJSON(object: any): MetadataField {
-  switch (object) {
-    case 0:
-    case "METADATA_FIELD_UNSPECIFIED":
-      return MetadataField.METADATA_FIELD_UNSPECIFIED;
-    case 1:
-    case "METADATA_ID":
-      return MetadataField.METADATA_ID;
-    case 2:
-    case "METADATA_PAYMENT_CRON":
-      return MetadataField.METADATA_PAYMENT_CRON;
-    case 3:
-    case "METADATA_PAYMENT_WEBHOOK":
-      return MetadataField.METADATA_PAYMENT_WEBHOOK;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return MetadataField.UNRECOGNIZED;
-  }
-}
-
-export function metadataFieldToJSON(object: MetadataField): string {
-  switch (object) {
-    case MetadataField.METADATA_FIELD_UNSPECIFIED:
-      return "METADATA_FIELD_UNSPECIFIED";
-    case MetadataField.METADATA_ID:
-      return "METADATA_ID";
-    case MetadataField.METADATA_PAYMENT_CRON:
-      return "METADATA_PAYMENT_CRON";
-    case MetadataField.METADATA_PAYMENT_WEBHOOK:
-      return "METADATA_PAYMENT_WEBHOOK";
-    case MetadataField.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
   }
@@ -1148,13 +1028,7 @@ export const DataQueryServiceClient = makeGenericClientConstructor(
 };
 
 type Builtin =
-  | Date
-  | Function
-  | Uint8Array
-  | string
-  | number
-  | boolean
-  | undefined;
+  Date | Function | Uint8Array | string | number | boolean | undefined;
 
 export type DeepPartial<T> = T extends Builtin
   ? T

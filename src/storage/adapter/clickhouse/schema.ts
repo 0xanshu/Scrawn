@@ -1,10 +1,10 @@
 import { getClickHouseDB } from "../../db/clickhouse";
 import { logger } from "../../../errors/logger";
-import { innerProduct } from "drizzle-orm";
 
 const BASIC_USAGE_EVENTS_TABLE = `
 CREATE TABLE IF NOT EXISTS basic_usage_events (
   id UUID DEFAULT generateUUIDv4(),
+  project_id String,
   event_id String,
   idempotency_key String,
   user_id String,
@@ -16,12 +16,13 @@ CREATE TABLE IF NOT EXISTS basic_usage_events (
   debit_amount Int64,
   metadata JSON
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (idempotency_key, user_id)
+ORDER BY (project_id, idempotency_key, user_id)
 `;
 
 const AI_TOKEN_USAGE_EVENTS_TABLE = `
 CREATE TABLE IF NOT EXISTS ai_token_usage_events (
   id UUID DEFAULT generateUUIDv4(),
+  project_id String,
   event_id String,
   idempotency_key String,
   user_id String,
@@ -34,7 +35,7 @@ CREATE TABLE IF NOT EXISTS ai_token_usage_events (
   metrics String,
   metadata JSON
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (idempotency_key, user_id)
+ORDER BY (project_id, idempotency_key, user_id)
 `;
 
 export async function runClickHouseMigrations(): Promise<void> {

@@ -5,6 +5,7 @@ import { DateTime } from "luxon";
 import type { PgTransaction } from "drizzle-orm/pg-core";
 
 export async function handleAddPayment(
+  projectId: string,
   userId: string,
   creditAmount: number,
   apiKeyId: string,
@@ -30,6 +31,7 @@ export async function handleAddPayment(
     const [result] = await db
       .insert(paymentEventsTable)
       .values({
+        projectId,
         reportedTimestamp: DateTime.utc().toISO()!,
         userId,
         apiKeyId,

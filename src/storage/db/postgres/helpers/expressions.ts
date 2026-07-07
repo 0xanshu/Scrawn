@@ -4,14 +4,19 @@ import { eq, and, isNull } from "drizzle-orm";
 import { StorageError } from "../../../../errors/storage";
 import { DateTime } from "luxon";
 
-export async function listExpressions(): Promise<string[]> {
+export async function listExpressions(projectId: string): Promise<string[]> {
   const db = getPostgresDB();
 
   try {
     const rows = await db
       .select({ key: expressionsTable.key })
       .from(expressionsTable)
-      .where(isNull(expressionsTable.deletedAt));
+      .where(
+        and(
+          eq(expressionsTable.projectId, projectId),
+          isNull(expressionsTable.deletedAt)
+        )
+      );
     return rows.map((row) => row.key);
   } catch (e) {
     throw StorageError.queryFailed(
@@ -21,7 +26,10 @@ export async function listExpressions(): Promise<string[]> {
   }
 }
 
-export async function findExpressionByKey(key: string): Promise<string | null> {
+export async function findExpressionByKey(
+  projectId: string,
+  key: string
+): Promise<string | null> {
   const db = getPostgresDB();
 
   try {
@@ -29,7 +37,11 @@ export async function findExpressionByKey(key: string): Promise<string | null> {
       .select({ expr: expressionsTable.expr })
       .from(expressionsTable)
       .where(
-        and(eq(expressionsTable.key, key), isNull(expressionsTable.deletedAt))
+        and(
+          eq(expressionsTable.projectId, projectId),
+          eq(expressionsTable.key, key),
+          isNull(expressionsTable.deletedAt)
+        )
       )
       .limit(1);
 
@@ -43,29 +55,21 @@ export async function findExpressionByKey(key: string): Promise<string | null> {
 }
 
 export async function createExpression(
+  projectId: string,
   key: string,
   expr: string
 ): Promise<void> {
   const db = getPostgresDB();
 
   try {
-    const existing = await db
-      .select({ id: expressionsTable.id })
-      .from(expressionsTable)
-      .where(
-        and(eq(expressionsTable.key, key), isNull(expressionsTable.deletedAt))
-      )
-      .limit(1);
-
-    if (existing[0]) {
-      await db
-        .update(expressionsTable)
-        .set({ expr })
-        .where(eq(expressionsTable.id, existing[0].id));
-      return;
-    }
-
-    await db.insert(expressionsTable).values({ key, expr });
+    await db
+      .insert(expressionsTable)
+      .values({ projectId, key, expr })
+      .onConflictDoUpdate({
+        target: [expressionsTable.projectId, expressionsTable.key],
+        targetWhere: isNull(expressionsTable.deletedAt),
+        set: { expr },
+      });
   } catch (e) {
     throw StorageError.insertFailed(
       `Failed to upsert expression '${key}'`,
@@ -74,7 +78,10 @@ export async function createExpression(
   }
 }
 
-export async function deleteExpression(key: string): Promise<boolean> {
+export async function deleteExpression(
+  projectId: string,
+  key: string
+): Promise<boolean> {
   const db = getPostgresDB();
 
   try {
@@ -83,7 +90,11 @@ export async function deleteExpression(key: string): Promise<boolean> {
       .update(expressionsTable)
       .set({ deletedAt: now })
       .where(
-        and(eq(expressionsTable.key, key), isNull(expressionsTable.deletedAt))
+        and(
+          eq(expressionsTable.projectId, projectId),
+          eq(expressionsTable.key, key),
+          isNull(expressionsTable.deletedAt)
+        )
       );
 
     return (result.count ?? 0) > 0;

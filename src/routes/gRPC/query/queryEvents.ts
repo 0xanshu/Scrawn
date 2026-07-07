@@ -101,8 +101,17 @@ function buildEventRow(row: QueryResponse["rows"][number]): EventRow {
   if (row.inputCacheDebitAmount != null) {
     eventRow.inputCacheDebitAmount = Number(row.inputCacheDebitAmount);
   }
+  if (row.outputCacheTokens != null) {
+    eventRow.outputCacheTokens = Number(row.outputCacheTokens);
+  }
+  if (row.outputCacheDebitAmount != null) {
+    eventRow.outputCacheDebitAmount = Number(row.outputCacheDebitAmount);
+  }
+  if (row.provider != null) {
+    eventRow.provider = String(row.provider);
+  }
   if (row.metadata != null) {
-    eventRow.metadata = JSON.stringify(row.metadata);
+    eventRow.metadata = String(row.metadata);
   }
 
   return eventRow;

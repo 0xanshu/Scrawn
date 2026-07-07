@@ -16,6 +16,7 @@ import {
   apiKeysTable,
 } from "../../../storage/db/postgres/schema";
 import { and, eq, desc, inArray, sql } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 
 const listDeliveriesQuerySchema = z.object({
   apiKeyId: z.string().uuid("Invalid API key ID").optional(),
@@ -37,47 +38,60 @@ export async function handleListDeliveries(
   );
 
   try {
-    await authenticateHttpApiKey(request.headers.authorization);
+    const auth = await authenticateHttpApiKey(request.headers.authorization);
+
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can read webhook deliveries"
+      );
+    }
 
     const query = listDeliveriesQuerySchema.parse(request.query);
     const db = getPostgresDB();
 
-    let conditions = undefined;
+    let conditions: SQL | undefined = eq(
+      webhookDeliveriesTable.projectId,
+      auth.projectId
+    );
     if (query.apiKeyId) {
       const endpoints = await db
         .select({ id: webhookEndpointsTable.id })
         .from(webhookEndpointsTable)
-        .where(eq(webhookEndpointsTable.apiKeyId, query.apiKeyId));
-      const ids = endpoints.map((e) => e.id);
-      if (ids.length > 0) {
-        conditions = inArray(webhookDeliveriesTable.endpointId, ids);
-      } else {
-        conditions = eq(
-          webhookDeliveriesTable.id,
-          "00000000-0000-0000-0000-000000000000"
+        .where(
+          and(
+            eq(webhookEndpointsTable.projectId, auth.projectId),
+            eq(webhookEndpointsTable.apiKeyId, query.apiKeyId)
+          )
         );
-      }
+      const ids = endpoints.map((e) => e.id);
+      conditions =
+        ids.length > 0
+          ? and(conditions, inArray(webhookDeliveriesTable.endpointId, ids))
+          : and(
+              conditions,
+              eq(
+                webhookDeliveriesTable.id,
+                "00000000-0000-0000-0000-000000000000"
+              )
+            );
     }
 
     if (query.eventType) {
-      conditions = conditions
-        ? and(conditions, eq(webhookDeliveriesTable.eventType, query.eventType))
-        : eq(webhookDeliveriesTable.eventType, query.eventType);
+      conditions = and(
+        conditions,
+        eq(webhookDeliveriesTable.eventType, query.eventType)
+      );
     }
 
     if (query.status) {
-      conditions = conditions
-        ? and(
-            conditions,
-            sql`${webhookDeliveriesTable.status} = ${query.status}`
-          )
-        : sql`${webhookDeliveriesTable.status} = ${query.status}`;
+      conditions = and(
+        conditions,
+        sql`${webhookDeliveriesTable.status} = ${query.status}`
+      );
     }
 
     if (query.role) {
-      conditions = conditions
-        ? and(conditions, sql`${apiKeysTable.role} = ${query.role}`)
-        : sql`${apiKeysTable.role} = ${query.role}`;
+      conditions = and(conditions, sql`${apiKeysTable.role} = ${query.role}`);
     }
 
     const rows = await db

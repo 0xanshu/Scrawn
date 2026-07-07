@@ -32,7 +32,7 @@ import { getPostgresDB } from "../../../storage/db/postgres/db";
 import { checkIfExistingCheckoutLink } from "../../../storage/db/postgres/helpers/sessions";
 import { ensureUserExists } from "../../../storage/db/postgres/helpers/users";
 import { usersTable } from "../../../storage/db/postgres/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export async function createCheckoutLink(
   call: ContextUnaryCall<CreateCheckoutLinkRequest, CreateCheckoutLinkResponse>,
@@ -64,7 +64,7 @@ export async function createCheckoutLink(
 
     const mode = auth.mode;
 
-    const config = await getPaymentProviderConfig(mode);
+    const config = await getPaymentProviderConfig(auth.projectId, mode);
     const validatedData = validateRequest(req);
     wideEventBuilder?.setUser(validatedData.userId);
 
@@ -79,29 +79,26 @@ export async function createCheckoutLink(
     );
     wideEventBuilder?.setPaymentContext({ priceAmount: custom_price });
 
-    const checkoutResult = await createCheckoutSession(
-      config,
-      custom_price,
-      validatedData.userId,
-      auth.apiKeyId,
-      beforeTimestamp,
-      mode
-    );
-
     const checkoutLink = await executeInTransaction(
       db,
       "create checkout link",
       async (txn) => {
-        await ensureUserExists(validatedData.userId, txn);
+        await ensureUserExists(auth.projectId, validatedData.userId, txn);
 
         await txn
           .select({ id: usersTable.id })
           .from(usersTable)
-          .where(eq(usersTable.id, validatedData.userId))
+          .where(
+            and(
+              eq(usersTable.projectId, auth.projectId),
+              eq(usersTable.id, validatedData.userId)
+            )
+          )
           .for("update");
 
         const existingId = await checkIfExistingCheckoutLink(
           txn,
+          auth.projectId,
           validatedData.userId,
           mode
         );
@@ -111,7 +108,18 @@ export async function createCheckoutLink(
           return proxyUrl;
         }
 
+        const checkoutResult = await createCheckoutSession(
+          auth.projectId,
+          config,
+          custom_price,
+          validatedData.userId,
+          auth.apiKeyId,
+          beforeTimestamp,
+          mode
+        );
+
         const sessionResult = await handleAddSession(
+          auth.projectId,
           validatedData.userId,
           checkoutResult.sessionId,
           beforeTimestamp,
@@ -164,6 +172,7 @@ async function calculatePrice(
 }
 
 async function createCheckoutSession(
+  projectId: string,
   config: PaymentProviderConfig,
   customPrice: number,
   userId: string,
@@ -177,7 +186,12 @@ async function createCheckoutSession(
     apiKeyId,
   };
 
-  const checkoutResult = await createProviderCheckout(config, params, mode);
+  const checkoutResult = await createProviderCheckout(
+    projectId,
+    config,
+    params,
+    mode
+  );
 
   if (
     !checkoutResult.checkoutUrl ||

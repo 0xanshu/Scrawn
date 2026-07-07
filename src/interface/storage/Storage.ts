@@ -2,6 +2,7 @@ import type { SerializedEvent, EventKind } from "../event/Event";
 import { type UserId } from "../../config/identifiers";
 import type { DateTime } from "luxon";
 import type { AuthContext } from "../../context/auth";
+import type { OrderByRequest } from "../../zod/data";
 
 export type QueryOperator = "EQ" | "GT" | "GTE" | "LT" | "LTE" | "NEQ";
 
@@ -20,6 +21,8 @@ export const QUERY_FIELD_NAMES = [
   "outputDebitAmount",
   "inputCacheTokens",
   "inputCacheDebitAmount",
+  "outputCacheTokens",
+  "outputCacheDebitAmount",
   "creditAmount",
   "provider",
   "metadata",
@@ -52,6 +55,7 @@ export interface QueryRequest {
   groupBy?: string;
   limit?: number;
   offset?: number;
+  orderBy?: OrderByRequest;
 }
 
 export type QueryResultRow = Record<string, unknown>;

@@ -106,6 +106,24 @@ export async function handleCreateWebhookEndpoint(
       return { error: "Target API key not found" };
     }
 
+    if (targetKey.revoked) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Cannot set webhook for a revoked API key",
+      });
+      reply.code(400);
+      return { error: "Cannot set webhook for a revoked API key" };
+    }
+
+    if (targetKey.projectId !== auth.projectId) {
+      builder.setError(403, {
+        type: "PermissionDenied",
+        message: "Target API key does not belong to this project",
+      });
+      reply.code(403);
+      return { error: "Target API key does not belong to this project" };
+    }
+
     if (targetKey.role === "dashboard") {
       builder.setError(400, {
         type: "ValidationError",
@@ -130,6 +148,7 @@ export async function handleCreateWebhookEndpoint(
     const keyPair = generateWebhookKeyPair();
 
     const endpoint = await upsertWebhookEndpoint(
+      auth.projectId,
       targetApiKeyId,
       validated.url,
       keyPair.privateKeyPem,
@@ -184,7 +203,38 @@ export async function handleGetWebhookEndpoint(
     const auth = await authenticateHttpApiKey(request.headers.authorization);
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
-    const endpoint = await getWebhookEndpointByApiKeyId(auth.apiKeyId);
+    const query = request.query as { apiKeyId?: string };
+    const targetApiKeyId =
+      query.apiKeyId && auth.role === "dashboard"
+        ? query.apiKeyId
+        : auth.apiKeyId;
+
+    if (targetApiKeyId !== auth.apiKeyId) {
+      const targetKey = await getApiKeyRoleById(targetApiKeyId);
+      if (!targetKey || targetKey.projectId !== auth.projectId) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key not found or belongs to another project",
+        });
+        reply.code(403);
+        return {
+          error: "Target API key not found or belongs to another project",
+        };
+      }
+      if (targetKey.revoked) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key is revoked",
+        });
+        reply.code(403);
+        return { error: "Target API key is revoked" };
+      }
+    }
+
+    const endpoint = await getWebhookEndpointByApiKeyId(
+      auth.projectId,
+      targetApiKeyId
+    );
 
     const endpoints: WebhookEndpointResponse[] = endpoint
       ? [toEndpointResponse(endpoint)]
@@ -227,7 +277,35 @@ export async function handleDeleteWebhookEndpoint(
     const auth = await authenticateHttpApiKey(request.headers.authorization);
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
-    const deleted = await deleteWebhookEndpoint(auth.apiKeyId);
+    const query = request.query as { apiKeyId?: string };
+    const targetApiKeyId =
+      query.apiKeyId && auth.role === "dashboard"
+        ? query.apiKeyId
+        : auth.apiKeyId;
+
+    if (targetApiKeyId !== auth.apiKeyId) {
+      const targetKey = await getApiKeyRoleById(targetApiKeyId);
+      if (!targetKey || targetKey.projectId !== auth.projectId) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key not found or belongs to another project",
+        });
+        reply.code(403);
+        return {
+          error: "Target API key not found or belongs to another project",
+        };
+      }
+      if (targetKey.revoked) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key is revoked",
+        });
+        reply.code(403);
+        return { error: "Target API key is revoked" };
+      }
+    }
+
+    const deleted = await deleteWebhookEndpoint(auth.projectId, targetApiKeyId);
 
     if (!deleted) {
       builder.setError(404, {
@@ -238,7 +316,7 @@ export async function handleDeleteWebhookEndpoint(
       return { error: "No webhook endpoint found for this API key" };
     }
 
-    invalidateWebhookEndpointCache(auth.apiKeyId);
+    invalidateWebhookEndpointCache(targetApiKeyId);
 
     builder.setSuccess(200);
     reply.code(200);
@@ -299,6 +377,24 @@ export async function handleSendTestWebhook(
       return { error: "API key not found" };
     }
 
+    if (targetKey.revoked) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Cannot send test webhook to a revoked API key",
+      });
+      reply.code(400);
+      return { error: "Cannot send test webhook to a revoked API key" };
+    }
+
+    if (targetKey.projectId !== auth.projectId) {
+      builder.setError(403, {
+        type: "PermissionDenied",
+        message: "API key does not belong to this project",
+      });
+      reply.code(403);
+      return { error: "API key does not belong to this project" };
+    }
+
     if (targetKey.role !== "test") {
       builder.setError(400, {
         type: "ValidationError",
@@ -308,7 +404,10 @@ export async function handleSendTestWebhook(
       return { error: "Can only send test webhooks to test API keys" };
     }
 
-    const endpoint = await getWebhookEndpointByApiKeyId(validated.apiKeyId);
+    const endpoint = await getWebhookEndpointByApiKeyId(
+      auth.projectId,
+      validated.apiKeyId
+    );
 
     if (!endpoint) {
       builder.setError(404, {
@@ -321,7 +420,7 @@ export async function handleSendTestWebhook(
 
     const now = DateTime.utc();
 
-    await forwardWebhook(validated.apiKeyId, {
+    await forwardWebhook(auth.projectId, validated.apiKeyId, {
       eventType: "payment.succeeded",
       resource: "payment",
       action: "succeeded",
@@ -374,7 +473,38 @@ export async function handleGetPublicKey(
     const auth = await authenticateHttpApiKey(request.headers.authorization);
     builder.setApiKeyContext({ name: `webhook:${auth.apiKeyId}` });
 
-    const endpoint = await getWebhookEndpointByApiKeyId(auth.apiKeyId);
+    const query = request.query as { apiKeyId?: string };
+    const targetApiKeyId =
+      query.apiKeyId && auth.role === "dashboard"
+        ? query.apiKeyId
+        : auth.apiKeyId;
+
+    if (targetApiKeyId !== auth.apiKeyId) {
+      const targetKey = await getApiKeyRoleById(targetApiKeyId);
+      if (!targetKey || targetKey.projectId !== auth.projectId) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key not found or belongs to another project",
+        });
+        reply.code(403);
+        return {
+          error: "Target API key not found or belongs to another project",
+        };
+      }
+      if (targetKey.revoked) {
+        builder.setError(403, {
+          type: "PermissionDenied",
+          message: "Target API key is revoked",
+        });
+        reply.code(403);
+        return { error: "Target API key is revoked" };
+      }
+    }
+
+    const endpoint = await getWebhookEndpointByApiKeyId(
+      auth.projectId,
+      targetApiKeyId
+    );
 
     if (!endpoint) {
       builder.setError(404, {

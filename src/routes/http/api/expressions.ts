@@ -45,9 +45,9 @@ export async function handleListExpressions(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const auth = await authenticateHttpApiKey(authHeader);
 
-    const expressions = await listExpressions();
+    const expressions = await listExpressions(auth.projectId);
 
     builder.setSuccess(200).addContext({ expressionCount: expressions.length });
     reply.code(200);
@@ -84,15 +84,21 @@ export async function handleCreateExpression(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const auth = await authenticateHttpApiKey(authHeader);
+
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage expressions"
+      );
+    }
 
     const body = await request.body;
     const validated = createExpressionSchema.parse(body);
 
     validateExprSyntax(validated.expr);
-    await resolveExprRefsInExpression(validated.expr);
+    await resolveExprRefsInExpression(validated.expr, auth.projectId);
 
-    await createExpression(validated.key, validated.expr);
+    await createExpression(auth.projectId, validated.key, validated.expr);
 
     builder.setSuccess(200);
     reply.code(200);
@@ -147,10 +153,16 @@ export async function handleDeleteExpression(
 
   try {
     const authHeader = request.headers.authorization;
-    await authenticateHttpApiKey(authHeader);
+    const auth = await authenticateHttpApiKey(authHeader);
+
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage expressions"
+      );
+    }
 
     const params = request.params as { key: string };
-    const deleted = await deleteExpression(params.key);
+    const deleted = await deleteExpression(auth.projectId, params.key);
 
     if (!deleted) {
       builder.setError(404, {

@@ -8,6 +8,7 @@ import {
 } from "../../../context/requestContext.ts";
 import { logger } from "../../../errors/logger.ts";
 import { AuthError } from "../../../errors/auth.ts";
+import { StorageError } from "../../../errors/storage.ts";
 import { authenticateHttpApiKey } from "../../../utils/authenticateHttpApiKey.ts";
 import { generateAPIKey } from "../../../utils/generateAPIKey";
 import { hashAPIKey } from "../../../utils/hashAPIKey";
@@ -16,13 +17,17 @@ import { createApiKey } from "../../../storage/db/postgres/helpers/apiKeys";
 import { upsertWebhookEndpoint } from "../../../storage/db/postgres/helpers/webhookEndpoints";
 import { generateWebhookKeyPair } from "../../../utils/generateWebhookKeyPair";
 import { getPostgresDB } from "../../../storage/db/postgres/db";
+import { executeInTransaction } from "../../../storage/adapter/postgres/handlers/addEventUtils";
 import {
   apiKeysTable,
+  projectsTable,
   webhookEndpointsTable,
 } from "../../../storage/db/postgres/schema";
 import { eq, and, isNull, ne, sql } from "drizzle-orm";
 import type { ApiKeyRole } from "../../../utils/keyFormat";
 import { invalidateWebhookEndpointCache } from "../../../interceptors/auth";
+import { apiKeyCache } from "../../../utils/apiKeyCache";
+import { authenticateMasterApiKey } from "../../../utils/authenticateMasterApiKey.ts";
 
 const createApiKeySchema = z.object({
   name: z.string().min(1, "Name is required").max(255),
@@ -47,29 +52,72 @@ export async function handleCreateApiKey(
 
   try {
     const auth = await authenticateHttpApiKey(request.headers.authorization);
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage API keys"
+      );
+    }
     builder.setApiKeyContext({ name: `create-key:${auth.apiKeyId}` });
 
     const body = await request.body;
+
+    if (
+      typeof body === "object" &&
+      body !== null &&
+      (body as Record<string, unknown>).role === "dashboard"
+    ) {
+      throw AuthError.permissionDenied(
+        "Dashboard role creation is reserved for master keys"
+      );
+    }
+
     const validated = createApiKeySchema.parse(body);
+
+    if (
+      validated.role === "production" &&
+      !validated.webhookUrl.startsWith("https://")
+    ) {
+      builder.setError(400, {
+        type: "ValidationError",
+        message: "Production webhook URLs must use HTTPS",
+      });
+      reply.code(400);
+      return { error: "Production webhook URLs must use HTTPS" };
+    }
 
     const apiKey = generateAPIKey(validated.role as ApiKeyRole);
     const apiKeyHash = hashAPIKey(apiKey);
     const now = DateTime.utc();
     const expiresAt = now.plus({ seconds: validated.expiresIn });
 
-    const keyRecord = await createApiKey({
-      name: validated.name,
-      key: apiKeyHash,
-      role: validated.role,
-      expiresAt: expiresAt.toISO(),
-    });
+    const db = getPostgresDB();
+    const { keyRecord, endpoint } = await executeInTransaction(
+      db,
+      "create API key",
+      async (txn) => {
+        const rec = await createApiKey(
+          {
+            name: validated.name,
+            key: apiKeyHash,
+            role: validated.role,
+            expiresAt: expiresAt.toISO(),
+            projectId: auth.projectId,
+          },
+          txn
+        );
 
-    const keyPair = generateWebhookKeyPair();
-    const endpoint = await upsertWebhookEndpoint(
-      keyRecord.id,
-      validated.webhookUrl,
-      keyPair.privateKeyPem,
-      keyPair.publicKeyPrefixed
+        const keyPair = generateWebhookKeyPair();
+        const ep = await upsertWebhookEndpoint(
+          auth.projectId,
+          rec.id,
+          validated.webhookUrl,
+          keyPair.privateKeyPem,
+          keyPair.publicKeyPrefixed,
+          txn
+        );
+
+        return { keyRecord: rec, endpoint: ep };
+      }
     );
     invalidateWebhookEndpointCache(keyRecord.id);
 
@@ -91,6 +139,18 @@ export async function handleCreateApiKey(
     Sentry.captureException(error, {
       extra: { context: "create API key handler" },
     });
+
+    if (
+      error instanceof StorageError &&
+      error.type === "CONSTRAINT_VIOLATION"
+    ) {
+      builder.setError(409, {
+        type: "ConflictError",
+        message: "An API key with this name already exists",
+      });
+      reply.code(409);
+      return { error: "An API key with this name already exists" };
+    }
 
     if (error instanceof AuthError) {
       builder.setError(401, { type: error.type, message: error.message });
@@ -127,7 +187,12 @@ export async function handleListApiKeys(
   );
 
   try {
-    await authenticateHttpApiKey(request.headers.authorization);
+    const auth = await authenticateHttpApiKey(request.headers.authorization);
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage API keys"
+      );
+    }
 
     const db = getPostgresDB();
     const keys = await db
@@ -151,7 +216,11 @@ export async function handleListApiKeys(
         )
       )
       .where(
-        and(ne(apiKeysTable.role, "dashboard"), eq(apiKeysTable.revoked, false))
+        and(
+          eq(apiKeysTable.projectId, auth.projectId),
+          ne(apiKeysTable.role, "dashboard"),
+          eq(apiKeysTable.revoked, false)
+        )
       )
       .orderBy(apiKeysTable.createdAt);
 
@@ -189,20 +258,31 @@ export async function handleRevokeApiKey(
   );
 
   try {
-    await authenticateHttpApiKey(request.headers.authorization);
+    const auth = await authenticateHttpApiKey(request.headers.authorization);
+    if (auth.role !== "dashboard") {
+      throw AuthError.permissionDenied(
+        "Only dashboard keys can manage API keys"
+      );
+    }
 
     const params = request.params as { id: string };
     const db = getPostgresDB();
     const now = DateTime.utc().toISO();
 
-    const result = await db
+    const [revokedRow] = await db
       .update(apiKeysTable)
       .set({ revoked: true, revokedAt: now })
       .where(
-        and(eq(apiKeysTable.id, params.id), eq(apiKeysTable.revoked, false))
-      );
+        and(
+          eq(apiKeysTable.projectId, auth.projectId),
+          eq(apiKeysTable.id, params.id),
+          eq(apiKeysTable.revoked, false),
+          ne(apiKeysTable.role, "dashboard")
+        )
+      )
+      .returning({ key: apiKeysTable.key });
 
-    if ((result.count ?? 0) === 0) {
+    if (!revokedRow) {
       builder.setError(404, {
         type: "NotFoundError",
         message: "API key not found or already revoked",
@@ -210,6 +290,8 @@ export async function handleRevokeApiKey(
       reply.code(404);
       return { error: "API key not found or already revoked" };
     }
+
+    apiKeyCache.delete(revokedRow.key);
 
     builder.setSuccess(200);
     reply.code(200);
@@ -231,5 +313,109 @@ export async function handleRevokeApiKey(
     return { error: "Internal server error" };
   } finally {
     logger.emit(builder.build());
+  }
+}
+
+export async function handleCreateDashboardKey(
+  request: FastifyRequest,
+  reply: FastifyReply
+): Promise<Record<string, unknown> | { error: string }> {
+  const builder = createWideEventBuilder(
+    generateRequestId(),
+    request.method,
+    request.url
+  );
+
+  try {
+    const authHeader = request.headers.authorization;
+    authenticateMasterApiKey(authHeader);
+
+    const params = request.params as { projectId: string };
+
+    const project_id = params.projectId;
+
+    const existing = await getPostgresDB()
+      .select({ id: projectsTable.id })
+      .from(projectsTable)
+      .where(eq(projectsTable.id, project_id))
+      .limit(1);
+
+    if (existing.length === 0) {
+      builder.setError(404, {
+        type: "NotFound",
+        message: `Project with name '${project_id}' doesn't exist`,
+      });
+      reply.code(404);
+      return {
+        error: `Project with name '${project_id}' doesn't exist`,
+      };
+    }
+
+    const dashboardKey = generateAPIKey("dashboard");
+    const dashboardKeyHash = hashAPIKey(dashboardKey);
+    const expiresAt = DateTime.utc().plus({ years: 10 }).toISO()!;
+    const db = getPostgresDB();
+
+    await executeInTransaction(db, "rotate dashboard key", async (txn) => {
+      const existingKey = await txn
+        .select({ id: apiKeysTable.id, key: apiKeysTable.key })
+        .from(apiKeysTable)
+        .where(
+          and(
+            eq(apiKeysTable.projectId, project_id),
+            eq(apiKeysTable.name, "Default dashboard key"),
+            eq(apiKeysTable.role, "dashboard"),
+            eq(apiKeysTable.revoked, false)
+          )
+        )
+        .for("update")
+        .limit(1);
+
+      const existingDashboardKey = existingKey[0];
+      if (existingDashboardKey) {
+        await txn
+          .update(apiKeysTable)
+          .set({
+            key: dashboardKeyHash,
+            role: "dashboard",
+            expiresAt,
+          })
+          .where(eq(apiKeysTable.id, existingDashboardKey.id));
+
+        apiKeyCache.delete(existingDashboardKey.key);
+      } else {
+        await txn.insert(apiKeysTable).values({
+          projectId: project_id,
+          name: "Default dashboard key",
+          key: dashboardKeyHash,
+          role: "dashboard",
+          expiresAt,
+        });
+      }
+    });
+
+    builder.setSuccess(201);
+    reply.code(201);
+    return { projectId: project_id, apiKey: dashboardKey };
+  } catch (error) {
+    if (error instanceof AuthError) {
+      builder.setError(401, { type: error.type, message: error.message });
+      reply.code(401);
+      return { error: error.message };
+    }
+
+    if (error instanceof ZodError) {
+      const issues = error.issues
+        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+        .join("; ");
+      builder.setError(400, { type: "ValidationError", message: issues });
+      reply.code(400);
+      return { error: issues };
+    }
+
+    const err = error instanceof Error ? error : new Error(String(error));
+    builder.setError(500, { type: "InternalError", message: err.message });
+    reply.code(500);
+    return { error: "Internal server error" };
   }
 }

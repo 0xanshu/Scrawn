@@ -1,12 +1,14 @@
 import { getPostgresDB } from "../db";
 import { webhookEndpointsTable } from "../schema";
 import { eq, and, isNull } from "drizzle-orm";
+import type { PgTransaction } from "drizzle-orm/pg-core";
 import { StorageError } from "../../../../errors/storage";
 import { DateTime } from "luxon";
 
 export type WebhookEndpoint = typeof webhookEndpointsTable.$inferSelect;
 
 export async function getWebhookEndpointByApiKeyId(
+  projectId: string,
   apiKeyId: string
 ): Promise<WebhookEndpoint | undefined> {
   const db = getPostgresDB();
@@ -17,6 +19,7 @@ export async function getWebhookEndpointByApiKeyId(
       .from(webhookEndpointsTable)
       .where(
         and(
+          eq(webhookEndpointsTable.projectId, projectId),
           eq(webhookEndpointsTable.apiKeyId, apiKeyId),
           isNull(webhookEndpointsTable.deletedAt)
         )
@@ -33,12 +36,14 @@ export async function getWebhookEndpointByApiKeyId(
 }
 
 export async function upsertWebhookEndpoint(
+  projectId: string,
   apiKeyId: string,
   url: string,
   privateKey: string,
-  publicKey: string
+  publicKey: string,
+  txn?: PgTransaction<any, any, any>
 ): Promise<WebhookEndpoint> {
-  const db = getPostgresDB();
+  const db = txn ?? getPostgresDB();
 
   try {
     const now = DateTime.utc().toISO();
@@ -46,6 +51,7 @@ export async function upsertWebhookEndpoint(
     const [result] = await db
       .insert(webhookEndpointsTable)
       .values({
+        projectId,
         apiKeyId,
         url,
         privateKey,
@@ -85,6 +91,7 @@ export async function upsertWebhookEndpoint(
 }
 
 export async function deleteWebhookEndpoint(
+  projectId: string,
   apiKeyId: string
 ): Promise<boolean> {
   const db = getPostgresDB();
@@ -97,6 +104,7 @@ export async function deleteWebhookEndpoint(
       .set({ deletedAt: now })
       .where(
         and(
+          eq(webhookEndpointsTable.projectId, projectId),
           eq(webhookEndpointsTable.apiKeyId, apiKeyId),
           isNull(webhookEndpointsTable.deletedAt)
         )

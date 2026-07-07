@@ -6,9 +6,7 @@ import type {
 export type EventTypeLabel = "BASIC_USAGE" | "AI_TOKEN_USAGE" | "PAYMENT";
 
 export type EventTableName =
-  | "basic_usage_events"
-  | "ai_token_usage_events"
-  | "payment_events";
+  "basic_usage_events" | "ai_token_usage_events" | "payment_events";
 
 const EVENT_TYPE_TO_TABLE: Record<EventTypeLabel, EventTableName> = {
   BASIC_USAGE: "basic_usage_events",
@@ -43,50 +41,33 @@ export const OPERATOR_SQL: Record<string, string> = {
   NEQ: "!=",
 };
 
-interface EventTypeFilter {
-  operator: string;
-  value: string;
-}
+function canTableMatch(
+  group: QueryFilterGroup,
+  table: EventTableName
+): boolean {
+  const tableEventType = TABLE_TO_EVENT_TYPE[table];
 
-function collectEventTypeFilters(group: QueryFilterGroup): EventTypeFilter[] {
-  const filters: EventTypeFilter[] = [];
-  for (const c of group.conditions) {
+  const conditionResults = group.conditions.map((c) => {
     if (c.field === "eventType") {
-      filters.push({ operator: c.operator, value: c.value });
+      if (c.operator === "EQ") return c.value === tableEventType;
+      if (c.operator === "NEQ") return c.value !== tableEventType;
+      return true;
     }
+    return true;
+  });
+
+  const groupResults = group.groups.map((g) => canTableMatch(g, table));
+  const allResults = [...conditionResults, ...groupResults];
+
+  if (allResults.length === 0) return true;
+
+  if (group.logical === "AND") {
+    return allResults.every((res) => res);
+  } else {
+    return allResults.some((res) => res);
   }
-  for (const sub of group.groups) {
-    filters.push(...collectEventTypeFilters(sub));
-  }
-  return filters;
 }
 
 export function getTablesForRequest(where: QueryFilterGroup): EventTableName[] {
-  const filters = collectEventTypeFilters(where);
-  if (filters.length === 0) {
-    return [...ALL_TABLES];
-  }
-
-  const included = new Set<EventTableName>();
-  const excluded = new Set<EventTableName>();
-
-  for (const { operator, value } of filters) {
-    if (!(value in EVENT_TYPE_TO_TABLE)) continue;
-    const table = EVENT_TYPE_TO_TABLE[value as EventTypeLabel];
-    if (operator === "EQ") {
-      included.add(table);
-    } else if (operator === "NEQ") {
-      excluded.add(table);
-    }
-  }
-
-  if (included.size > 0) {
-    return [...included];
-  }
-
-  if (excluded.size > 0) {
-    return ALL_TABLES.filter((t) => !excluded.has(t));
-  }
-
-  return [];
+  return ALL_TABLES.filter((table) => canTableMatch(where, table));
 }

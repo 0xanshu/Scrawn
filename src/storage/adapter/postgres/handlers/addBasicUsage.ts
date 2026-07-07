@@ -28,7 +28,11 @@ export async function handleAddBasicUsage(
     connectionObject,
     "storing BASIC_USAGE event",
     async (txn) => {
-      const ensurePromise = ensureUserExists(event_data.userId, txn);
+      const ensurePromise = await ensureUserExists(
+        auth.projectId,
+        event_data.userId,
+        txn
+      );
 
       const reportedTimestamp = await validateAndPrepareTimestamp(
         event_data.reported_timestamp
@@ -38,6 +42,7 @@ export async function handleAddBasicUsage(
         const [result] = await txn
           .insert(basicUsageEventsTable)
           .values({
+            projectId: auth.projectId,
             eventId: event_data.eventId,
             idempotencyKey: event_data.idempotencyKey,
             reportedTimestamp,

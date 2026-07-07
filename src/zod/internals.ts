@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Currency } from "dodopayments/resources/misc";
 
 export interface FilterGroupOutput<C> {
   logical: "AND" | "OR";
@@ -33,10 +34,11 @@ export function createFilterGroupSchema<C extends z.ZodTypeAny>(
 }
 
 export const onboardingSchema = z.object({
+  name: z.string().min(1, "Project name is required").max(255),
   dodoLiveApiKey: z.string().min(1, "Dodo live API key is required"),
   dodoTestApiKey: z.string().min(1, "Dodo test API key is required"),
-  dodoLiveProductId: z.string().min(1, "Dodo live product ID is required"),
-  dodoTestProductId: z.string().min(1, "Dodo test product ID is required"),
-  currency: z.string().min(1, "Currency is required"),
+  currency: z
+    .enum(["usd", "eur", "gbp", "inr", "jpy"])
+    .transform((c) => c.toUpperCase() as Currency),
   redirectUrl: z.url("Redirect URL must be a valid URL"),
 });
